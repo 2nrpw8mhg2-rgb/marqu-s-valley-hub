@@ -582,16 +582,30 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
       let doneWrites = 0;
       setProgress({ phase: "A gravar registos", done: doneWrites, total: totalWrites });
 
-      for (const batch of chunkArray(updates, 100)) {
-        const linhas = batch.map((item) => item._linha);
+      // Deduplicate updates by id (keep the last occurrence) to avoid
+      // "ON CONFLICT DO UPDATE command cannot affect row a second time"
+      const updatesById = new Map<string, any>();
+      for (const u of updates) updatesById.set(u.id, u);
+      const dedupUpdates = Array.from(updatesById.values());
+
+      for (const batch of chunkArray(dedupUpdates, 100)) {
         const payload = batch.map(({ _linha, ...item }) => item);
         const { error } = await supabase.from("subempreiteiros").upsert(payload, { onConflict: "id" });
-        if (error) rep.erros.push({ linha: linhas[0], motivo: `Erro ao atualizar ${batch.length} registos: ${error.message}` });
-        else rep.atualizados += batch.length;
+        if (error) {
+          for (const item of batch) {
+            const { _linha, ...row } = item;
+            const { error: rowErr } = await supabase.from("subempreiteiros").upsert(row, { onConflict: "id" });
+            if (rowErr) rep.erros.push({ linha: _linha, motivo: rowErr.message });
+            else rep.atualizados++;
+          }
+        } else {
+          rep.atualizados += batch.length;
+        }
         doneWrites += batch.length;
         setProgress({ phase: "A gravar registos", done: doneWrites, total: totalWrites });
         await waitForUi();
       }
+
 
       for (const batch of chunkArray(inserts, 100)) {
         const payload = batch.map(({ _linha, ...item }) => item);
