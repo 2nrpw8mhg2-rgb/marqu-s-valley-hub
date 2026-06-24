@@ -1093,6 +1093,13 @@ function nomeCopia(nome: string) {
   return `${nome.slice(0, idx)} (cópia)${nome.slice(idx)}`;
 }
 
+function sanitizarNome(nome: string) {
+  // Storage Supabase só aceita ASCII + alguns símbolos. Remove acentos e
+  // substitui caracteres não permitidos por "_".
+  const semAcentos = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return semAcentos.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/_+/g, "_");
+}
+
 function formatBytes(n: number | null) {
   if (!n) return "—";
   if (n < 1024) return `${n} B`;
