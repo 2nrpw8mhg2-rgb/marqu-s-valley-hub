@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,11 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/orcamentos/$id")({
   head: () => ({ meta: [{ title: "Editor de orçamento — MV OS" }] }),
+  beforeLoad: ({ params }) => {
+    if (params.id === "decomposicao") {
+      throw redirect({ to: "/decomposicao-precos" });
+    }
+  },
   component: OrcamentoEditor,
 });
 
