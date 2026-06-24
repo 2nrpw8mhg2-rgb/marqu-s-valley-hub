@@ -9,38 +9,125 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppSubempreiteirosRouteImport } from './routes/_app/subempreiteiros'
+import { Route as AppObrasRouteImport } from './routes/_app/obras'
+import { Route as AppDocumentosRouteImport } from './routes/_app/documentos'
+import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppSubempreiteirosRoute = AppSubempreiteirosRouteImport.update({
+  id: '/subempreiteiros',
+  path: '/subempreiteiros',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppObrasRoute = AppObrasRouteImport.update({
+  id: '/obras',
+  path: '/obras',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDocumentosRoute = AppDocumentosRouteImport.update({
+  id: '/documentos',
+  path: '/documentos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/documentos': typeof AppDocumentosRoute
+  '/obras': typeof AppObrasRoute
+  '/subempreiteiros': typeof AppSubempreiteirosRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/documentos': typeof AppDocumentosRoute
+  '/obras': typeof AppObrasRoute
+  '/subempreiteiros': typeof AppSubempreiteirosRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/documentos': typeof AppDocumentosRoute
+  '/_app/obras': typeof AppObrasRoute
+  '/_app/subempreiteiros': typeof AppSubempreiteirosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/documentos'
+    | '/obras'
+    | '/subempreiteiros'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/documentos'
+    | '/obras'
+    | '/subempreiteiros'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/auth'
+    | '/_app/dashboard'
+    | '/_app/documentos'
+    | '/_app/obras'
+    | '/_app/subempreiteiros'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  AuthRoute: typeof AuthRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +135,58 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/subempreiteiros': {
+      id: '/_app/subempreiteiros'
+      path: '/subempreiteiros'
+      fullPath: '/subempreiteiros'
+      preLoaderRoute: typeof AppSubempreiteirosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/obras': {
+      id: '/_app/obras'
+      path: '/obras'
+      fullPath: '/obras'
+      preLoaderRoute: typeof AppObrasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/documentos': {
+      id: '/_app/documentos'
+      path: '/documentos'
+      fullPath: '/documentos'
+      preLoaderRoute: typeof AppDocumentosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppDashboardRoute: typeof AppDashboardRoute
+  AppDocumentosRoute: typeof AppDocumentosRoute
+  AppObrasRoute: typeof AppObrasRoute
+  AppSubempreiteirosRoute: typeof AppSubempreiteirosRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppDashboardRoute: AppDashboardRoute,
+  AppDocumentosRoute: AppDocumentosRoute,
+  AppObrasRoute: AppObrasRoute,
+  AppSubempreiteirosRoute: AppSubempreiteirosRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  AuthRoute: AuthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
