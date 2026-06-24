@@ -457,7 +457,83 @@ function PacoteDetailPage() {
         artigosJaIncluidos={new Set(artigos.map((a: any) => a.artigo_id).filter(Boolean))}
         onAdded={() => qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] })}
       />
+
+      <Dialog open={auditoriaOpen} onOpenChange={setAuditoriaOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Auditoria do pacote — {especialidade}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 max-h-[60vh] overflow-auto">
+            <div>
+              <h3 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                Artigos a rever ({auditoria?.sinalizados.length ?? 0})
+              </h3>
+              {auditoria && auditoria.sinalizados.length > 0 ? (
+                <div className="space-y-2">
+                  {auditoria.sinalizados.map((s: any) => (
+                    <div key={s.pacoteArtigoId} className="rounded-md border p-3 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-mono text-xs text-muted-foreground">{s.codigo}</div>
+                          <div>{s.descricao}</div>
+                          <div className="text-xs text-muted-foreground mt-1">{s.motivo}</div>
+                          {s.sugestao && (
+                            <Badge variant="outline" className="mt-1 text-[10px]">Sugestão: {s.sugestao}</Badge>
+                          )}
+                        </div>
+                        <Button size="sm" variant="ghost" onClick={() => removerArtigo(s.pacoteArtigoId)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Nenhum artigo a rever.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                <Plus className="h-4 w-4 text-emerald-600" />
+                Artigos em falta sugeridos ({auditoria?.sugeridos.length ?? 0})
+              </h3>
+              {auditoria && auditoria.sugeridos.length > 0 ? (
+                <div className="space-y-2">
+                  {auditoria.sugeridos.map((s: any) => (
+                    <div key={s.artigoId} className="rounded-md border p-3 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-mono text-xs text-muted-foreground">{s.codigo}</div>
+                          <div>{s.descricao}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Confiança {Math.round(s.confianca * 100)}% · {s.motivo}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground">
+                    Usa "Adicionar artigos" para os incluir manualmente.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Nenhum artigo em falta.
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setAuditoriaOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
+
   );
 }
 
