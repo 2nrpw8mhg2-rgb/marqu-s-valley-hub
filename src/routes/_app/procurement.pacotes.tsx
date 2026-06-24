@@ -741,14 +741,14 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
             <input type="checkbox" checked={skipExistentes} onChange={e => setSkipExistentes(e.target.checked)} />
             Ignorar artigos já incluídos noutros pacotes deste orçamento
           </label>
-          {preview && (
+          {subs && subs.length > 0 && (
             <div>
-              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Pré-visualização</Label>
-              <div className="mt-2 rounded-md border divide-y">
-                {Object.entries(preview).sort((a, b) => b[1] - a[1]).map(([esp, n]) => (
-                  <div key={esp} className="flex justify-between px-3 py-1.5 text-sm">
-                    <span>{esp}</span>
-                    <Badge variant="secondary">{n} art.</Badge>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Subempreitadas detetadas</Label>
+              <div className="mt-2 rounded-md border divide-y max-h-72 overflow-auto">
+                {subs.map(sub => (
+                  <div key={sub.key} className="flex justify-between px-3 py-1.5 text-sm">
+                    <span><span className="text-muted-foreground tabular-nums mr-2">{sub.key}</span>{sub.nome}</span>
+                    <Badge variant={sub.artigoCount > 0 ? "secondary" : "outline"}>{sub.artigoCount} art.</Badge>
                   </div>
                 ))}
               </div>
