@@ -134,6 +134,12 @@ function PacoteDetailPage() {
             <Button variant="outline" asChild>
               <Link to="/procurement/pacotes"><ArrowLeft className="h-4 w-4 mr-2" /> Voltar</Link>
             </Button>
+            <Button variant="outline" onClick={() => exportarExcel(nome || "pacote", especialidade, artigos)} disabled={artigos.length === 0}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+            </Button>
+            <Button variant="outline" onClick={() => exportarPDF(nome || "pacote", especialidade, pacote.orcamento?.nome, artigos)} disabled={artigos.length === 0}>
+              <FileText className="h-4 w-4 mr-2" /> PDF
+            </Button>
             <Button onClick={salvarHeader}><Save className="h-4 w-4 mr-2" /> Guardar</Button>
             <Button variant="default" onClick={prepararEnvio} disabled={artigos.length === 0}>
               <Send className="h-4 w-4 mr-2" /> Preparar envio
