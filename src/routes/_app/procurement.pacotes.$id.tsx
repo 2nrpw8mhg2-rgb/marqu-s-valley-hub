@@ -20,7 +20,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Save, Send, Trash2, Search, FileSpreadsheet, FileText, Users, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Plus, Save, Send, Trash2, Search, FileSpreadsheet, FileText, Users, Sparkles, AlertTriangle, CheckCircle2, MoreHorizontal, ArrowRightLeft } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -28,6 +28,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { ESPECIALIDADES, validarArtigoParaEspecialidade } from "@/lib/procurement/especialidades";
 import { reanalisarPacote, registarCorrecao } from "@/lib/procurement/classifier.functions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/_app/procurement/pacotes/$id")({
   head: () => ({ meta: [{ title: "Pacote — Procurement — MV OS" }] }),
@@ -179,6 +182,8 @@ function PacoteDetailPage() {
   const [auditoriaOpen, setAuditoriaOpen] = useState(false);
   const [auditoria, setAuditoria] = useState<{ sinalizados: any[]; sugeridos: any[] } | null>(null);
   const [reanalising, setReanalising] = useState(false);
+  const [moverState, setMoverState] = useState<{ artigo: any | null; destinoId: string }>({ artigo: null, destinoId: "" });
+  const [movendo, setMovendo] = useState(false);
   const reanalisar = useServerFn(reanalisarPacote);
   const registar = useServerFn(registarCorrecao);
 
@@ -255,6 +260,57 @@ function PacoteDetailPage() {
     const { error } = await supabase.from("procurement_pacote_artigos").update(patch).eq("id", artigoId);
     if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] });
+  }
+
+  const { data: outrosPacotes = [] } = useQuery({
+    queryKey: ["procurement-pacotes-do-orcamento", pacote?.orcamento_id],
+    enabled: !!pacote?.orcamento_id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("procurement_pacotes")
+        .select("id, nome, especialidade")
+        .eq("orcamento_id", pacote!.orcamento_id)
+        .neq("id", id)
+        .order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  async function confirmarMover() {
+    const art = moverState.artigo;
+    const destinoId = moverState.destinoId;
+    if (!art || !destinoId) return;
+    const destino = outrosPacotes.find((p: any) => p.id === destinoId);
+    if (!destino) return;
+    setMovendo(true);
+    // 1) update pacote_id + especialidade do artigo
+    const { error } = await supabase
+      .from("procurement_pacote_artigos")
+      .update({
+        pacote_id: destinoId,
+        especialidade: destino.especialidade,
+        sinalizado_revisao: false,
+        motivo: `Movido manualmente de "${especialidade}" para "${destino.especialidade}"`,
+        confianca: 1,
+      })
+      .eq("id", art.id);
+    setMovendo(false);
+    if (error) { toast.error(error.message); return; }
+    // 2) aprendizagem
+    registar({ data: {
+      artigo: { codigo: art.codigo, descricao: art.descricao, capitulo: art.capitulo, subcapitulo: art.subcapitulo },
+      especialidadeAnterior: especialidade,
+      especialidadeFinal: destino.especialidade,
+      confiancaAnterior: art.confianca ?? null,
+      obraId: (pacote?.orcamento as any)?.obra?.id ?? null,
+      acao: "move",
+    }}).catch(() => {});
+    toast.success(`Artigo movido para "${destino.nome}"`);
+    setMoverState({ artigo: null, destinoId: "" });
+    qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] });
+    qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", destinoId] });
+    qc.invalidateQueries({ queryKey: ["procurement-pacotes"] });
   }
 
   async function correrAuditoria() {
@@ -438,9 +494,30 @@ function PacoteDetailPage() {
                       {fmtEUR(Number(a.quantidade ?? 0) * Number(a.preco_seco_estimado ?? 0))}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => removerArtigo(a.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => setMoverState({ artigo: a, destinoId: "" })}
+                            disabled={outrosPacotes.length === 0}
+                          >
+                            <ArrowRightLeft className="h-4 w-4 mr-2" />
+                            Mover para outro pacote
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => removerArtigo(a.id)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Remover do pacote
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                   );
@@ -529,6 +606,54 @@ function PacoteDetailPage() {
           </div>
           <DialogFooter>
             <Button onClick={() => setAuditoriaOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!moverState.artigo} onOpenChange={(v) => !v && setMoverState({ artigo: null, destinoId: "" })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mover artigo para outro pacote</DialogTitle>
+          </DialogHeader>
+          {moverState.artigo && (
+            <div className="space-y-4">
+              <div className="rounded-md border p-3 text-sm bg-muted/30">
+                <div className="font-mono text-xs text-muted-foreground">{moverState.artigo.codigo ?? "—"}</div>
+                <div>{moverState.artigo.descricao}</div>
+                <div className="text-xs text-muted-foreground mt-1">Pacote atual: <span className="font-medium">{especialidade}</span></div>
+              </div>
+              <div>
+                <Label>Pacote de destino</Label>
+                {outrosPacotes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Não existem outros pacotes neste orçamento.
+                  </p>
+                ) : (
+                  <Select
+                    value={moverState.destinoId}
+                    onValueChange={(v) => setMoverState((s) => ({ ...s, destinoId: v }))}
+                  >
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Escolher pacote..." /></SelectTrigger>
+                    <SelectContent>
+                      {outrosPacotes.map((p: any) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nome} <span className="text-muted-foreground">· {p.especialidade}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Esta correção é guardada na base de aprendizagem para melhorar a classificação em obras futuras.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoverState({ artigo: null, destinoId: "" })}>Cancelar</Button>
+            <Button onClick={confirmarMover} disabled={!moverState.destinoId || movendo}>
+              {movendo ? "A mover..." : "Mover artigo"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
