@@ -253,9 +253,9 @@ function pontuar(a: ArtigoCtx, vizinhos: ArtigoCtx[]): ResultadoClassificacao {
 
   if (scores.size === 0) {
     return {
-      especialidade: ehBetao ? "Betão" : "Outros",
+      especialidade: ehBetao ? "Betão" : "Por Classificar",
       confianca: ehBetao ? 0.85 : 0.1,
-      motivo: ehBetao ? "Reconhecido como trabalho de betão" : "Sem sinais reconhecidos",
+      motivo: ehBetao ? "Reconhecido como trabalho de betão" : "Sem palavras-chave técnicas suficientes",
       scores: ehBetao ? { "Betão": 80 } : {},
       alternativas: [],
     };
