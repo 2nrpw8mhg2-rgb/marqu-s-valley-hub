@@ -303,7 +303,7 @@ function AdicionarArtigosDialog({
       return {
         pacote_id: pacoteId, artigo_id: a.id, codigo: a.codigo, descricao: a.descricao,
         unidade: a.unidade, quantidade: a.quantidade,
-        capitulo: a.capitulo?.nome ?? null, subcapitulo: null,
+        capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
         preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
         categoria_custo: null, especialidade,
       };
@@ -346,7 +346,7 @@ function AdicionarArtigosDialog({
                     <TableCell><Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggle(a.id)} /></TableCell>
                     <TableCell className="font-mono text-xs">{a.codigo ?? "—"}</TableCell>
                     <TableCell className="text-sm max-w-md truncate">{a.descricao}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{a.capitulo?.nome ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{a.capitulo?.descricao ?? "—"}</TableCell>
                     <TableCell className="text-right text-sm">{Number(a.quantidade).toFixed(2)}</TableCell>
                     <TableCell className="text-right text-sm">{fmtEUR(Number(a.preco_unitario))}</TableCell>
                   </TableRow>

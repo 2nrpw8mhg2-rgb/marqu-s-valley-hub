@@ -358,7 +358,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
     const c: Record<string, number> = {};
     (artigos ?? []).forEach((a: any) => {
       const esp = inferirEspecialidade({
-        descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.nome,
+        descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.descricao,
       });
       c[esp] = (c[esp] ?? 0) + 1;
     });
@@ -389,7 +389,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
       const grupos = new Map<Especialidade, any[]>();
       (artigos ?? []).forEach((a: any) => {
         const esp = inferirEspecialidade({
-          descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.nome,
+          descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.descricao,
         });
         if (!selecionadas.has(esp)) return;
         if (!grupos.has(esp)) grupos.set(esp, []);
@@ -417,7 +417,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
             return {
               pacote_id: novo.id, artigo_id: a.id, codigo: a.codigo, descricao: a.descricao,
               unidade: a.unidade, quantidade: a.quantidade,
-              capitulo: a.capitulo?.nome ?? null, subcapitulo: null,
+              capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
               preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
               categoria_custo: null, especialidade: esp,
             };
@@ -585,7 +585,7 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
     const counts: Record<string, number> = {};
     (artigos ?? []).forEach((a: any) => {
       const esp = inferirEspecialidade({
-        descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.nome,
+        descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.descricao,
       });
       counts[esp] = (counts[esp] ?? 0) + 1;
     });
@@ -616,7 +616,7 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
       (artigos ?? []).forEach((a: any) => {
         if (jaIncluidos.has(a.id)) return;
         const esp = inferirEspecialidade({
-          descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.nome,
+          descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.descricao,
         });
         if (!grupos.has(esp)) grupos.set(esp, []);
         grupos.get(esp)!.push(a);
@@ -646,7 +646,7 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
           return {
             pacote_id: novo.id, artigo_id: a.id, codigo: a.codigo, descricao: a.descricao,
             unidade: a.unidade, quantidade: a.quantidade,
-            capitulo: a.capitulo?.nome ?? null, subcapitulo: null,
+            capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
             preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
             categoria_custo: null, especialidade: esp,
           };
