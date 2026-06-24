@@ -670,11 +670,14 @@ function PacoteDetailPage() {
                   value={moverState.destinoId}
                   onValueChange={(v) => setMoverState((s) => ({ ...s, destinoId: v }))}
                 >
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Escolher especialidade..." /></SelectTrigger>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Escolher subempreitada..." /></SelectTrigger>
                   <SelectContent>
-                    {opcoesDestino.map((o) => (
-                      <SelectItem key={o.especialidade} value={o.especialidade}>
-                        {o.especialidade}
+                    {opcoesDestino.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">Sem subempreitadas no orçamento.</div>
+                    ) : opcoesDestino.map((o) => (
+                      <SelectItem key={o.key} value={o.key}>
+                        <span className="tabular-nums text-muted-foreground mr-2">{o.codigo}</span>
+                        {o.nome}
                         {o.pacote ? (
                           <span className="text-muted-foreground"> · pacote existente</span>
                         ) : (
@@ -686,7 +689,7 @@ function PacoteDetailPage() {
                 </Select>
               </div>
               <p className="text-xs text-muted-foreground">
-                Se o pacote da especialidade escolhida ainda não existir neste orçamento, será criado automaticamente. A correção é guardada na base de aprendizagem para melhorar a classificação em obras futuras.
+                Se a subempreitada escolhida ainda não tiver pacote neste orçamento, será criado automaticamente. A correção é guardada na base de aprendizagem para melhorar a classificação em obras futuras.
               </p>
             </div>
           )}
