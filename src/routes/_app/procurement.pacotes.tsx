@@ -29,6 +29,7 @@ import {
   Plus, Sparkles, MoreHorizontal, Trash2, Copy, Pencil, Send, FolderOpen, ShoppingCart,
 } from "lucide-react";
 import { ESPECIALIDADES, inferirEspecialidade, classificarArtigo, CONFIANCA_MINIMA, validarArtigoParaEspecialidade, isBetaoArtigo, type Especialidade } from "@/lib/procurement/especialidades";
+import { pertenceAoPacote } from "@/lib/procurement/classifier";
 
 const BETAO_KEY = "__betao__";
 
