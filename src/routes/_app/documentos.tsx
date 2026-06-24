@@ -34,6 +34,7 @@ import {
   ChevronRight,
   Pencil,
   FolderInput,
+  FolderUp,
   Copy,
   Home,
   Building2,
@@ -172,6 +173,7 @@ function DocumentosPage() {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   // Limpa selecção ao mudar de pasta
   useEffect(() => {
@@ -295,10 +297,161 @@ function DocumentosPage() {
     invalidar();
   };
 
+  const traverseEntry = (entry: any): Promise<{ file: File; path: string }[]> =>
+    new Promise((resolve) => {
+      if (!entry) return resolve([]);
+      if (entry.isFile) {
+        entry.file(
+          (f: File) =>
+            resolve([{ file: f, path: (entry.fullPath || "/" + f.name).replace(/^\//, "") }]),
+          () => resolve([]),
+        );
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const all: any[] = [];
+        const readBatch = () => {
+          reader.readEntries(async (batch: any[]) => {
+            if (batch.length === 0) {
+              const nested = await Promise.all(all.map(traverseEntry));
+              resolve(nested.flat());
+            } else {
+              all.push(...batch);
+              readBatch();
+            }
+          }, () => resolve([]));
+        };
+        readBatch();
+      } else resolve([]);
+    });
+
+  const ensurePastaPath = async (
+    segments: string[],
+    rootId: string,
+    cache: Map<string, string>,
+  ): Promise<string> => {
+    let parentId = rootId;
+    for (const seg of segments) {
+      const key = parentId + "::" + seg.toLowerCase();
+      if (cache.has(key)) {
+        parentId = cache.get(key)!;
+        continue;
+      }
+      const { data: existing } = await supabase
+        .from("documento_pastas")
+        .select("id")
+        .eq("obra_id", obraId!)
+        .eq("parent_id", parentId)
+        .ilike("nome", seg)
+        .maybeSingle();
+      if (existing?.id) {
+        parentId = existing.id;
+      } else {
+        const { data: created, error } = await supabase
+          .from("documento_pastas")
+          .insert({ obra_id: obraId!, parent_id: parentId, nome: seg, is_default: false })
+          .select("id")
+          .single();
+        if (error) throw error;
+        parentId = created!.id;
+      }
+      cache.set(key, parentId);
+    }
+    return parentId;
+  };
+
+  const subirArvore = async (items: { file: File; path: string }[]) => {
+    if (!items.length || !obraId || !pastaActualId) return;
+    const validos = items.filter((i) => i.file.size <= MAX_BYTES);
+    const grandes = items.length - validos.length;
+    if (grandes) toast.error(`${grandes} ficheiro(s) excedem 200 MB e foram ignorados`);
+    if (!validos.length) return;
+
+    setUploading(true);
+    setUploadProgress({ done: 0, total: validos.length });
+    const cache = new Map<string, string>();
+    const { data: { user } } = await supabase.auth.getUser();
+    let sucesso = 0;
+    let ignorados = 0;
+
+    for (const item of validos) {
+      try {
+        const parts = item.path.split("/").filter(Boolean);
+        const fileName = parts.pop()!;
+        const destinoPastaId = parts.length
+          ? await ensurePastaPath(parts, pastaActualId, cache)
+          : pastaActualId;
+
+        const { data: ex } = await supabase
+          .from("documentos")
+          .select("id")
+          .eq("pasta_id", destinoPastaId)
+          .ilike("nome", fileName)
+          .maybeSingle();
+        if (ex?.id) {
+          ignorados++;
+          setUploadProgress((p) => ({ ...p, done: p.done + 1 }));
+          continue;
+        }
+
+        const path = `${user?.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${sanitizarNome(fileName)}`;
+        const { error: upErr } = await supabase.storage.from("documentos").upload(path, item.file);
+        if (upErr) {
+          toast.error(`${fileName}: ${upErr.message}`);
+          setUploadProgress((p) => ({ ...p, done: p.done + 1 }));
+          continue;
+        }
+        const { error } = await supabase.from("documentos").insert({
+          nome: fileName,
+          tipo: "outro" as const,
+          obra_id: obraId,
+          pasta_id: destinoPastaId,
+          storage_path: path,
+          tamanho: item.file.size,
+          mime_type: item.file.type || null,
+          uploaded_by: user?.id,
+        });
+        if (error) {
+          await supabase.storage.from("documentos").remove([path]);
+          toast.error(`${fileName}: ${error.message}`);
+        } else {
+          sucesso++;
+        }
+      } catch (e: any) {
+        toast.error(e.message ?? "Falha ao carregar");
+      }
+      setUploadProgress((p) => ({ ...p, done: p.done + 1 }));
+    }
+
+    setUploading(false);
+    if (sucesso > 0) toast.success(`${sucesso} ficheiro(s) carregados com estrutura preservada`);
+    if (ignorados > 0) toast.info(`${ignorados} ficheiro(s) já existiam e foram ignorados`);
+    invalidar();
+  };
+
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     if (!pastaActualId) return;
+    const dtItems = e.dataTransfer.items;
+    if (dtItems && dtItems.length && (dtItems[0] as any).webkitGetAsEntry) {
+      const entries: any[] = [];
+      for (let i = 0; i < dtItems.length; i++) {
+        const ent = (dtItems[i] as any).webkitGetAsEntry?.();
+        if (ent) entries.push(ent);
+      }
+      if (entries.length) {
+        const all = (await Promise.all(entries.map(traverseEntry))).flat();
+        const hasFolder = entries.some((en) => en.isDirectory);
+        if (hasFolder) {
+          await subirArvore(all);
+          return;
+        }
+        if (all.length) {
+          await subirFicheiros(all.map((x) => x.file));
+          return;
+        }
+      }
+    }
     const files = Array.from(e.dataTransfer.files);
     if (files.length) await subirFicheiros(files);
   };
