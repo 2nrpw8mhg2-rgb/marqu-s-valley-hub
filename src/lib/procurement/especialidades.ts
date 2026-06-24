@@ -327,29 +327,38 @@ export function validarArtigoParaEspecialidade(a: ArtigoInput, especialidade: st
 }
 
 // =============================================================
-// Pacote "Betão" — sempre presente em qualquer obra. Identifica
-// artigos relacionados com betão / estruturas em betão mesmo que
-// estejam dispersos noutros capítulos (estruturas, bases de
-// pavimentos, lajes de cobertura, fundações, etc.).
+// Pacote "Betão" — sempre presente em qualquer obra, mas com filtro estrito.
+// Só entram artigos cujo trabalho principal é execução/aplicação de betão
+// ou elementos estruturais em betão. Referências ocasionais a betão como
+// suporte/base de outros trabalhos (pinturas, tetos falsos, revestimentos,
+// redes, caixas, etc.) não entram no pacote.
 // =============================================================
 
-const BETAO_DESC_RX = /\b(bet[ãa]o|betonagem|betonilha|sapatas?|ensoleiramento|cofrag\w*|armaduras?\s+(?:em|para|de)|ma[çc]i[çc]os?|micro\s*estacas?|muros?\s+de\s+(?:suporte|conten[çc][ãa]o|tens[ãa]o)|escadas?\s+em\s+bet|enchimentos?\s+(?:em\s+)?bet|regulariza[çc][ãa]o\s+(?:em\s+)?bet|malha\s+electrossoldada|ferro\s+para\s+bet|c\s*\d{2}\s*\/\s*\d{2}\b|\bxc\s*\d|estruturas?\s+mistas?|vigas?\s+(?:de\s+funda[çc][ãa]o|de\s+borda|de\s+lintel|principais?|secund[áa]rias?|em\s+bet|de\s+bet|de\s+contorno|de\s+coroamento|\/p[óo]rticos?|p[óo]rticos?))\b/i;
+const BETAO_FORTE_RX = /\b(betonagem|bet[ãa]o\s+(?:armado|pronto|de\s+regulariza[çc][ãa]o|tipo\s+c\s*\d{2}\s*\/\s*\d{2})|central\s+de\s+bet[ãa]o|c\s*\d{2}\s*\/\s*\d{2}\b|\bxc\s*\d|d\s*m[áa]x|dmax|cl\s*0[,\.]?\s*4|malha\s+electrossoldada|malhasol|a\s*400\s*nr|a\s*500\s*el)\b/i;
+const BETAO_TRABALHO_RX = /\b(execu[çc][ãa]o|aplica[çc][ãa]o|realizado|fabricado|betonagem|regulariza[çc][ãa]o|cofragem|descofragem|armaduras?)\b/i;
+const BETAO_ELEMENTO_RX = /\b(sapatas?|vigas?(?:\s+de\s+funda[çc][ãa]o|\/p[óo]rticos?|\s*p[óo]rticos?)?|pilares?|lajes?|ensoleiramento|funda[çc][õo]es?|funda[çc][ãa]o|base\s+de\s+pavimento|bases\s+de\s+pavimentos|pavimento\s+t[ée]rreo|muros?\s+de\s+(?:suporte|conten[çc][ãa]o|tens[ãa]o))\b/i;
+const BETAO_CONTEXTO_RX = /\b(estruturas?|bet[ãa]o\s+armado|bases?\s+de\s+pavimentos?|funda[çc][õo]es?)\b/i;
 
-// Padrões soltos (viga/pilar/laje/sapata) — aceites quando o capítulo é
-// claramente estrutural OU quando o próprio artigo contém betão.
-const BETAO_SOFT_RX = /\b(vigas?|pilares?|lajes?|sapatas?|funda[çc][õo]es?|funda[çc][ãa]o)\b/i;
-const CAP_ESTRUTURAL_RX = /\b(estruturas?|funda[çc][õo]es?|bet[ãa]o|bases?\s+de\s+pavimentos?)\b/i;
-
-// Negativos: "viga/pilar/laje" referem-se claramente a outro material.
-const BETAO_NEG_RX = /\b(em\s+madeira|de\s+madeira|em\s+alum[íi]nio|de\s+alum[íi]nio|em\s+pvc|gesso\s*cartonado|pladur|laje\s+de\s+gesso)\b/i;
+// Trabalhos onde "betão" costuma ser apenas suporte/substrato ou elemento
+// acessório. Só passam se a própria descrição for claramente uma execução de
+// laje/base/elemento em betão.
+const BETAO_EXCLUIR_RX = /\b(betonilha|pinturas?|tintas?|prim[áa]rios?|dem[ãa]os?|sikagard|tetos?\s+falsos?|tectos?\s+falsos?|gesso\s*laminado|gesso\s*cartonado|pladur|knauf|placas?\s+de\s+gesso|revestimentos?|tijoleira|ladrilhos?|mosaicos?|cer[âa]mic[ao]s?|colagem|isolamento|impermeabiliza[çc][ãa]o|telas?|caixas?\s+de\s+visita|po[çc]o\s+de\s+infiltra[çc][ãa]o|rede\s+de\s+esgotos?|canaliza[çc][õo]es?|perfis?\s+em\s+a[çc]o|estrutura\s+met[áa]lica|em\s+madeira|de\s+madeira|em\s+alum[íi]nio|de\s+alum[íi]nio|em\s+pvc)\b/i;
+const BETAO_EXCLUSAO_PERMITIDA_RX = /\b(execu[çc][ãa]o\s+de\s+(?:base\s+de\s+pavimento|laje)|laje\s+(?:mista|aligeirada|de\s+pavimento|em\s+bet[ãa]o)|pavimento\s+t[ée]rreo\s+em\s+bet[ãa]o)\b/i;
 
 export function isBetaoArtigo(a: ArtigoInput): boolean {
   const desc = (a.descricao ?? "").toString();
   const chap = `${a.capitulo ?? ""} ${a.subcapitulo ?? ""}`;
   const hay = `${desc} ${chap}`;
-  if (BETAO_NEG_RX.test(desc) && !/\bbet[ãa]o\b/i.test(desc)) return false;
-  if (BETAO_DESC_RX.test(hay)) return true;
-  if (CAP_ESTRUTURAL_RX.test(chap) && BETAO_SOFT_RX.test(desc)) return true;
+  const descTemBetaoForte = BETAO_FORTE_RX.test(desc);
+  const contextoTemBetaoForte = BETAO_FORTE_RX.test(chap);
+  const temElemento = BETAO_ELEMENTO_RX.test(desc);
+  const temTrabalhoBetao = BETAO_TRABALHO_RX.test(desc);
+  const exclusaoPrimaria = BETAO_EXCLUIR_RX.test(desc) || BETAO_EXCLUIR_RX.test(chap);
+
+  if (exclusaoPrimaria && !BETAO_EXCLUSAO_PERMITIDA_RX.test(desc)) return false;
+  if (descTemBetaoForte && (temTrabalhoBetao || temElemento || BETAO_CONTEXTO_RX.test(chap))) return true;
+  if (contextoTemBetaoForte && temElemento && !exclusaoPrimaria) return true;
+  if (/\b(betonagem|cofragem|descofragem)\b/i.test(desc) && /\bbet[ãa]o\b/i.test(hay)) return true;
   return false;
 }
 
