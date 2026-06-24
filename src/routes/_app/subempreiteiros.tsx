@@ -311,33 +311,131 @@ type ImportRow = {
 };
 
 type ImportReport = { criados: number; atualizados: number; duplicados: number; erros: { linha: number; motivo: string }[] };
+type RawImportRow = { linha: number; values: Record<string, unknown> };
 
 const HEADER_MAP: Record<string, keyof ImportRow | "skip"> = {
   tipo: "tipo",
+  tipodeentidade: "tipo",
+  categoria: "tipo",
   especialidade: "especialidades",
   especialidades: "especialidades",
+  area: "especialidades",
+  areas: "especialidades",
+  atividadade: "especialidades",
+  atividade: "especialidades",
+  atividades: "especialidades",
   empresa: "nome",
+  empresas: "nome",
   nome: "nome",
+  nomeempresa: "nome",
+  empresanome: "nome",
   nomedaempresa: "nome",
+  nomedempresa: "nome",
+  fornecedor: "nome",
+  fornecedores: "nome",
+  subempreiteiro: "nome",
+  subempreiteiros: "nome",
+  entidade: "nome",
+  razaosocial: "nome",
+  designacao: "nome",
+  designacaosocial: "nome",
+  nomecomercial: "nome",
   nif: "nif",
+  nifnipc: "nif",
+  nipc: "nif",
+  contribuinte: "nif",
+  numerocontribuinte: "nif",
   contactosemail: "emails",
+  contactoemail: "emails",
+  emailcontacto: "emails",
   email: "emails",
   emails: "emails",
+  mail: "emails",
+  correioeletronico: "emails",
   contactospessoais: "contacto_nome",
+  contactos: "contacto_nome",
   contacto: "contacto_nome",
   contactonome: "contacto_nome",
+  nomecontacto: "contacto_nome",
+  pessoacontacto: "contacto_nome",
+  responsavel: "contacto_nome",
   ndetelemoveis: "telefones",
   ndetelemovel: "telefones",
+  ntelemovel: "telefones",
+  ntelemoveis: "telefones",
+  numerotelemovel: "telefones",
+  numerostelemoveis: "telefones",
   telemovel: "telefones",
   telemoveis: "telefones",
   telefone: "telefones",
   telefones: "telefones",
+  tlm: "telefones",
+  tel: "telefones",
+  contactoTelefonico: "telefones",
   distrito: "distrito",
   concelho: "concelho",
+  municipio: "concelho",
   zona: "zonas",
   zonas: "zonas",
   zonadeatuacao: "zonas",
+  zonasdeatuacao: "zonas",
+  zonageografica: "zonas",
 };
+
+const DEFAULT_IMPORT_HEADERS = [
+  "TIPO",
+  "ESPECIALIDADE",
+  "EMPRESA",
+  "NIF",
+  "CONTACTOS EMAIL",
+  "CONTACTOS PESSOAIS",
+  "Nº DE TELEMÓVEIS",
+  "DISTRITO",
+  "CONCELHO",
+  "ZONA",
+];
+
+function detectHeaderRow(matrix: unknown[][]) {
+  let best = { index: -1, headers: [] as string[], score: 0, hasName: false };
+
+  matrix.slice(0, 60).forEach((row, index) => {
+    const headers = row.map((cell) => String(cell ?? "").trim());
+    const mapped = headers.map((h) => HEADER_MAP[normKey(h)]).filter(Boolean);
+    const unique = new Set(mapped);
+    const hasName = unique.has("nome");
+    const score = unique.size + (hasName ? 4 : 0);
+    if (score > best.score) best = { index, headers, score, hasName };
+  });
+
+  return best.hasName && best.score >= 5 ? best : null;
+}
+
+function buildRowsFromSheet(sheet: XLSX.WorkSheet): RawImportRow[] {
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    defval: "",
+    blankrows: false,
+    raw: false,
+  }) as unknown[][];
+
+  if (matrix.length === 0) return [];
+
+  const detected = detectHeaderRow(matrix);
+  const headerIndex = detected?.index ?? -1;
+  const headers = detected?.headers.length ? detected.headers : DEFAULT_IMPORT_HEADERS;
+  const dataRows = matrix.slice(headerIndex + 1);
+
+  return dataRows
+    .map((row, idx) => {
+      const values: Record<string, unknown> = {};
+      headers.forEach((header, colIndex) => {
+        if (!header) return;
+        values[header] = row[colIndex] ?? "";
+      });
+      return { linha: (headerIndex >= 0 ? headerIndex : 0) + idx + 2, values };
+    })
+    .filter(({ values }) => Object.values(values).some((v) => String(v ?? "").trim() !== ""));
+}
 
 function parseRow(raw: Record<string, unknown>, headers: string[]): ImportRow | null {
   const r: ImportRow = {
