@@ -33,6 +33,7 @@ const sections: { title: string; items: NavItem[] }[] = [
     title: "Fase 2 — Orçamentação",
     items: [
       { to: "/orcamentos", label: "Orçamentos", icon: Calculator },
+      { to: "/orcamentos", label: "Decomposição de Preços", icon: Layers },
       { to: "/biblioteca", label: "Biblioteca de Artigos", icon: BookMarked },
     ],
   },
