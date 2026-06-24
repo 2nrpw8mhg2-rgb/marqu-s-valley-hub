@@ -222,7 +222,7 @@ function PacotesListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
+                  <TableHead>Pacote geral</TableHead>
                   <TableHead>Especialidade</TableHead>
                   <TableHead>Orçamento</TableHead>
                   <TableHead className="text-right">Artigos</TableHead>
