@@ -235,8 +235,19 @@ function PacoteDetailPage() {
   }
 
   async function removerArtigo(artigoId: string) {
+    const art = artigos.find((a: any) => a.id === artigoId);
     const { error } = await supabase.from("procurement_pacote_artigos").delete().eq("id", artigoId);
     if (error) { toast.error(error.message); return; }
+    if (art) {
+      registar({ data: {
+        artigo: { codigo: art.codigo, descricao: art.descricao, capitulo: art.capitulo, subcapitulo: art.subcapitulo },
+        especialidadeAnterior: especialidade,
+        especialidadeFinal: "__removido__",
+        confiancaAnterior: art.confianca ?? null,
+        obraId: (pacote?.orcamento as any)?.obra?.id ?? null,
+        acao: "remove",
+      }}).catch(() => {});
+    }
     qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] });
   }
 
@@ -245,6 +256,26 @@ function PacoteDetailPage() {
     if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] });
   }
+
+  async function correrAuditoria() {
+    setReanalising(true);
+    try {
+      const res: any = await reanalisar({ data: { pacoteId: id } });
+      setAuditoria(res);
+      setAuditoriaOpen(true);
+      qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] });
+      if (res.sinalizados.length === 0 && res.sugeridos.length === 0) {
+        toast.success("Pacote tecnicamente correto — sem sinalizações");
+      } else {
+        toast.info(`${res.sinalizados.length} artigo(s) a rever · ${res.sugeridos.length} sugestão(ões) em falta`);
+      }
+    } catch (e: any) {
+      toast.error(e.message ?? "Falha na auditoria");
+    } finally {
+      setReanalising(false);
+    }
+  }
+
 
   async function prepararEnvio() {
     setEstado("preparado");
