@@ -352,13 +352,13 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
     }
     const { data: artigos, error } = await supabase
       .from("orcamento_artigos")
-      .select("descricao, codigo, capitulo:orcamento_capitulos(nome)")
+      .select("descricao, codigo, capitulo:orcamento_capitulos(descricao)")
       .eq("orcamento_id", id);
     if (error) { toast.error(error.message); return; }
     const c: Record<string, number> = {};
     (artigos ?? []).forEach((a: any) => {
       const esp = inferirEspecialidade({
-        descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.nome,
+        descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.descricao,
       });
       c[esp] = (c[esp] ?? 0) + 1;
     });
@@ -382,14 +382,14 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
       const orc = orcamentos.find((o: any) => o.id === orcamentoId);
       const { data: artigos, error } = await supabase
         .from("orcamento_artigos")
-        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(nome)")
+        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(descricao)")
         .eq("orcamento_id", orcamentoId);
       if (error) throw error;
 
       const grupos = new Map<Especialidade, any[]>();
       (artigos ?? []).forEach((a: any) => {
         const esp = inferirEspecialidade({
-          descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.nome,
+          descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.descricao,
         });
         if (!selecionadas.has(esp)) return;
         if (!grupos.has(esp)) grupos.set(esp, []);
@@ -417,7 +417,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
             return {
               pacote_id: novo.id, artigo_id: a.id, codigo: a.codigo, descricao: a.descricao,
               unidade: a.unidade, quantidade: a.quantidade,
-              capitulo: a.capitulo?.nome ?? null, subcapitulo: null,
+              capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
               preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
               categoria_custo: null, especialidade: esp,
             };
@@ -471,23 +471,21 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
               <div className="mt-2 rounded-md border max-h-64 overflow-auto divide-y">
                 {ESPECIALIDADES.map(esp => {
                   const n = counts?.[esp] ?? 0;
-                  const disabled = n === 0;
                   const checked = selecionadas.has(esp);
                   return (
                     <label
                       key={esp}
-                      className={`flex items-center justify-between gap-2 px-3 py-2 text-sm cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/50"}`}
+                      className="flex items-center justify-between gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50"
                     >
                       <span className="flex items-center gap-2">
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={disabled}
                           onChange={() => toggleEsp(esp)}
                         />
                         {esp}
                       </span>
-                      <Badge variant="secondary">{n} art.</Badge>
+                      <Badge variant={n > 0 ? "secondary" : "outline"}>{n} art.</Badge>
                     </label>
                   );
                 })}
@@ -495,7 +493,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
             )}
             {orcamentoId && counts && (
               <div className="flex gap-2 mt-2">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setSelecionadas(new Set(ESPECIALIDADES.filter(e => (counts[e] ?? 0) > 0)))}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setSelecionadas(new Set(ESPECIALIDADES))}>
                   Selecionar todas
                 </Button>
                 <Button type="button" variant="ghost" size="sm" onClick={() => setSelecionadas(new Set())}>
@@ -579,13 +577,13 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
     if (!id) return;
     const { data: artigos, error } = await supabase
       .from("orcamento_artigos")
-      .select("descricao, codigo, capitulo:orcamento_capitulos(nome)")
+      .select("descricao, codigo, capitulo:orcamento_capitulos(descricao)")
       .eq("orcamento_id", id);
     if (error) { toast.error(error.message); return; }
     const counts: Record<string, number> = {};
     (artigos ?? []).forEach((a: any) => {
       const esp = inferirEspecialidade({
-        descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.nome,
+        descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.descricao,
       });
       counts[esp] = (counts[esp] ?? 0) + 1;
     });
@@ -599,7 +597,7 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
       const orc = orcamentos.find((o: any) => o.id === orcamentoId);
       const { data: artigos, error } = await supabase
         .from("orcamento_artigos")
-        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(nome)")
+        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(descricao)")
         .eq("orcamento_id", orcamentoId);
       if (error) throw error;
 
@@ -616,7 +614,7 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
       (artigos ?? []).forEach((a: any) => {
         if (jaIncluidos.has(a.id)) return;
         const esp = inferirEspecialidade({
-          descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.nome,
+          descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.descricao,
         });
         if (!grupos.has(esp)) grupos.set(esp, []);
         grupos.get(esp)!.push(a);
@@ -646,7 +644,7 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
           return {
             pacote_id: novo.id, artigo_id: a.id, codigo: a.codigo, descricao: a.descricao,
             unidade: a.unidade, quantidade: a.quantidade,
-            capitulo: a.capitulo?.nome ?? null, subcapitulo: null,
+            capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
             preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
             categoria_custo: null, especialidade: esp,
           };
