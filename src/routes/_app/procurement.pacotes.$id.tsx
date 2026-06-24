@@ -182,6 +182,8 @@ function PacoteDetailPage() {
   const [auditoriaOpen, setAuditoriaOpen] = useState(false);
   const [auditoria, setAuditoria] = useState<{ sinalizados: any[]; sugeridos: any[] } | null>(null);
   const [reanalising, setReanalising] = useState(false);
+  const [moverState, setMoverState] = useState<{ artigo: any | null; destinoId: string }>({ artigo: null, destinoId: "" });
+  const [movendo, setMovendo] = useState(false);
   const reanalisar = useServerFn(reanalisarPacote);
   const registar = useServerFn(registarCorrecao);
 
