@@ -290,7 +290,7 @@ function PacotesListPage() {
         onCreated={() => qc.invalidateQueries({ queryKey: ["procurement-pacotes"] })}
       />
       <EditPacoteDialog
-        pacote={editPacote} onOpenChange={(v) => !v && setEditPacote(null)}
+        pacote={editPacote} onOpenChange={(v: boolean) => !v && setEditPacote(null)}
         onSaved={() => qc.invalidateQueries({ queryKey: ["procurement-pacotes"] })}
       />
       <AlertDialog open={!!eliminarId} onOpenChange={(v) => !v && setEliminarId(null)}>
