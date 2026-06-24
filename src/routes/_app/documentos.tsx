@@ -787,6 +787,14 @@ function DocumentosPage() {
           }}
         />
       )}
+      {bulkMoveOpen && (
+        <BulkMoveDialog
+          count={selecionados.size}
+          pastas={pastas}
+          onClose={() => setBulkMoveOpen(false)}
+          onConfirm={moverSelecionadosPara}
+        />
+      )}
       {novaObraOpen && (
         <NovaObraDialog
           onClose={(novoId) => {
