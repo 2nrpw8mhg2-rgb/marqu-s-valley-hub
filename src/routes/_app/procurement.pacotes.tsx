@@ -263,8 +263,8 @@ function PacotesListPage() {
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link to="/procurement/pacotes/$id" params={{ id: p.id }}><FolderOpen className="h-4 w-4 mr-2" /> Abrir</Link>
+                            <DropdownMenuItem onSelect={() => navigate({ to: "/procurement/pacotes/$id", params: { id: p.id } })}>
+                              <FolderOpen className="h-4 w-4 mr-2" /> Abrir
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setEditPacote(p)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => duplicar.mutate(p)}><Copy className="h-4 w-4 mr-2" /> Duplicar</DropdownMenuItem>
