@@ -591,6 +591,14 @@ function DocumentosPage() {
                 </>
               )}
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => folderInputRef.current?.click()}
+              disabled={!pastaActualId || uploading}
+              title="Carregar pasta inteira preservando a estrutura"
+            >
+              <FolderUp className="h-4 w-4 mr-1.5" /> Carregar pasta
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -600,6 +608,24 @@ function DocumentosPage() {
                 const files = Array.from(e.target.files ?? []);
                 e.target.value = "";
                 subirFicheiros(files);
+              }}
+            />
+            <input
+              ref={folderInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              // @ts-expect-error non-standard attributes for directory upload
+              webkitdirectory=""
+              directory=""
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                e.target.value = "";
+                const items = files.map((f) => ({
+                  file: f,
+                  path: (f as any).webkitRelativePath || f.name,
+                }));
+                subirArvore(items);
               }}
             />
           </>
