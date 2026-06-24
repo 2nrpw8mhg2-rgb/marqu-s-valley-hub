@@ -253,6 +253,9 @@ function OrcamentoEditor() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link to="/orcamentos"><Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> Lista</Button></Link>
+            <Link to="/orcamentos/$id/decomposicao" params={{ id }}>
+              <Button variant="outline" size="sm"><Layers className="h-4 w-4 mr-1" /> Decomposição de Preços</Button>
+            </Link>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-1" /> Importar MQ</Button>
             <Button variant="outline" size="sm" onClick={novaVersao}><GitBranch className="h-4 w-4 mr-1" /> Nova versão</Button>
             <Button variant="outline" size="sm" onClick={doExportExcel}><FileSpreadsheet className="h-4 w-4 mr-1" /> Excel</Button>
