@@ -400,11 +400,10 @@ function DecomposicaoPage() {
                                   {EXTRA_COST_COLS.map(c => (
                                     <div key={c.key} className="space-y-1">
                                       <Label className="text-[10px] text-muted-foreground">{c.label}</Label>
-                                      <Input
-                                        className="h-7 text-xs text-right tabular-nums no-spin px-1.5 w-full min-w-0"
-                                        type="number" step="0.01"
+                                      <NumberInput
+                                        className="h-7 text-xs text-right tabular-nums px-1.5 w-full min-w-0"
                                         value={a[c.key]}
-                                        onChange={e => updateArt(idx, { [c.key]: Number(e.target.value) } as Partial<Art>)}
+                                        onChange={v => updateArt(idx, { [c.key]: v } as Partial<Art>)}
                                       />
                                     </div>
                                   ))}
