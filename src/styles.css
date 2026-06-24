@@ -6,8 +6,8 @@
 
 /* =========================================================
    MV OS — Marquês Valley Operating System
-   Dark professional design system (construção/engenharia)
-   Base: #0B0F14 / Surface: #11171F / Accent gold: #E8B23A
+   Apple-inspired light design system
+   Base: #F8F9FB / Surface: #FFFFFF / Accent gold: #C9A15A
    ========================================================= */
 
 @theme inline {
@@ -53,83 +53,97 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.75rem;                              /* 12px cards */
 
-  /* Base surfaces */
-  --background: oklch(0.16 0.012 250);          /* #0B0F14 */
-  --foreground: oklch(0.96 0.005 250);          /* #F5F5F5 */
+  /* Base surfaces — light */
+  --background: oklch(0.985 0.003 250);           /* #F8F9FB */
+  --foreground: oklch(0.21 0.02 260);             /* #111827 */
 
-  --card: oklch(0.20 0.014 250);                /* #11171F */
-  --card-foreground: oklch(0.96 0.005 250);
+  --card: oklch(1 0 0);                           /* #FFFFFF */
+  --card-foreground: oklch(0.21 0.02 260);
 
-  --popover: oklch(0.22 0.014 250);
-  --popover-foreground: oklch(0.96 0.005 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 260);
 
-  /* Brand gold */
-  --primary: oklch(0.78 0.135 78);              /* #E8B23A */
-  --primary-foreground: oklch(0.16 0.012 250);
+  /* Brand gold — subtle, used for accents only */
+  --primary: oklch(0.72 0.085 80);                /* #C9A15A */
+  --primary-foreground: oklch(1 0 0);
 
-  --secondary: oklch(0.26 0.014 250);
-  --secondary-foreground: oklch(0.96 0.005 250);
+  --secondary: oklch(0.97 0.003 250);             /* #F3F4F6 */
+  --secondary-foreground: oklch(0.21 0.02 260);
 
-  --muted: oklch(0.24 0.012 250);
-  --muted-foreground: oklch(0.68 0.012 250);
+  --muted: oklch(0.97 0.003 250);
+  --muted-foreground: oklch(0.55 0.013 260);      /* #6B7280 */
 
-  --accent: oklch(0.30 0.018 250);
-  --accent-foreground: oklch(0.96 0.005 250);
+  --accent: oklch(0.96 0.005 80);                 /* very faint gold tint */
+  --accent-foreground: oklch(0.21 0.02 260);
 
-  --destructive: oklch(0.62 0.21 27);
-  --destructive-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.6 0.21 27);
+  --destructive-foreground: oklch(1 0 0);
 
-  --success: oklch(0.70 0.15 155);
-  --success-foreground: oklch(0.14 0.01 250);
+  --success: oklch(0.65 0.16 155);
+  --success-foreground: oklch(1 0 0);
 
   --warning: oklch(0.78 0.14 70);
-  --warning-foreground: oklch(0.14 0.01 250);
+  --warning-foreground: oklch(0.21 0.02 260);
 
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.78 0.135 78 / 60%);
+  --border: oklch(0.92 0.005 260);                /* #E5E7EB */
+  --input: oklch(0.92 0.005 260);
+  --ring: oklch(0.72 0.085 80 / 50%);
 
-  --chart-1: oklch(0.78 0.135 78);
-  --chart-2: oklch(0.70 0.15 155);
-  --chart-3: oklch(0.65 0.18 240);
-  --chart-4: oklch(0.62 0.21 27);
-  --chart-5: oklch(0.75 0.12 305);
+  --chart-1: oklch(0.72 0.085 80);
+  --chart-2: oklch(0.65 0.16 155);
+  --chart-3: oklch(0.6 0.15 240);
+  --chart-4: oklch(0.6 0.21 27);
+  --chart-5: oklch(0.65 0.12 305);
 
-  /* Sidebar */
-  --sidebar: oklch(0.18 0.012 250);
-  --sidebar-foreground: oklch(0.90 0.005 250);
-  --sidebar-primary: oklch(0.78 0.135 78);
-  --sidebar-primary-foreground: oklch(0.16 0.012 250);
-  --sidebar-accent: oklch(0.26 0.014 250);
-  --sidebar-accent-foreground: oklch(0.96 0.005 250);
-  --sidebar-border: oklch(1 0 0 / 6%);
-  --sidebar-ring: oklch(0.78 0.135 78 / 60%);
+  /* Sidebar — white, minimal */
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.32 0.015 260);
+  --sidebar-primary: oklch(0.72 0.085 80);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.97 0.003 250);        /* subtle active bg */
+  --sidebar-accent-foreground: oklch(0.21 0.02 260);
+  --sidebar-border: oklch(0.93 0.005 260);
+  --sidebar-ring: oklch(0.72 0.085 80 / 50%);
 
-  /* Gradients & shadows */
-  --gradient-gold: linear-gradient(135deg, oklch(0.82 0.14 80), oklch(0.70 0.13 70));
-  --gradient-surface: linear-gradient(180deg, oklch(0.22 0.014 250), oklch(0.18 0.012 250));
-  --shadow-elevated: 0 10px 30px -10px oklch(0 0 0 / 0.6), 0 2px 6px -2px oklch(0 0 0 / 0.4);
-  --shadow-gold: 0 10px 30px -12px oklch(0.78 0.135 78 / 0.45);
+  /* Gradients & shadows — extremely subtle */
+  --gradient-gold: linear-gradient(135deg, oklch(0.78 0.09 82), oklch(0.68 0.08 75));
+  --gradient-surface: linear-gradient(180deg, oklch(1 0 0), oklch(0.985 0.003 250));
+  --shadow-elevated: 0 1px 2px oklch(0 0 0 / 0.04), 0 4px 12px -4px oklch(0 0 0 / 0.06);
+  --shadow-gold: 0 4px 16px -6px oklch(0.72 0.085 80 / 0.25);
 }
 
 @layer base {
+  html {
+    font-size: 15px;
+  }
   html, body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-display);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    letter-spacing: -0.01em;
   }
   * {
     border-color: var(--color-border);
   }
+  h1, h2, h3, h4, h5 {
+    letter-spacing: -0.02em;
+  }
   ::selection {
-    background: oklch(0.78 0.135 78 / 0.35);
+    background: oklch(0.72 0.085 80 / 0.25);
     color: var(--color-foreground);
+  }
+  /* Subtle zebra-striping helper for tables */
+  table tbody tr:nth-child(even) {
+    background-color: oklch(0.985 0.002 250);
   }
 }
