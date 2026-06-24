@@ -338,6 +338,7 @@ const BETAO_FORTE_RX = /\b(betonagem|bet[ãa]o\s+(?:armado|pronto|de\s+regulariz
 const BETAO_TRABALHO_RX = /\b(execu[çc][ãa]o|aplica[çc][ãa]o|realizado|fabricado|betonagem|regulariza[çc][ãa]o|cofragem|descofragem|armaduras?)\b/i;
 const BETAO_ELEMENTO_RX = /\b(sapatas?|vigas?(?:\s+de\s+funda[çc][ãa]o|\/p[óo]rticos?|\s*p[óo]rticos?)?|pilares?|lajes?|ensoleiramento|funda[çc][õo]es?|funda[çc][ãa]o|base\s+de\s+pavimento|bases\s+de\s+pavimentos|pavimento\s+t[ée]rreo|muros?\s+de\s+(?:suporte|conten[çc][ãa]o|tens[ãa]o))\b/i;
 const BETAO_CONTEXTO_RX = /\b(estruturas?|bet[ãa]o\s+armado|bases?\s+de\s+pavimentos?|funda[çc][õo]es?)\b/i;
+const BETAO_ESTRUTURA_MISTA_RX = /\bestruturas?\s+mistas?\b/i;
 
 // Trabalhos onde "betão" costuma ser apenas suporte/substrato ou elemento
 // acessório. Só passam se a própria descrição for claramente uma execução de
@@ -359,6 +360,10 @@ export function isBetaoArtigo(a: ArtigoInput): boolean {
   const temTrabalhoBetao = BETAO_TRABALHO_RX.test(desc);
   const exclusaoPrimaria = BETAO_EXCLUIR_RX.test(desc) || BETAO_EXCLUIR_RX.test(chap);
 
+  // A referência enviada para Betão inclui o capítulo completo de Estruturas
+  // Mistas, que faz parte do âmbito estrutural mesmo quando uma linha isolada
+  // descreve perfis metálicos auxiliares da solução mista.
+  if (BETAO_ESTRUTURA_MISTA_RX.test(hay)) return true;
   if (exclusaoPrimaria && !BETAO_EXCLUSAO_PERMITIDA_RX.test(desc)) return false;
   if (descTemBetaoForte && (temTrabalhoBetao || temElemento || BETAO_CONTEXTO_RX.test(chap))) return true;
   if (contextoTemBetaoForte && temElemento && !exclusaoPrimaria) return true;
