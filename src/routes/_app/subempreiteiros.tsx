@@ -71,9 +71,18 @@ function SubsPage() {
   const { data: subs = [], isLoading } = useQuery({
     queryKey: ["subempreiteiros"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("subempreiteiros").select("*").order("nome");
-      if (error) throw error;
-      return data as Sub[];
+      const all: Sub[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase
+          .from("subempreiteiros")
+          .select("*")
+          .order("nome")
+          .range(from, from + 999);
+        if (error) throw error;
+        all.push(...((data ?? []) as Sub[]));
+        if (!data || data.length < 1000) break;
+      }
+      return all;
     },
   });
 
