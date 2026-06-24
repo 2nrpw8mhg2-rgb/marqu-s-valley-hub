@@ -352,7 +352,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
     }
     const { data: artigos, error } = await supabase
       .from("orcamento_artigos")
-      .select("descricao, codigo, capitulo:orcamento_capitulos(nome)")
+      .select("descricao, codigo, capitulo:orcamento_capitulos(descricao)")
       .eq("orcamento_id", id);
     if (error) { toast.error(error.message); return; }
     const c: Record<string, number> = {};
@@ -382,7 +382,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
       const orc = orcamentos.find((o: any) => o.id === orcamentoId);
       const { data: artigos, error } = await supabase
         .from("orcamento_artigos")
-        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(nome)")
+        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(descricao)")
         .eq("orcamento_id", orcamentoId);
       if (error) throw error;
 
@@ -579,7 +579,7 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
     if (!id) return;
     const { data: artigos, error } = await supabase
       .from("orcamento_artigos")
-      .select("descricao, codigo, capitulo:orcamento_capitulos(nome)")
+      .select("descricao, codigo, capitulo:orcamento_capitulos(descricao)")
       .eq("orcamento_id", id);
     if (error) { toast.error(error.message); return; }
     const counts: Record<string, number> = {};
@@ -599,7 +599,7 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
       const orc = orcamentos.find((o: any) => o.id === orcamentoId);
       const { data: artigos, error } = await supabase
         .from("orcamento_artigos")
-        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(nome)")
+        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(descricao)")
         .eq("orcamento_id", orcamentoId);
       if (error) throw error;
 

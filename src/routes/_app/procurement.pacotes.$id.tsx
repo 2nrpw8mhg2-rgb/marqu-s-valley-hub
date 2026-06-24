@@ -269,7 +269,7 @@ function AdicionarArtigosDialog({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orcamento_artigos")
-        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(nome)")
+        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(descricao)")
         .eq("orcamento_id", orcamentoId);
       if (error) throw error;
       return data ?? [];
