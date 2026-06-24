@@ -350,7 +350,7 @@ function AdicionarArtigosDialog({
         return valido;
       })
       .filter((a: any) => !q || a.descricao?.toLowerCase().includes(q) || a.codigo?.toLowerCase().includes(q));
-  }, [artigos, artigosJaIncluidos, search]);
+  }, [artigos, artigosJaIncluidos, especialidade, search]);
 
   function toggle(id: string) {
     setSelecionados(prev => {
