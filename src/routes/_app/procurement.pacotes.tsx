@@ -71,6 +71,54 @@ function fmtDate(s: string | null) {
   return new Date(s).toLocaleDateString("pt-PT");
 }
 
+function criarLinhaPacoteArtigo(a: any, pacoteId: string, especialidade: string, revisao: boolean, motivo: string, confianca: number) {
+  const custoTotal = Number(a.custo_mao_obra ?? 0) + Number(a.custo_tarefeiros ?? 0)
+    + Number(a.custo_subempreitadas ?? 0) + Number(a.custo_materiais ?? 0)
+    + Number(a.custo_equipamentos ?? 0) + Number(a.custo_transportes ?? 0)
+    + Number(a.custo_encargos_gerais ?? 0) + Number(a.custo_outros ?? 0);
+  return {
+    pacote_id: pacoteId,
+    artigo_id: a.id,
+    codigo: a.codigo,
+    descricao: a.descricao,
+    unidade: a.unidade,
+    quantidade: a.quantidade,
+    capitulo: a.capitulo?.descricao ?? null,
+    subcapitulo: null,
+    preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
+    categoria_custo: null,
+    especialidade,
+    confianca,
+    motivo,
+    sinalizado_revisao: revisao,
+  };
+}
+
+async function garantirPacotePorClassificar(orcamentoId: string, obraId: string | null, grupoConsulta?: string | null) {
+  const { data: existente, error: e0 } = await supabase
+    .from("procurement_pacotes")
+    .select("id")
+    .eq("orcamento_id", orcamentoId)
+    .eq("especialidade", "Por Classificar")
+    .maybeSingle();
+  if (e0) throw e0;
+  if (existente?.id) return existente.id;
+  const { data: novo, error } = await supabase
+    .from("procurement_pacotes")
+    .insert({
+      orcamento_id: orcamentoId,
+      obra_id: obraId,
+      nome: "Por Classificar",
+      especialidade: "Por Classificar",
+      estado: "por_preparar",
+      grupo_consulta: grupoConsulta ?? null,
+    } as any)
+    .select("id")
+    .single();
+  if (error) throw error;
+  return novo.id;
+}
+
 function PacotesListPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -490,6 +538,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
 
       let criados = 0;
       let totalIncluidos = 0;
+      const porClassificar: any[] = [];
       const escolhidas = subs.filter(s => selecionadas.has(s.key));
       for (const sub of escolhidas) {
         const isBetao = sub.key === BETAO_KEY;
@@ -509,29 +558,35 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
           } as any).select("id").single();
         if (e1) throw e1;
         if (items.length > 0) {
-          const rows = items.map((a: any) => {
-            const custoTotal = Number(a.custo_mao_obra ?? 0) + Number(a.custo_tarefeiros ?? 0)
-              + Number(a.custo_subempreitadas ?? 0) + Number(a.custo_materiais ?? 0)
-              + Number(a.custo_equipamentos ?? 0) + Number(a.custo_transportes ?? 0)
-              + Number(a.custo_encargos_gerais ?? 0) + Number(a.custo_outros ?? 0);
+          const rows: any[] = [];
+          for (const a of items) {
             const r = pertenceAoPacote({
               descricao: a.descricao, codigo: a.codigo,
               capitulo: a.capitulo?.descricao, capituloCodigo: a.capitulo?.codigo,
             }, especialidade);
-            return {
-              pacote_id: novo.id, artigo_id: a.id, codigo: a.codigo, descricao: a.descricao,
-              unidade: a.unidade, quantidade: a.quantidade,
-              capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
-              preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
-              categoria_custo: null, especialidade,
-              confianca: r.confianca, motivo: r.motivo, sinalizado_revisao: !r.pertence,
-            };
-          });
-          const { error: e2 } = await supabase.from("procurement_pacote_artigos").insert(rows);
-          if (e2) throw e2;
+            if (r.pertence) {
+              rows.push(criarLinhaPacoteArtigo(a, novo.id, especialidade, false, r.motivo, r.confianca));
+            } else {
+              porClassificar.push({ artigo: a, motivo: `Excluído de ${especialidade}: ${r.motivo}`, confianca: r.confianca });
+            }
+          }
+          if (rows.length > 0) {
+            const { error: e2 } = await supabase.from("procurement_pacote_artigos").insert(rows);
+            if (e2) throw e2;
+          }
           totalIncluidos += rows.length;
         }
         criados++;
+      }
+
+      if (porClassificar.length > 0) {
+        const pacotePorClassificarId = await garantirPacotePorClassificar(orcamentoId, (orc as any)?.obra?.id ?? null, nomeGeral.trim());
+        const rows = porClassificar.map(({ artigo, motivo, confianca }) =>
+          criarLinhaPacoteArtigo(artigo, pacotePorClassificarId, "Por Classificar", true, motivo, confianca),
+        );
+        const { error: e3 } = await supabase.from("procurement_pacote_artigos").insert(rows);
+        if (e3) throw e3;
+        totalIncluidos += rows.length;
       }
 
       toast.success(`${criados} pacote(s) criado(s) · ${totalIncluidos} artigo(s) incluído(s)`);
@@ -715,6 +770,7 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
       }
 
       let totalCriados = 0;
+      const porClassificar: any[] = [];
       for (const sub of subs) {
         const isBetao = sub.key === BETAO_KEY;
         const items = (artigos ?? []).filter((a: any) => {
@@ -733,28 +789,36 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
             especialidade: especialidade as any, estado: "por_preparar",
           }).select("id").single();
         if (e1) throw e1;
-        const rows = items.map((a: any) => {
-          const custoTotal = Number(a.custo_mao_obra ?? 0) + Number(a.custo_tarefeiros ?? 0)
-            + Number(a.custo_subempreitadas ?? 0) + Number(a.custo_materiais ?? 0)
-            + Number(a.custo_equipamentos ?? 0) + Number(a.custo_transportes ?? 0)
-            + Number(a.custo_encargos_gerais ?? 0) + Number(a.custo_outros ?? 0);
+        const rows: any[] = [];
+        for (const a of items) {
           const r = pertenceAoPacote({
             descricao: a.descricao, codigo: a.codigo,
             capitulo: a.capitulo?.descricao, capituloCodigo: a.capitulo?.codigo,
           }, especialidade);
-          return {
-            pacote_id: novo.id, artigo_id: a.id, codigo: a.codigo, descricao: a.descricao,
-            unidade: a.unidade, quantidade: a.quantidade,
-            capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
-            preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
-            categoria_custo: null, especialidade,
-            confianca: r.confianca, motivo: r.motivo, sinalizado_revisao: !r.pertence,
-          };
-        });
+          if (r.pertence) {
+            rows.push(criarLinhaPacoteArtigo(a, novo.id, especialidade, false, r.motivo, r.confianca));
+            jaIncluidos.add(a.id);
+          } else {
+            porClassificar.push({ artigo: a, motivo: `Excluído de ${especialidade}: ${r.motivo}`, confianca: r.confianca });
+          }
+        }
 
-        const { error: e2 } = await supabase.from("procurement_pacote_artigos").insert(rows);
-        if (e2) throw e2;
+        if (rows.length > 0) {
+          const { error: e2 } = await supabase.from("procurement_pacote_artigos").insert(rows);
+          if (e2) throw e2;
+        }
         totalCriados++;
+      }
+      if (porClassificar.length > 0) {
+        const pacotePorClassificarId = await garantirPacotePorClassificar(orcamentoId, (orc as any)?.obra?.id ?? null, null);
+        const rows = porClassificar
+          .filter(({ artigo }) => !jaIncluidos.has(artigo.id))
+          .map(({ artigo, motivo, confianca }) => criarLinhaPacoteArtigo(artigo, pacotePorClassificarId, "Por Classificar", true, motivo, confianca));
+        if (rows.length > 0) {
+          const { error: e3 } = await supabase.from("procurement_pacote_artigos").insert(rows);
+          if (e3) throw e3;
+          totalCriados++;
+        }
       }
       if (totalCriados === 0) {
         toast.info("Não há artigos novos para agrupar.");

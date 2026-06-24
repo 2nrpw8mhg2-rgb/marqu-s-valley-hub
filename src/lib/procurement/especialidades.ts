@@ -7,6 +7,7 @@ export const ESPECIALIDADES = [
   "Terraplanagens",
   "Estruturas",
   "Alvenarias",
+  "Impermeabilizações",
   "Cobertura",
   "Caixilharias",
   "Eletricidade/ITED",
@@ -15,6 +16,7 @@ export const ESPECIALIDADES = [
   "Carpintarias",
   "Pinturas",
   "Arranjos Exteriores",
+  "Por Classificar",
   "Outros",
 ] as const;
 
@@ -57,6 +59,22 @@ const RULES: Rule[] = [
       /\breboco/i, /\bestuque/i, /\bgesso\s*cart/i, /\bpladur/i,
     ],
     negative: [/\bcobertura/i],
+  },
+  {
+    esp: "Impermeabilizações",
+    positive: [
+      /\bimpermeabiliza[çc][ãa]o/i, /\btelas?\s+(asf[áa]ltica|betuminosa|bicamada|liquida|l[íi]quida)/i,
+      /\bmembrana\s+(betuminosa|impermeabilizante|liquida|l[íi]quida)/i, /\bhumidades?\b/i,
+      /\bdrenagem\s+perif[ée]rica/i, /\bbarreira\s+(de|para)-?vapor/i, /\bemuls[ãa]o\s+betuminosa/i,
+      /\bbetuminos[ao]\b/i, /\bterra[çc]os?\b/i, /\bcobertura\s+plana/i, /\bzonas?\s+h[úu]midas?\b/i,
+      /\bmuros?\s+enterrados?\b/i, /\bcasas?\s+de\s+banho\b/i,
+    ],
+    negative: [
+      /\bsapatas?\b/i, /\bfunda[çc][õo]es?\s+estruturais?\b/i, /\bpilares?\b/i, /\bvigas?\b/i,
+      /\blajes?\s+estruturais?\b/i, /\balpendres?\b/i, /\bparedes?\s+divis[óo]rias?\b/i,
+      /\balvenarias?\b/i, /\brebocos?\b/i, /\bbet[ãa]o\s+armado\b/i, /\barmaduras?\b/i,
+      /\bcofragens?\b/i, /\bestrutura\s+met[áa]lica\b/i,
+    ],
   },
   {
     esp: "Cobertura",
@@ -135,6 +153,7 @@ const CHAPTER_HINTS: Array<{ esp: Especialidade; rx: RegExp }> = [
   { esp: "Terraplanagens", rx: /terraplan|movimento\s+de\s+terras|escava/i },
   { esp: "Estruturas", rx: /estrutur|funda[çc]/i },
   { esp: "Alvenarias", rx: /alvenari|paredes\s+divis/i },
+  { esp: "Impermeabilizações", rx: /impermeabiliza|telas?|membrana|humidade|barreira\s+(de|para)-?vapor/i },
   { esp: "Cobertura", rx: /cobertur/i },
   { esp: "Caixilharias", rx: /caixilh|v[ãa]os\s+exteri/i },
   { esp: "Eletricidade/ITED", rx: /electric|el[ée]tr|ited/i },
@@ -167,6 +186,8 @@ const COBERTURA_RX = /\b(coberturas?|telhados?|telhas?|subtelha|cumeeira|beirado
 const DEMOLICAO_RX = /\b(demoli[çc][ãa]o|demoli[çc][õo]es|demolir|levantamento|remo[çc][ãa]o|desmontagem|desmantelamento|picagem|arrombamento)\b/i;
 const ESTRUTURA_RX = /\b(estruturas?|bet[ãa]o\s+armado|funda[çc][õo]es?|sapatas?|vigas?|pilares?|lajes?|cofragem|armaduras?|a[çc]o\s+a?\d+|malha\s+electrossoldada|micro\s*estacas?)\b/i;
 const ALVENARIA_RX = /\b(alvenarias?|tijolos?|blocos?|rebocos?|estuques?|gesso\s*cartonado|pladur|paredes?\s+divis[óo]rias?)\b/i;
+const IMPERMEABILIZACOES_RX = /\b(impermeabiliza[çc][ãa]o|telas?\s+(?:asf[áa]ltica|betuminosa|bicamada|liquida|l[íi]quida)|membrana\s+(?:betuminosa|impermeabilizante|liquida|l[íi]quida)|humidades?|drenagem\s+perif[ée]rica|barreira\s+(?:de|para)-?vapor|emuls[ãa]o\s+betuminosa|betuminos[ao]|terra[çc]os?|cobertura\s+plana|zonas?\s+h[úu]midas?|muros?\s+enterrados?|casas?\s+de\s+banho)\b/i;
+const IMPERMEABILIZACOES_NEGATIVO_RX = /\b(sapatas?|funda[çc][õo]es?\s+estruturais?|pilares?|vigas?|lajes?\s+estruturais?|alpendres?|paredes?\s+divis[óo]rias?|alvenarias?|rebocos?|bet[ãa]o\s+armado|armaduras?|cofragens?|estrutura\s+met[áa]lica)\b/i;
 const CAIXILHARIA_RX = /\b(caixilharias?|janelas?|v[ãa]os?\s+exteriores?|portas?\s+de\s+alum[íi]nio|alum[íi]nio|\bpvc\b|vidros?|estores?|persianas?)\b/i;
 const ELETRICIDADE_RX = /\b(eletricidade|electricidade|el[ée]tric[ao]s?|tomadas?|interruptores?|quadro\s+el[ée]ctrico|ilumina[çc][ãa]o|lumin[áa]rias?|\bited\b|cctv|dom[óo]tica|cablagem|fotovoltaic[ao])\b/i;
 const AVAC_RX = /\b(avac|ar\s*condicionado|climatiza[çc][ãa]o|ventila[çc][ãa]o|extra[çc][ãa]o|bomba\s+de\s+calor|piso\s+radiante|\bvrv\b|\bvrf\b|daikin|condutas?|grelhas?\s+de\s+ar)\b/i;
@@ -183,6 +204,28 @@ function codigoComecaPor(codigo: string, prefixo: string) {
   return codigo === prefixo || codigo.startsWith(`${prefixo}.`);
 }
 
+export function canonizarEspecialidade(nome?: string | null): Especialidade | null {
+  const n = (nome ?? "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").trim();
+  const exact = ESPECIALIDADES.find((e) => e.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "") === n);
+  if (exact) return exact;
+  if (/por\s+classificar|nao\s+classificado/.test(n)) return "Por Classificar";
+  if (/impermeabil|tela|membrana|humidade|barreira\s+(de|para)-?vapor/.test(n)) return "Impermeabilizações";
+  if (/betao/.test(n)) return "Betão";
+  if (/demoli/.test(n)) return "Demolições";
+  if (/terraplan|terraplen|escava|movimento\s+de\s+terras|aterro/.test(n)) return "Terraplanagens";
+  if (/estrutura|fundac|sapata|pilar|viga|laje|betao\s+armado/.test(n)) return "Estruturas";
+  if (/alvenaria|paredes?|divisoria|reboco|tijolo|bloco/.test(n)) return "Alvenarias";
+  if (/cobertura|telhado|telha/.test(n)) return "Cobertura";
+  if (/caixilh|janela|vao\s+exterior|vidro/.test(n)) return "Caixilharias";
+  if (/eletric|electric|ited|rede\s+eletrica|iluminacao/.test(n)) return "Eletricidade/ITED";
+  if (/avac|climatiz|ventil/.test(n)) return "AVAC";
+  if (/canaliz|hidraulic|abastecimento\s+de\s+aguas|aguas|esgoto|saneamento/.test(n)) return "Canalizações";
+  if (/carpint|madeira|roupeiro|armario/.test(n)) return "Carpintarias";
+  if (/pintur|tinta/.test(n)) return "Pinturas";
+  if (/arranjo|exterior|calcada|jardim|lancil/.test(n)) return "Arranjos Exteriores";
+  return null;
+}
+
 function classificacaoEstrutural({ codigo, capituloCodigo, hay, chap }: { codigo: string; capituloCodigo: string; hay: string; chap: string }): ClassificacaoResultado | null {
   if (DEMOLICAO_RX.test(hay) || codigoComecaPor(capituloCodigo, "3") || codigoComecaPor(codigo, "3")) {
     return { especialidade: "Demolições", confianca: 1, motivo: "Capítulo/código de demolições" };
@@ -192,6 +235,9 @@ function classificacaoEstrutural({ codigo, capituloCodigo, hay, chap }: { codigo
   }
   if ((codigoComecaPor(codigo, "8") || codigoComecaPor(capituloCodigo, "8")) && BASE_PAVIMENTO_RX.test(hay)) {
     return { especialidade: "Outros", confianca: 0.95, motivo: "Base de pavimentos — rever fora de cobertura/instalações" };
+  }
+  if (IMPERMEABILIZACOES_RX.test(hay) && !IMPERMEABILIZACOES_NEGATIVO_RX.test(hay)) {
+    return { especialidade: "Impermeabilizações", confianca: 0.95, motivo: "Palavras-chave técnicas de impermeabilização" };
   }
   if (ESTRUTURA_RX.test(hay)) {
     return { especialidade: "Estruturas", confianca: 0.95, motivo: "Capítulo/descrição de estruturas" };
@@ -274,7 +320,7 @@ export function classificarArtigo(a: ArtigoInput): ClassificacaoResultado {
 
   // Sem nenhum sinal
   if (scores.size === 0) {
-    return { especialidade: "Outros", confianca: 0.1, motivo: "Sem palavras-chave reconhecidas" };
+    return { especialidade: "Por Classificar", confianca: 0.1, motivo: "Sem palavras-chave técnicas suficientes" };
   }
 
   // Escolher a maior pontuação positiva
@@ -283,12 +329,16 @@ export function classificarArtigo(a: ArtigoInput): ClassificacaoResultado {
   const second = ordered[1]?.[1] ?? 0;
 
   if (topScore <= 0) {
-    return { especialidade: "Outros", confianca: 0.2, motivo: "Palavras-chave negativas anularam a classificação" };
+    return { especialidade: "Por Classificar", confianca: 0.2, motivo: "Palavras-chave negativas anularam a classificação" };
   }
 
   // Confiança = combinação do score e da margem face ao segundo
   const margem = topScore - Math.max(second, 0);
   const confianca = Math.min(1, 0.5 + 0.15 * topScore + 0.1 * margem);
+
+  if (confianca < CONFIANCA_MINIMA || topScore < 2 || margem < 1) {
+    return { especialidade: "Por Classificar", confianca, motivo: `Baixa confiança: ${topEsp} com score ${topScore} e margem ${margem}` };
+  }
 
   return {
     especialidade: topEsp,
@@ -305,9 +355,10 @@ export function inferirEspecialidade(a: ArtigoInput): Especialidade {
 export const CONFIANCA_MINIMA = 0.8;
 
 export function validarArtigoParaEspecialidade(a: ArtigoInput, especialidade: string) {
+  const alvo = canonizarEspecialidade(especialidade) ?? especialidade;
   // Especialidade especial "Betão" agrega todos os artigos relacionados com
   // betão / elementos estruturais, independentemente do capítulo de origem.
-  if (especialidade === "Betão") {
+  if (alvo === "Betão") {
     const valido = isBetaoArtigo(a);
     return {
       valido,
@@ -320,8 +371,14 @@ export function validarArtigoParaEspecialidade(a: ArtigoInput, especialidade: st
   }
   const { especialidade: _ignorarEspecialidadeGuardada, ...semEspecialidadeGuardada } = a;
   const classificacao = classificarArtigo(semEspecialidadeGuardada);
+  if (alvo === "Por Classificar") {
+    return {
+      valido: classificacao.especialidade === "Por Classificar" || classificacao.confianca < CONFIANCA_MINIMA,
+      classificacao,
+    };
+  }
   return {
-    valido: classificacao.especialidade === especialidade && classificacao.confianca >= CONFIANCA_MINIMA,
+    valido: classificacao.especialidade === alvo && classificacao.confianca >= CONFIANCA_MINIMA,
     classificacao,
   };
 }

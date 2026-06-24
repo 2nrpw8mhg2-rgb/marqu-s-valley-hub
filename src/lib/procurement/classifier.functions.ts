@@ -106,7 +106,7 @@ export const reanalisarPacote = createServerFn({ method: "POST" })
 
     const { data: pacote, error: ePac } = await supabase
       .from("procurement_pacotes")
-      .select("id, especialidade, orcamento_id")
+      .select("id, especialidade, orcamento_id, obra_id, grupo_consulta")
       .eq("id", data.pacoteId)
       .single();
     if (ePac) throw new Error(ePac.message);
@@ -193,8 +193,46 @@ export const reanalisarPacote = createServerFn({ method: "POST" })
       }
     }
 
-    // Marca os sinalizados na BD
-    if (sinalizados.length > 0) {
+    // Artigos tecnicamente incoerentes saem do pacote e vão para "Por Classificar".
+    if (sinalizados.length > 0 && especialidade !== "Por Classificar") {
+      const { data: destinoExistente, error: eDestino } = await supabase
+        .from("procurement_pacotes")
+        .select("id")
+        .eq("orcamento_id", pacote.orcamento_id)
+        .eq("especialidade", "Por Classificar")
+        .maybeSingle();
+      if (eDestino) throw new Error(eDestino.message);
+
+      let destinoId = destinoExistente?.id as string | undefined;
+      if (!destinoId) {
+        const { data: novoDestino, error: eNovoDestino } = await supabase
+          .from("procurement_pacotes")
+          .insert({
+            orcamento_id: pacote.orcamento_id,
+            obra_id: pacote.obra_id ?? null,
+            nome: "Por Classificar",
+            especialidade: "Por Classificar",
+            estado: "por_preparar",
+            grupo_consulta: pacote.grupo_consulta ?? null,
+          } as any)
+          .select("id")
+          .single();
+        if (eNovoDestino) throw new Error(eNovoDestino.message);
+        destinoId = novoDestino.id;
+      }
+
+      const ids = sinalizados.map((s) => s.pacoteArtigoId);
+      await supabase
+        .from("procurement_pacote_artigos")
+        .update({
+          pacote_id: destinoId,
+          especialidade: "Por Classificar",
+          sinalizado_revisao: true,
+          confianca: 0.25,
+          motivo: `Movido para Por Classificar por reanálise técnica do pacote ${especialidade}`,
+        })
+        .in("id", ids);
+    } else if (sinalizados.length > 0) {
       const ids = sinalizados.map((s) => s.pacoteArtigoId);
       await supabase
         .from("procurement_pacote_artigos")

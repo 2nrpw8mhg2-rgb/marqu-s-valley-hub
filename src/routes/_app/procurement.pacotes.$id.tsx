@@ -62,6 +62,13 @@ function compareCodigo(a: string, b: string) {
   return (a || "").localeCompare(b || "");
 }
 
+function labelConfianca(conf: number | null) {
+  if (conf == null) return "—";
+  if (conf >= 0.85) return "Alta";
+  if (conf >= 0.7) return "Média";
+  return "Baixa";
+}
+
 function exportarExcel(
   nome: string,
   especialidade: string,
@@ -499,7 +506,7 @@ function PacoteDetailPage() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded ${confTone}`}>
-                                  {Math.round(conf * 100)}%
+                                  {labelConfianca(conf)} · {Math.round(conf * 100)}%
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs text-xs">{a.motivo ?? "Sem motivo registado"}</TooltipContent>
