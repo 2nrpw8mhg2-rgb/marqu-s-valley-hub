@@ -83,9 +83,21 @@ export function ImportMQDialog({ open, onClose, onImport }: Props) {
         </DialogHeader>
 
         {step === 1 && (
-          <label className="block border-2 border-dashed border-border rounded-lg p-12 text-center cursor-pointer hover:border-primary/60 hover:bg-muted/30 transition-colors">
+          <label
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true); }}
+            onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true); }}
+            onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); }}
+            onDrop={(e) => {
+              e.preventDefault(); e.stopPropagation(); setDragOver(false);
+              const f = e.dataTransfer.files?.[0];
+              if (!f) return;
+              if (!/\.(xlsx|xls)$/i.test(f.name)) { toast.error("Apenas .xlsx ou .xls"); return; }
+              handleFile(f);
+            }}
+            className={`block border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${dragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/60 hover:bg-muted/30"}`}
+          >
             <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-            <p className="font-medium">Escolhe um ficheiro Excel</p>
+            <p className="font-medium">Arrasta o ficheiro Excel ou clica para escolher</p>
             <p className="text-xs text-muted-foreground mt-1">Suportado: .xlsx, .xls</p>
             <input
               type="file"
