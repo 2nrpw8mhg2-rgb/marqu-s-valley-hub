@@ -156,11 +156,73 @@ export type Database = {
         }
         Relationships: []
       }
+      orcamento_artigo_fontes: {
+        Row: {
+          artigo_id: string
+          categoria: string
+          created_at: string
+          descricao: string
+          id: string
+          notas: string | null
+          selecionado: boolean
+          subempreiteiro_id: string | null
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          artigo_id: string
+          categoria: string
+          created_at?: string
+          descricao: string
+          id?: string
+          notas?: string | null
+          selecionado?: boolean
+          subempreiteiro_id?: string | null
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          artigo_id?: string
+          categoria?: string
+          created_at?: string
+          descricao?: string
+          id?: string
+          notas?: string | null
+          selecionado?: boolean
+          subempreiteiro_id?: string | null
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamento_artigo_fontes_artigo_id_fkey"
+            columns: ["artigo_id"]
+            isOneToOne: false
+            referencedRelation: "orcamento_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamento_artigo_fontes_subempreiteiro_id_fkey"
+            columns: ["subempreiteiro_id"]
+            isOneToOne: false
+            referencedRelation: "subempreiteiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orcamento_artigos: {
         Row: {
           capitulo_id: string | null
           codigo: string | null
           created_at: string
+          custo_encargos_gerais: number
+          custo_equipamentos: number
+          custo_mao_obra: number
+          custo_materiais: number
+          custo_outros: number
+          custo_subempreitadas: number
+          custo_tarefeiros: number
+          custo_transportes: number
           descricao: string
           id: string
           margem_pct: number
@@ -175,6 +237,14 @@ export type Database = {
           capitulo_id?: string | null
           codigo?: string | null
           created_at?: string
+          custo_encargos_gerais?: number
+          custo_equipamentos?: number
+          custo_mao_obra?: number
+          custo_materiais?: number
+          custo_outros?: number
+          custo_subempreitadas?: number
+          custo_tarefeiros?: number
+          custo_transportes?: number
           descricao: string
           id?: string
           margem_pct?: number
@@ -189,6 +259,14 @@ export type Database = {
           capitulo_id?: string | null
           codigo?: string | null
           created_at?: string
+          custo_encargos_gerais?: number
+          custo_equipamentos?: number
+          custo_mao_obra?: number
+          custo_materiais?: number
+          custo_outros?: number
+          custo_subempreitadas?: number
+          custo_tarefeiros?: number
+          custo_transportes?: number
           descricao?: string
           id?: string
           margem_pct?: number

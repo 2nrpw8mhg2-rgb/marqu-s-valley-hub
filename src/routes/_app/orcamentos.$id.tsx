@@ -12,7 +12,7 @@ import { ImportMQDialog } from "@/components/orcamentos/ImportMQDialog";
 import { exportToExcel, exportToPDF, type ExportData } from "@/lib/orcamento-export";
 import { fmtEUR, fmtNum, lineTotal } from "@/lib/orcamento-utils";
 import type { ParsedRow } from "@/lib/mq-parser";
-import { Upload, FileDown, FileSpreadsheet, Trash2, Plus, ArrowLeft, GitBranch, Save } from "lucide-react";
+import { Upload, FileDown, FileSpreadsheet, Trash2, Plus, ArrowLeft, GitBranch, Save, Layers } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/orcamentos/$id")({
@@ -253,6 +253,9 @@ function OrcamentoEditor() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link to="/orcamentos"><Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> Lista</Button></Link>
+            <Link to="/orcamentos/$id/decomposicao" params={{ id }}>
+              <Button variant="outline" size="sm"><Layers className="h-4 w-4 mr-1" /> Decomposição de Preços</Button>
+            </Link>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-1" /> Importar MQ</Button>
             <Button variant="outline" size="sm" onClick={novaVersao}><GitBranch className="h-4 w-4 mr-1" /> Nova versão</Button>
             <Button variant="outline" size="sm" onClick={doExportExcel}><FileSpreadsheet className="h-4 w-4 mr-1" /> Excel</Button>
@@ -265,6 +268,12 @@ function OrcamentoEditor() {
       />
 
       <div className="p-6 space-y-4">
+        <div className="flex gap-1 border-b border-border">
+          <div className="px-4 py-2 text-sm font-medium border-b-2 border-primary text-foreground">Mapa de Quantidades</div>
+          <Link to="/orcamentos/$id/decomposicao" params={{ id }} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">
+            Decomposição de Preços
+          </Link>
+        </div>
         <Card className="bg-card border-border p-4 grid sm:grid-cols-4 gap-4">
           <div className="space-y-1.5"><Label>Nome</Label><Input value={meta.nome} onChange={(e) => setMeta({ ...meta, nome: e.target.value })} /></div>
           <div className="space-y-1.5">
