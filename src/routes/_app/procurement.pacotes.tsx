@@ -493,7 +493,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
             )}
             {orcamentoId && counts && (
               <div className="flex gap-2 mt-2">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setSelecionadas(new Set(ESPECIALIDADES.filter(e => (counts[e] ?? 0) > 0)))}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setSelecionadas(new Set(ESPECIALIDADES))}>
                   Selecionar todas
                 </Button>
                 <Button type="button" variant="ghost" size="sm" onClick={() => setSelecionadas(new Set())}>
