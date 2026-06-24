@@ -14,16 +14,219 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      documentos: {
+        Row: {
+          created_at: string
+          id: string
+          mime_type: string | null
+          nome: string
+          obra_id: string | null
+          storage_path: string
+          tamanho: number | null
+          tipo: Database["public"]["Enums"]["documento_tipo"]
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mime_type?: string | null
+          nome: string
+          obra_id?: string | null
+          storage_path: string
+          tamanho?: number | null
+          tipo?: Database["public"]["Enums"]["documento_tipo"]
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mime_type?: string | null
+          nome?: string
+          obra_id?: string | null
+          storage_path?: string
+          tamanho?: number | null
+          tipo?: Database["public"]["Enums"]["documento_tipo"]
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentos_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      obras: {
+        Row: {
+          cliente: string | null
+          codigo: string | null
+          created_at: string
+          created_by: string | null
+          data_fim_prevista: string | null
+          data_inicio: string | null
+          descricao: string | null
+          estado: Database["public"]["Enums"]["obra_estado"]
+          id: string
+          localizacao: string | null
+          nome: string
+          responsavel_id: string | null
+          updated_at: string
+          valor_estimado: number | null
+        }
+        Insert: {
+          cliente?: string | null
+          codigo?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_fim_prevista?: string | null
+          data_inicio?: string | null
+          descricao?: string | null
+          estado?: Database["public"]["Enums"]["obra_estado"]
+          id?: string
+          localizacao?: string | null
+          nome: string
+          responsavel_id?: string | null
+          updated_at?: string
+          valor_estimado?: number | null
+        }
+        Update: {
+          cliente?: string | null
+          codigo?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_fim_prevista?: string | null
+          data_inicio?: string | null
+          descricao?: string | null
+          estado?: Database["public"]["Enums"]["obra_estado"]
+          id?: string
+          localizacao?: string | null
+          nome?: string
+          responsavel_id?: string | null
+          updated_at?: string
+          valor_estimado?: number | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          nome: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id: string
+          nome?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      subempreiteiros: {
+        Row: {
+          ativo: boolean
+          avaliacao: number | null
+          contacto_nome: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          especialidades: string[]
+          id: string
+          nif: string | null
+          nome: string
+          notas: string | null
+          telefone: string | null
+          updated_at: string
+          zonas: string[]
+        }
+        Insert: {
+          ativo?: boolean
+          avaliacao?: number | null
+          contacto_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          especialidades?: string[]
+          id?: string
+          nif?: string | null
+          nome: string
+          notas?: string | null
+          telefone?: string | null
+          updated_at?: string
+          zonas?: string[]
+        }
+        Update: {
+          ativo?: boolean
+          avaliacao?: number | null
+          contacto_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          especialidades?: string[]
+          id?: string
+          nif?: string | null
+          nome?: string
+          notas?: string | null
+          telefone?: string | null
+          updated_at?: string
+          zonas?: string[]
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "orcamentista" | "diretor_obra" | "comprador"
+      documento_tipo:
+        | "projeto"
+        | "mq"
+        | "caderno_encargos"
+        | "proposta"
+        | "outro"
+      obra_estado: "oportunidade" | "em_curso" | "concluida" | "cancelada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +353,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "orcamentista", "diretor_obra", "comprador"],
+      documento_tipo: [
+        "projeto",
+        "mq",
+        "caderno_encargos",
+        "proposta",
+        "outro",
+      ],
+      obra_estado: ["oportunidade", "em_curso", "concluida", "cancelada"],
+    },
   },
 } as const
