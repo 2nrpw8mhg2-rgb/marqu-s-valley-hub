@@ -268,6 +268,12 @@ function OrcamentoEditor() {
       />
 
       <div className="p-6 space-y-4">
+        <div className="flex gap-1 border-b border-border">
+          <div className="px-4 py-2 text-sm font-medium border-b-2 border-primary text-foreground">Mapa de Quantidades</div>
+          <Link to="/orcamentos/$id/decomposicao" params={{ id }} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">
+            Decomposição de Preços
+          </Link>
+        </div>
         <Card className="bg-card border-border p-4 grid sm:grid-cols-4 gap-4">
           <div className="space-y-1.5"><Label>Nome</Label><Input value={meta.nome} onChange={(e) => setMeta({ ...meta, nome: e.target.value })} /></div>
           <div className="space-y-1.5">
