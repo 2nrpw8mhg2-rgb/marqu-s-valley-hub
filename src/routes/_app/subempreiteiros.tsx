@@ -319,7 +319,7 @@ type ImportRow = {
   telefones: string[];
 };
 
-type ImportReport = { criados: number; atualizados: number; duplicados: number; erros: { linha: number; motivo: string }[] };
+type ImportReport = { lidos: number; criados: number; atualizados: number; duplicados: number; erros: { linha: number; motivo: string }[] };
 type RawImportRow = { linha: number; values: Record<string, unknown> };
 type ImportProgress = { phase: string; done: number; total: number };
 
@@ -494,6 +494,31 @@ function waitForUi() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+function normImportValue(value: string | null | undefined) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function normImportList(values: string[] | null | undefined) {
+  return [...(values ?? [])].map(normImportValue).filter(Boolean).sort().join(";");
+}
+
+function importFingerprint(row: Pick<ImportRow, "nome" | "tipo" | "nif" | "especialidades" | "zonas" | "distrito" | "concelho" | "contacto_nome" | "email" | "emails" | "telefone" | "telefones">) {
+  return [
+    normImportValue(row.nome),
+    normImportValue(row.tipo),
+    normImportValue(row.nif),
+    normImportList(row.especialidades),
+    normImportList(row.zonas),
+    normImportValue(row.distrito),
+    normImportValue(row.concelho),
+    normImportValue(row.contacto_nome),
+    normImportValue(row.email),
+    normImportList(row.emails),
+    normImportValue(row.telefone),
+    normImportList(row.telefones),
+  ].join("|");
+}
+
 function ImportDialog({ onClose }: { onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -520,28 +545,21 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
 
       setProgress({ phase: "A comparar com registos existentes", done: 0, total: rows.length });
 
-      const existing: { id: string; nif: string | null; email: string | null }[] = [];
+      const existing: Pick<Sub, "nome" | "tipo" | "nif" | "especialidades" | "zonas" | "distrito" | "concelho" | "contacto_nome" | "email" | "emails" | "telefone" | "telefones">[] = [];
       for (let from = 0; ; from += 1000) {
         const { data, error } = await supabase
           .from("subempreiteiros")
-          .select("id, nif, email")
+          .select("nome, tipo, nif, especialidades, zonas, distrito, concelho, contacto_nome, email, emails, telefone, telefones")
           .range(from, from + 999);
         if (error) throw error;
         existing.push(...(data ?? []));
         if (!data || data.length < 1000) break;
       }
-      const byNif = new Map<string, string>();
-      const byEmail = new Map<string, string>();
-      for (const e of existing) {
-        if (e.nif) byNif.set(String(e.nif).trim(), e.id);
-        if (e.email) byEmail.set(String(e.email).trim().toLowerCase(), e.id);
-      }
-      const seenKeys = new Set<string>();
+      const seenKeys = new Set(existing.map((e) => importFingerprint(e)));
 
       const { data: { user } } = await supabase.auth.getUser();
-      const rep: ImportReport = { criados: 0, atualizados: 0, duplicados: 0, erros: [] };
+      const rep: ImportReport = { lidos: rows.length, criados: 0, atualizados: 0, duplicados: 0, erros: [] };
       const inserts: any[] = [];
-      const updates: any[] = [];
 
       for (let i = 0; i < rows.length; i++) {
         const parsed = parseRow(rows[i].values, headers);
@@ -549,20 +567,12 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
           rep.erros.push({ linha: rows[i].linha, motivo: "Sem nome/empresa" });
           continue;
         }
-        const keyNif = parsed.nif ? `nif:${parsed.nif}` : null;
-        const keyEmail = parsed.email ? `email:${parsed.email.toLowerCase()}` : null;
-        const dedupKey = keyNif ?? keyEmail;
-        if (dedupKey && seenKeys.has(dedupKey)) {
+        const dedupKey = importFingerprint(parsed);
+        if (seenKeys.has(dedupKey)) {
           rep.duplicados++;
           continue;
         }
-        if (dedupKey) seenKeys.add(dedupKey);
-
-
-        const existingId =
-          (parsed.nif && byNif.get(parsed.nif)) ||
-          (parsed.email && byEmail.get(parsed.email.toLowerCase())) ||
-          null;
+        seenKeys.add(dedupKey);
 
         const payload: any = {
           nome: parsed.nome,
@@ -579,42 +589,13 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
           telefones: parsed.telefones,
         };
 
-        if (existingId) {
-          updates.push({ ...payload, id: existingId, _linha: rows[i].linha });
-        } else {
-          payload.created_by = user?.id ?? null;
-          inserts.push({ ...payload, _linha: rows[i].linha });
-        }
+        payload.created_by = user?.id ?? null;
+        inserts.push({ ...payload, _linha: rows[i].linha });
       }
 
-      const totalWrites = inserts.length + updates.length;
+      const totalWrites = inserts.length;
       let doneWrites = 0;
       setProgress({ phase: "A gravar registos", done: doneWrites, total: totalWrites });
-
-      // Deduplicate updates by id (keep the last occurrence) to avoid
-      // "ON CONFLICT DO UPDATE command cannot affect row a second time"
-      const updatesById = new Map<string, any>();
-      for (const u of updates) updatesById.set(u.id, u);
-      const dedupUpdates = Array.from(updatesById.values());
-
-      for (const batch of chunkArray(dedupUpdates, 100)) {
-        const payload = batch.map(({ _linha, ...item }) => item);
-        const { error } = await supabase.from("subempreiteiros").upsert(payload, { onConflict: "id" });
-        if (error) {
-          for (const item of batch) {
-            const { _linha, ...row } = item;
-            const { error: rowErr } = await supabase.from("subempreiteiros").upsert(row, { onConflict: "id" });
-            if (rowErr) rep.erros.push({ linha: _linha, motivo: rowErr.message });
-            else rep.atualizados++;
-          }
-        } else {
-          rep.atualizados += batch.length;
-        }
-        doneWrites += batch.length;
-        setProgress({ phase: "A gravar registos", done: doneWrites, total: totalWrites });
-        await waitForUi();
-      }
-
 
       for (const batch of chunkArray(inserts, 100)) {
         const payload = batch.map(({ _linha, ...item }) => item);
@@ -637,7 +618,7 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
 
 
       setReport(rep);
-      toast.success(`Importação concluída: ${rep.criados} criados, ${rep.atualizados} atualizados`);
+      toast.success(`Importação concluída: ${rep.criados} criados, ${rep.duplicados} duplicados ignorados`);
     } catch (e: any) {
       toast.error(e.message ?? "Falha ao ler ficheiro");
     } finally {
@@ -653,8 +634,8 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
         <DialogDescription>
           Carrega um ficheiro Excel com as colunas: TIPO, ESPECIALIDADE, EMPRESA, NIF, CONTACTOS EMAIL,
           CONTACTOS PESSOAIS, Nº DE TELEMÓVEIS, DISTRITO, CONCELHO, ZONA. Múltiplos valores podem ser
-          separados por vírgula, ponto e vírgula ou nova linha. Registos com NIF ou email já existentes
-          são atualizados.
+          separados por vírgula, ponto e vírgula ou nova linha. Linhas exatamente iguais a registos já existentes
+          são ignoradas; linhas diferentes são acrescentadas.
         </DialogDescription>
       </DialogHeader>
 
@@ -703,7 +684,8 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
 
         {report && (
           <div className="space-y-2 text-sm">
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-5 gap-2 text-center">
+              <ReportTile label="Lidos" value={report.lidos} tone="info" />
               <ReportTile label="Criados" value={report.criados} tone="ok" />
               <ReportTile label="Atualizados" value={report.atualizados} tone="info" />
               <ReportTile label="Duplicados" value={report.duplicados} tone="warn" />
