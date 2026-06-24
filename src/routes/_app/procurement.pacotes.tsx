@@ -399,7 +399,8 @@ async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitad
       ids.add(top.id);
       const artigoCount = arts.filter((a: any) => a.capitulo_id && ids.has(a.capitulo_id)).length;
       return {
-        key: top.codigo.trim(),
+        key: top.id,
+        codigo: top.codigo.trim(),
         nome: (top.descricao ?? "").trim() || `Capítulo ${top.codigo}`,
         capituloIds: ids,
         artigoCount,
