@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSubempreiteirosRouteImport } from './routes/_app/subempreiteiros'
 import { Route as AppObrasRouteImport } from './routes/_app/obras'
 import { Route as AppDocumentosRouteImport } from './routes/_app/documentos'
+import { Route as AppDecomposicaoPrecosRouteImport } from './routes/_app/decomposicao-precos'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppBibliotecaRouteImport } from './routes/_app/biblioteca'
 import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos.index'
@@ -49,6 +50,11 @@ const AppObrasRoute = AppObrasRouteImport.update({
 const AppDocumentosRoute = AppDocumentosRouteImport.update({
   id: '/documentos',
   path: '/documentos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDecomposicaoPrecosRoute = AppDecomposicaoPrecosRouteImport.update({
+  id: '/decomposicao-precos',
+  path: '/decomposicao-precos',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/biblioteca': typeof AppBibliotecaRoute
   '/dashboard': typeof AppDashboardRoute
+  '/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/documentos': typeof AppDocumentosRoute
   '/obras': typeof AppObrasRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/biblioteca': typeof AppBibliotecaRoute
   '/dashboard': typeof AppDashboardRoute
+  '/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/documentos': typeof AppDocumentosRoute
   '/obras': typeof AppObrasRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
@@ -117,6 +125,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_app/biblioteca': typeof AppBibliotecaRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/_app/documentos': typeof AppDocumentosRoute
   '/_app/obras': typeof AppObrasRoute
   '/_app/subempreiteiros': typeof AppSubempreiteirosRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/biblioteca'
     | '/dashboard'
+    | '/decomposicao-precos'
     | '/documentos'
     | '/obras'
     | '/subempreiteiros'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/biblioteca'
     | '/dashboard'
+    | '/decomposicao-precos'
     | '/documentos'
     | '/obras'
     | '/subempreiteiros'
@@ -159,6 +170,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_app/biblioteca'
     | '/_app/dashboard'
+    | '/_app/decomposicao-precos'
     | '/_app/documentos'
     | '/_app/obras'
     | '/_app/subempreiteiros'
@@ -216,6 +228,13 @@ declare module '@tanstack/react-router' {
       path: '/documentos'
       fullPath: '/documentos'
       preLoaderRoute: typeof AppDocumentosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/decomposicao-precos': {
+      id: '/_app/decomposicao-precos'
+      path: '/decomposicao-precos'
+      fullPath: '/decomposicao-precos'
+      preLoaderRoute: typeof AppDecomposicaoPrecosRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/dashboard': {
@@ -278,6 +297,7 @@ const AppOrcamentosIdRouteWithChildren = AppOrcamentosIdRoute._addFileChildren(
 interface AppRouteChildren {
   AppBibliotecaRoute: typeof AppBibliotecaRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppDecomposicaoPrecosRoute: typeof AppDecomposicaoPrecosRoute
   AppDocumentosRoute: typeof AppDocumentosRoute
   AppObrasRoute: typeof AppObrasRoute
   AppSubempreiteirosRoute: typeof AppSubempreiteirosRoute
@@ -289,6 +309,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppBibliotecaRoute: AppBibliotecaRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppDecomposicaoPrecosRoute: AppDecomposicaoPrecosRoute,
   AppDocumentosRoute: AppDocumentosRoute,
   AppObrasRoute: AppObrasRoute,
   AppSubempreiteirosRoute: AppSubempreiteirosRoute,
