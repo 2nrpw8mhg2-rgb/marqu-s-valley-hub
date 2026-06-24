@@ -13,11 +13,11 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSubempreiteirosRouteImport } from './routes/_app/subempreiteiros'
-import { Route as AppOrcamentosRouteImport } from './routes/_app/orcamentos'
 import { Route as AppObrasRouteImport } from './routes/_app/obras'
 import { Route as AppDocumentosRouteImport } from './routes/_app/documentos'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppBibliotecaRouteImport } from './routes/_app/biblioteca'
+import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos.index'
 import { Route as AppOrcamentosIdRouteImport } from './routes/_app/orcamentos.$id'
 
 const AuthRoute = AuthRouteImport.update({
@@ -37,11 +37,6 @@ const IndexRoute = IndexRouteImport.update({
 const AppSubempreiteirosRoute = AppSubempreiteirosRouteImport.update({
   id: '/subempreiteiros',
   path: '/subempreiteiros',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppOrcamentosRoute = AppOrcamentosRouteImport.update({
-  id: '/orcamentos',
-  path: '/orcamentos',
   getParentRoute: () => AppRoute,
 } as any)
 const AppObrasRoute = AppObrasRouteImport.update({
@@ -64,10 +59,15 @@ const AppBibliotecaRoute = AppBibliotecaRouteImport.update({
   path: '/biblioteca',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOrcamentosIndexRoute = AppOrcamentosIndexRouteImport.update({
+  id: '/orcamentos/',
+  path: '/orcamentos/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppOrcamentosIdRoute = AppOrcamentosIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AppOrcamentosRoute,
+  id: '/orcamentos/$id',
+  path: '/orcamentos/$id',
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -77,9 +77,9 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AppDashboardRoute
   '/documentos': typeof AppDocumentosRoute
   '/obras': typeof AppObrasRoute
-  '/orcamentos': typeof AppOrcamentosRouteWithChildren
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/orcamentos/$id': typeof AppOrcamentosIdRoute
+  '/orcamentos/': typeof AppOrcamentosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -88,9 +88,9 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardRoute
   '/documentos': typeof AppDocumentosRoute
   '/obras': typeof AppObrasRoute
-  '/orcamentos': typeof AppOrcamentosRouteWithChildren
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/orcamentos/$id': typeof AppOrcamentosIdRoute
+  '/orcamentos': typeof AppOrcamentosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -101,9 +101,9 @@ export interface FileRoutesById {
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/documentos': typeof AppDocumentosRoute
   '/_app/obras': typeof AppObrasRoute
-  '/_app/orcamentos': typeof AppOrcamentosRouteWithChildren
   '/_app/subempreiteiros': typeof AppSubempreiteirosRoute
   '/_app/orcamentos/$id': typeof AppOrcamentosIdRoute
+  '/_app/orcamentos/': typeof AppOrcamentosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -114,9 +114,9 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/documentos'
     | '/obras'
-    | '/orcamentos'
     | '/subempreiteiros'
     | '/orcamentos/$id'
+    | '/orcamentos/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -125,9 +125,9 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/documentos'
     | '/obras'
-    | '/orcamentos'
     | '/subempreiteiros'
     | '/orcamentos/$id'
+    | '/orcamentos'
   id:
     | '__root__'
     | '/'
@@ -137,9 +137,9 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/documentos'
     | '/_app/obras'
-    | '/_app/orcamentos'
     | '/_app/subempreiteiros'
     | '/_app/orcamentos/$id'
+    | '/_app/orcamentos/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -178,13 +178,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSubempreiteirosRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/orcamentos': {
-      id: '/_app/orcamentos'
-      path: '/orcamentos'
-      fullPath: '/orcamentos'
-      preLoaderRoute: typeof AppOrcamentosRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/obras': {
       id: '/_app/obras'
       path: '/obras'
@@ -213,35 +206,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBibliotecaRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/orcamentos/': {
+      id: '/_app/orcamentos/'
+      path: '/orcamentos'
+      fullPath: '/orcamentos/'
+      preLoaderRoute: typeof AppOrcamentosIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/orcamentos/$id': {
       id: '/_app/orcamentos/$id'
-      path: '/$id'
+      path: '/orcamentos/$id'
       fullPath: '/orcamentos/$id'
       preLoaderRoute: typeof AppOrcamentosIdRouteImport
-      parentRoute: typeof AppOrcamentosRoute
+      parentRoute: typeof AppRoute
     }
   }
 }
-
-interface AppOrcamentosRouteChildren {
-  AppOrcamentosIdRoute: typeof AppOrcamentosIdRoute
-}
-
-const AppOrcamentosRouteChildren: AppOrcamentosRouteChildren = {
-  AppOrcamentosIdRoute: AppOrcamentosIdRoute,
-}
-
-const AppOrcamentosRouteWithChildren = AppOrcamentosRoute._addFileChildren(
-  AppOrcamentosRouteChildren,
-)
 
 interface AppRouteChildren {
   AppBibliotecaRoute: typeof AppBibliotecaRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDocumentosRoute: typeof AppDocumentosRoute
   AppObrasRoute: typeof AppObrasRoute
-  AppOrcamentosRoute: typeof AppOrcamentosRouteWithChildren
   AppSubempreiteirosRoute: typeof AppSubempreiteirosRoute
+  AppOrcamentosIdRoute: typeof AppOrcamentosIdRoute
+  AppOrcamentosIndexRoute: typeof AppOrcamentosIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -249,8 +238,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppDocumentosRoute: AppDocumentosRoute,
   AppObrasRoute: AppObrasRoute,
-  AppOrcamentosRoute: AppOrcamentosRouteWithChildren,
   AppSubempreiteirosRoute: AppSubempreiteirosRoute,
+  AppOrcamentosIdRoute: AppOrcamentosIdRoute,
+  AppOrcamentosIndexRoute: AppOrcamentosIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

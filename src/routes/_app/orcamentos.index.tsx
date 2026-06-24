@@ -15,7 +15,7 @@ import { Plus, Search, Calculator, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { fmtEUR, lineTotal } from "@/lib/orcamento-utils";
 
-export const Route = createFileRoute("/_app/orcamentos")({
+export const Route = createFileRoute("/_app/orcamentos/")({
   head: () => ({ meta: [{ title: "Orçamentos — MV OS" }] }),
   component: OrcamentosPage,
 });
