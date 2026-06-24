@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,8 +32,16 @@ import { ESPECIALIDADES, inferirEspecialidade, type Especialidade } from "@/lib/
 
 export const Route = createFileRoute("/_app/procurement/pacotes")({
   head: () => ({ meta: [{ title: "Pacotes de Consulta — Procurement — MV OS" }] }),
-  component: PacotesListPage,
+  component: PacotesRoutePage,
 });
+
+function PacotesRoutePage() {
+  const isDetailRoute = useRouterState({
+    select: (state) => state.location.pathname.startsWith("/procurement/pacotes/") && state.location.pathname !== "/procurement/pacotes/",
+  });
+
+  return isDetailRoute ? <Outlet /> : <PacotesListPage />;
+}
 
 const ESTADO_LABEL: Record<string, string> = {
   por_preparar: "Por preparar",
