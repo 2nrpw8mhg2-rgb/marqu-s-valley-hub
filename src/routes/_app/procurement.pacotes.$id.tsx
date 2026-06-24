@@ -585,25 +585,45 @@ function AdicionarArtigosDialog({
     });
   }
 
+  const registar = useServerFn(registarCorrecao);
+
   async function adicionar() {
     if (selecionados.size === 0) return;
     setSaving(true);
-    const rows = artigos.filter((a: any) => selecionados.has(a.id)).map((a: any) => {
+    const { pertenceAoPacote } = await import("@/lib/procurement/classifier");
+    const escolhidos = artigos.filter((a: any) => selecionados.has(a.id));
+    const rows = escolhidos.map((a: any) => {
       const custoTotal = Number(a.custo_mao_obra ?? 0) + Number(a.custo_tarefeiros ?? 0)
         + Number(a.custo_subempreitadas ?? 0) + Number(a.custo_materiais ?? 0)
         + Number(a.custo_equipamentos ?? 0) + Number(a.custo_transportes ?? 0)
         + Number(a.custo_encargos_gerais ?? 0) + Number(a.custo_outros ?? 0);
+      const r = pertenceAoPacote({
+        descricao: a.descricao, codigo: a.codigo,
+        capitulo: a.capitulo?.descricao, capituloCodigo: a.capitulo?.codigo,
+      }, especialidade);
       return {
         pacote_id: pacoteId, artigo_id: a.id, codigo: a.codigo, descricao: a.descricao,
         unidade: a.unidade, quantidade: a.quantidade,
         capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
         preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
         categoria_custo: null, especialidade,
+        confianca: r.confianca, motivo: r.motivo, sinalizado_revisao: !r.pertence,
       };
     });
     const { error } = await supabase.from("procurement_pacote_artigos").insert(rows);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
+    // Aprendizagem: cada adição manual é uma decisão do utilizador
+    for (const a of escolhidos) {
+      registar({ data: {
+        artigo: { codigo: a.codigo, descricao: a.descricao, capitulo: a.capitulo?.descricao, subcapitulo: null },
+        especialidadeAnterior: null,
+        especialidadeFinal: especialidade,
+        confiancaAnterior: null,
+        obraId: null,
+        acao: "add",
+      }}).catch(() => {});
+    }
     toast.success(`${rows.length} artigo(s) adicionado(s)`);
     setSelecionados(new Set()); setSearch("");
     onAdded(); onOpenChange(false);
