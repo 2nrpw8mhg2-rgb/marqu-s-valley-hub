@@ -309,6 +309,9 @@ function PacoteDetailPage() {
             <Button variant="outline" onClick={() => exportarPDF(nome || "pacote", especialidade, pacote.orcamento?.nome, artigos)} disabled={artigos.length === 0}>
               <FileText className="h-4 w-4 mr-2" /> PDF
             </Button>
+            <Button variant="outline" onClick={correrAuditoria} disabled={reanalising || artigos.length === 0}>
+              <Sparkles className="h-4 w-4 mr-2" /> {reanalising ? "A reanalisar..." : "Reanalisar pacote"}
+            </Button>
             <Button onClick={salvarHeader}><Save className="h-4 w-4 mr-2" /> Guardar</Button>
             <Button variant="default" onClick={prepararEnvio} disabled={artigos.length === 0}>
               <Send className="h-4 w-4 mr-2" /> Preparar envio
