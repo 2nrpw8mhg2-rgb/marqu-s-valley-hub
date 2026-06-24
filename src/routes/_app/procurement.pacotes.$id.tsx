@@ -44,23 +44,101 @@ function sanitizeFilename(s: string) {
   return s.replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, " ").trim().slice(0, 80);
 }
 
-function exportarExcel(nome: string, especialidade: string, artigos: any[]) {
-  const rows = artigos.map((a) => ({
-    Código: a.codigo ?? "",
-    Descrição: a.descricao ?? "",
-    Unidade: a.unidade ?? "",
-    Quantidade: Number(a.quantidade ?? 0),
-    "Preço unitário (€)": "",
-    "Total (€)": "",
-    Observações: "",
-  }));
-  const ws = XLSX.utils.json_to_sheet(rows, {
-    header: ["Código", "Descrição", "Unidade", "Quantidade", "Preço unitário (€)", "Total (€)", "Observações"],
-  });
-  ws["!cols"] = [{ wch: 12 }, { wch: 60 }, { wch: 8 }, { wch: 12 }, { wch: 18 }, { wch: 14 }, { wch: 30 }];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, especialidade.slice(0, 31) || "Pacote");
-  XLSX.writeFile(wb, `${sanitizeFilename(nome)}.xlsx`);
+function compareCodigo(a: string, b: string) {
+  const pa = (a || "").split(".").map((p) => parseInt(p, 10));
+  const pb = (b || "").split(".").map((p) => parseInt(p, 10));
+  const n = Math.max(pa.length, pb.length);
+  for (let i = 0; i < n; i++) {
+    const va = isNaN(pa[i]) ? 0 : pa[i];
+    const vb = isNaN(pb[i]) ? 0 : pb[i];
+    if (va !== vb) return va - vb;
+  }
+  return (a || "").localeCompare(b || "");
+}
+
+function exportarExcel(
+  nome: string,
+  especialidade: string,
+  artigos: any[],
+  obraInfo?: { nome?: string; codigo?: string | null; cliente?: string | null },
+  orcamentoInfo?: { nome?: string; versao?: number },
+) {
+  try {
+    const rows: any[][] = [];
+    rows.push(["Obra", obraInfo?.nome ?? "", "", "Código obra", obraInfo?.codigo ?? ""]);
+    rows.push(["Cliente", obraInfo?.cliente ?? "", "", "Especialidade", especialidade]);
+    rows.push([
+      "Orçamento",
+      orcamentoInfo?.nome ? `${orcamentoInfo.nome}${orcamentoInfo.versao ? ` (v${orcamentoInfo.versao})` : ""}` : "",
+      "",
+      "Pacote",
+      nome,
+    ]);
+    rows.push([]);
+    rows.push(["Código", "Descrição", "Un.", "Qtd.", "Preço unit.", "Total", "Observações"]);
+    const headerRowIdx = rows.length - 1;
+
+    // group by capitulo text
+    const grupos = new Map<string, any[]>();
+    for (const a of artigos) {
+      const k = (a.capitulo as string) || "OUTROS";
+      const arr = grupos.get(k) ?? [];
+      arr.push(a);
+      grupos.set(k, arr);
+    }
+    const capKeys = [...grupos.keys()].sort((x, y) => {
+      const ax = grupos.get(x)![0]?.codigo ?? "";
+      const ay = grupos.get(y)![0]?.codigo ?? "";
+      return compareCodigo(ax, ay);
+    });
+
+    const bandRows: number[] = [];
+    let total = 0;
+    for (const cap of capKeys) {
+      bandRows.push(rows.length);
+      rows.push(["", cap.toUpperCase(), "", "", "", "", ""]);
+      const arts = grupos.get(cap)!.sort((a, b) => compareCodigo(a.codigo ?? "", b.codigo ?? ""));
+      for (const a of arts) {
+        const qtd = Number(a.quantidade ?? 0);
+        const pu = Number(a.preco_seco_estimado ?? 0);
+        const t = qtd * pu;
+        total += t;
+        rows.push([
+          a.codigo ?? "",
+          a.descricao ?? "",
+          a.unidade ?? "",
+          qtd,
+          pu || "",
+          t || "",
+          "",
+        ]);
+      }
+    }
+    rows.push([]);
+    rows.push(["", "", "", "", "", "TOTAL", total]);
+    const totalRowIdx = rows.length - 1;
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 14 }, { wch: 60 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 30 }];
+
+    // basic styling (header bold via cell.s requires cell-styles fork; xlsx community ignores it,
+    // but we still set number formats which ARE preserved)
+    for (let r = headerRowIdx + 1; r <= totalRowIdx; r++) {
+      const qCell = XLSX.utils.encode_cell({ r, c: 3 });
+      const puCell = XLSX.utils.encode_cell({ r, c: 4 });
+      const tCell = XLSX.utils.encode_cell({ r, c: 5 });
+      if (ws[qCell] && typeof ws[qCell].v === "number") ws[qCell].z = "#,##0.00";
+      if (ws[puCell] && typeof ws[puCell].v === "number") ws[puCell].z = "#,##0.00 €";
+      if (ws[tCell] && typeof ws[tCell].v === "number") ws[tCell].z = "#,##0.00 €";
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, (especialidade || "Pacote").slice(0, 31));
+    XLSX.writeFile(wb, `${sanitizeFilename(nome)}.xlsx`);
+  } catch (err) {
+    console.error("Falha a exportar Excel", err);
+    toast.error("Não foi possível gerar o Excel");
+  }
 }
 
 function exportarPDF(nome: string, especialidade: string, orcamentoNome: string | undefined, artigos: any[]) {
