@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -304,16 +305,16 @@ function DecomposicaoPage() {
                   <th className="w-8"></th>
                   <th className="text-left px-2 py-2 w-20">Código</th>
                   <th className="text-left px-2 py-2 min-w-[220px]">Descrição</th>
-                  <th className="text-left px-2 py-2 w-14">Un.</th>
-                  <th className="text-right px-2 py-2 w-20">Qtd</th>
+                  <th className="text-left px-2 py-2 w-16">Unidade</th>
+                  <th className="text-right px-2 py-2 w-24">Quantidade</th>
                   <th className="text-right px-2 py-2 w-32" title="Preço unitário original importado do Mapa de Quantidades">Preço Seco</th>
                   {INLINE_COST_COLS.map(c => (
-                    <th key={c.key} className="text-right px-2 py-2 w-32" title={c.label}>{c.short}</th>
+                    <th key={c.key} className="text-right px-2 py-2 w-32">{c.label}</th>
                   ))}
                   <th className="text-right px-2 py-2 w-28 bg-muted/60">Custo Total</th>
                   <th className="text-right px-2 py-2 w-24">Margem %</th>
-                  <th className="text-right px-2 py-2 w-28">PV Unit.</th>
-                  <th className="text-right px-2 py-2 w-28">Total Venda</th>
+                  <th className="text-right px-2 py-2 w-32">Preço de Venda Unitário</th>
+                  <th className="text-right px-2 py-2 w-32">Total de Venda</th>
                   <th className="text-right px-2 py-2 w-28">Lucro Bruto</th>
                   <th className="w-10"></th>
                 </tr>
@@ -353,28 +354,27 @@ function DecomposicaoPage() {
                         <td className="px-2 text-muted-foreground">{a.unidade}</td>
                         <td className="px-2 text-right tabular-nums">{fmtNum(a.quantidade)}</td>
                         <td className="px-1">
-                          <Input
-                            className="h-7 text-xs text-right tabular-nums no-spin px-1.5 w-full min-w-0"
-                            type="number" step="0.01" value={a.preco_seco}
-                            onChange={e => updateArt(idx, { preco_seco: Number(e.target.value) })}
+                          <NumberInput
+                            className="h-7 text-xs text-right tabular-nums px-1.5 w-full min-w-0"
+                            value={a.preco_seco}
+                            onChange={v => updateArt(idx, { preco_seco: v })}
                           />
                         </td>
                         {INLINE_COST_COLS.map(c => (
                           <td key={c.key} className="px-1">
-                            <Input
-                              className="h-7 text-xs text-right tabular-nums no-spin px-1.5 w-full min-w-0"
-                              type="number" step="0.01"
+                            <NumberInput
+                              className="h-7 text-xs text-right tabular-nums px-1.5 w-full min-w-0"
                               value={a[c.key]}
-                              onChange={e => updateArt(idx, { [c.key]: Number(e.target.value) } as Partial<Art>)}
+                              onChange={v => updateArt(idx, { [c.key]: v } as Partial<Art>)}
                             />
                           </td>
                         ))}
                         <td className="px-2 text-right tabular-nums font-medium bg-muted/30">{fmtEUR(cu)}</td>
                         <td className="px-1">
-                          <Input
-                            className="h-7 text-xs text-right tabular-nums no-spin px-1.5 w-full min-w-0"
-                            type="number" step="0.1" value={a.margem_pct}
-                            onChange={e => updateArt(idx, { margem_pct: Number(e.target.value) })}
+                          <NumberInput
+                            className="h-7 text-xs text-right tabular-nums px-1.5 w-full min-w-0"
+                            value={a.margem_pct}
+                            onChange={v => updateArt(idx, { margem_pct: v })}
                           />
                         </td>
                         <td className="px-2 text-right tabular-nums">{fmtEUR(pv)}</td>
@@ -400,11 +400,10 @@ function DecomposicaoPage() {
                                   {EXTRA_COST_COLS.map(c => (
                                     <div key={c.key} className="space-y-1">
                                       <Label className="text-[10px] text-muted-foreground">{c.label}</Label>
-                                      <Input
-                                        className="h-7 text-xs text-right tabular-nums no-spin px-1.5 w-full min-w-0"
-                                        type="number" step="0.01"
+                                      <NumberInput
+                                        className="h-7 text-xs text-right tabular-nums px-1.5 w-full min-w-0"
                                         value={a[c.key]}
-                                        onChange={e => updateArt(idx, { [c.key]: Number(e.target.value) } as Partial<Art>)}
+                                        onChange={v => updateArt(idx, { [c.key]: v } as Partial<Art>)}
                                       />
                                     </div>
                                   ))}
