@@ -276,7 +276,20 @@ function OrcamentoEditor() {
           </div>
           <div className="space-y-1.5">
             <Label>Margem global %</Label>
-            <Input type="number" step="0.1" value={meta.margem_global_pct} onChange={(e) => setMeta({ ...meta, margem_global_pct: Number(e.target.value) })} />
+            <div className="flex gap-1">
+              <Input type="number" step="0.1" value={meta.margem_global_pct} onChange={(e) => setMeta({ ...meta, margem_global_pct: Number(e.target.value) })} />
+              <Button
+                variant="outline"
+                size="sm"
+                title="Aplicar esta margem a todas as linhas"
+                onClick={() => {
+                  const m = meta.margem_global_pct || 0;
+                  setArtsState((prev) => prev.map((a) => ({ ...a, margem_pct: m, _dirty: true })));
+                  setMeta((mt) => ({ ...mt, margem_global_pct: 0 }));
+                  toast.success(`Margem de ${m}% aplicada a todas as linhas`);
+                }}
+              >Aplicar</Button>
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label>Total proposta</Label>
