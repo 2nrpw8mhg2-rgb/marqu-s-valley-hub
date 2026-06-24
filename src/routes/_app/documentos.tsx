@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Upload,
   FolderPlus,
@@ -168,7 +169,63 @@ function DocumentosPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [isDragOver, setIsDragOver] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Limpa selecção ao mudar de pasta
+  useEffect(() => {
+    setSelecionados(new Set());
+  }, [pastaActualId]);
+
+  const toggleSel = (id: string) => {
+    setSelecionados((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+  const toggleSelAll = () => {
+    setSelecionados((prev) =>
+      prev.size === docs.length ? new Set() : new Set(docs.map((d) => d.id)),
+    );
+  };
+
+  const eliminarSelecionados = async () => {
+    if (selecionados.size === 0) return;
+    if (!confirm(`Eliminar ${selecionados.size} ficheiro(s)?`)) return;
+    const ids = Array.from(selecionados);
+    const alvos = docs.filter((d) => ids.includes(d.id));
+    const paths = alvos.map((d) => d.storage_path).filter(Boolean);
+    if (paths.length) await supabase.storage.from("documentos").remove(paths);
+    const { error } = await supabase.from("documentos").delete().in("id", ids);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`${ids.length} ficheiro(s) eliminados`);
+    setSelecionados(new Set());
+    invalidar();
+  };
+
+  const moverSelecionadosPara = async (destinoId: string) => {
+    if (selecionados.size === 0) return;
+    const ids = Array.from(selecionados);
+    const { error } = await supabase
+      .from("documentos")
+      .update({ pasta_id: destinoId })
+      .in("id", ids);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`${ids.length} ficheiro(s) movidos`);
+    setSelecionados(new Set());
+    setBulkMoveOpen(false);
+    invalidar();
+  };
+
 
   const invalidar = () => {
     qc.invalidateQueries({ queryKey: ["pastas-obra", obraId] });
@@ -569,9 +626,42 @@ function DocumentosPage() {
 
                   {/* Ficheiros */}
                   <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">
-                      Ficheiros
-                    </p>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                        Ficheiros
+                      </p>
+                      {selecionados.size > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            {selecionados.size} selecionado(s)
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => setBulkMoveOpen(true)}
+                          >
+                            <FolderInput className="h-3.5 w-3.5 mr-1" /> Mover
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs text-destructive border-destructive/40 hover:bg-destructive/10"
+                            onClick={eliminarSelecionados}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => setSelecionados(new Set())}
+                          >
+                            Limpar
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                     {docs.length === 0 ? (
                       <div className="border border-dashed border-border rounded-lg py-12 text-center">
                         <Upload className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
@@ -581,11 +671,26 @@ function DocumentosPage() {
                       </div>
                     ) : (
                       <Card className="bg-card border-border overflow-hidden divide-y divide-border">
+                        <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 text-xs text-muted-foreground">
+                          <Checkbox
+                            checked={selecionados.size === docs.length && docs.length > 0}
+                            onCheckedChange={toggleSelAll}
+                            aria-label="Selecionar todos"
+                          />
+                          <span>Selecionar todos</span>
+                        </div>
                         {docs.map((d) => (
                           <div
                             key={d.id}
-                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 group"
+                            className={`flex items-center gap-3 px-4 py-2.5 group ${
+                              selecionados.has(d.id) ? "bg-primary/5" : "hover:bg-muted/40"
+                            }`}
                           >
+                            <Checkbox
+                              checked={selecionados.has(d.id)}
+                              onCheckedChange={() => toggleSel(d.id)}
+                              aria-label={`Selecionar ${d.nome}`}
+                            />
                             <FileIcon mime={d.mime_type} nome={d.nome} />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{d.nome}</p>
@@ -644,6 +749,7 @@ function DocumentosPage() {
                       </Card>
                     )}
                   </div>
+
                 </div>
               </ScrollArea>
             </>
@@ -679,6 +785,14 @@ function DocumentosPage() {
             setMoveTarget(null);
             if (ok) invalidar();
           }}
+        />
+      )}
+      {bulkMoveOpen && (
+        <BulkMoveDialog
+          count={selecionados.size}
+          pastas={pastas}
+          onClose={() => setBulkMoveOpen(false)}
+          onConfirm={moverSelecionadosPara}
         />
       )}
       {novaObraOpen && (
@@ -979,6 +1093,69 @@ function MoveDialog({
 }
 
 type ArvoreNo = Pasta & { filhos: ArvoreNo[] };
+
+function BulkMoveDialog({
+  count,
+  pastas,
+  onClose,
+  onConfirm,
+}: {
+  count: number;
+  pastas: Pasta[];
+  onClose: () => void;
+  onConfirm: (destinoId: string) => void | Promise<void>;
+}) {
+  const [destinoId, setDestinoId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const arvore = useMemo(() => construirArvore(pastas), [pastas]);
+  const proibidas = useMemo(() => new Set<string>(), []);
+
+  const submit = async () => {
+    if (!destinoId) {
+      toast.error("Selecione uma pasta de destino");
+      return;
+    }
+    setBusy(true);
+    await onConfirm(destinoId);
+    setBusy(false);
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="bg-card border-border">
+        <DialogHeader>
+          <DialogTitle>Mover {count} ficheiro(s) para...</DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="max-h-80 border border-border rounded-md">
+          <div className="p-2">
+            {arvore.map((node) => (
+              <TreeNode
+                key={node.id}
+                node={node}
+                nivel={0}
+                proibidas={proibidas}
+                selecionada={destinoId}
+                onSelect={setDestinoId}
+              />
+            ))}
+          </div>
+        </ScrollArea>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={submit}
+            disabled={busy || !destinoId}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            {busy ? "A mover..." : "Mover"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function TreeNode({
   node,
