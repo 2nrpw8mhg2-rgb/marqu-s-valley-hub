@@ -301,19 +301,21 @@ function PacoteDetailPage() {
 
   async function confirmarMover() {
     const art = moverState.artigo;
-    const destinoEsp = moverState.destinoId; // agora guarda a especialidade
-    if (!art || !destinoEsp) return;
+    const destinoKey = moverState.destinoId; // chave da subempreitada
+    if (!art || !destinoKey) return;
+    const sub = opcoesDestino.find((o) => o.key === destinoKey);
+    if (!sub) return;
     setMovendo(true);
     try {
-      // 1) garantir pacote de destino (existente ou criar)
-      let destinoPacote = (outrosPacotes as any[]).find((p) => p.especialidade === destinoEsp);
+      // 1) garantir pacote de destino (existente ou criar) — match por nome da subempreitada
+      let destinoPacote = sub.pacote;
       if (!destinoPacote) {
         const { data: novo, error: errCria } = await supabase
           .from("procurement_pacotes")
           .insert({
             orcamento_id: pacote!.orcamento_id,
-            nome: destinoEsp,
-            especialidade: destinoEsp,
+            nome: sub.nome,
+            especialidade: sub.nome,
             estado: "por_preparar",
           })
           .select("id, nome, especialidade")
