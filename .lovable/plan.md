@@ -1,92 +1,90 @@
-## FASE 3 — Procurement · Módulo 1: Pacotes de Consulta
+# Classificador Inteligente de Pacotes de Consulta
 
-Criar a área **Procurement** integrada com Orçamentação e Decomposição de Preços, começando pelo Módulo 1 (Pacotes de Consulta). Os módulos seguintes (envio a subempreiteiros, receção e comparação de propostas, adjudicação, histórico) ficam para entregas posteriores desta mesma fase.
+Refatoração completa do sistema de classificação para suportar análise contextual, scoring multi-pacote, aprendizagem global e auditoria automática.
 
-### 1. Base de dados (migração)
+## 1. Base de dados (1 migration)
 
-Novas tabelas em `public`:
+**Tabela nova `classificacao_aprendizagem`** (global, partilhada entre obras):
+- descricao_original (texto)
+- descricao_normalizada (texto, indexado — minúsculas, sem acentos, sem números soltos)
+- codigo_artigo
+- capitulo, subcapitulo
+- especialidade_sugerida (o que o motor sugeriu)
+- especialidade_final (o que o utilizador escolheu)
+- confianca_sugerida (0–1)
+- obra_id, user_id, acao (move/add/remove/change)
+- created_at
+- RLS: leitura por qualquer autenticado (aprendizagem é global); escrita só do próprio user_id
 
-- `procurement_pacotes`
-  - `id`, `orcamento_id` (FK → orcamentos), `obra_id` (FK → obras, nullable derivado), `nome`, `especialidade`, `estado` (enum: `por_preparar | preparado | enviado | em_analise | adjudicado | cancelado`, default `por_preparar`), `observacoes`, `user_id`, `created_at`, `updated_at`.
-- `procurement_pacote_artigos`
-  - `id`, `pacote_id` (FK → procurement_pacotes ON DELETE CASCADE), `artigo_id` (FK → orcamento_artigos), `codigo`, `descricao`, `unidade`, `quantidade`, `capitulo`, `subcapitulo`, `preco_seco_estimado` (= custo unit. da decomposição), `categoria_custo`, `especialidade`, `created_at`.
+**Tabela nova `classificacao_cache`**:
+- hash (sha256 da descrição+capítulo+vizinhos) — PK
+- resultado_json (scores por pacote + justificação)
+- modelo (regras / ia) + created_at
+- Evita pagar IA várias vezes pelo mesmo artigo
 
-Enum `procurement_pacote_estado`. Grants `authenticated` + `service_role`. RLS por `user_id` (mesmo padrão das outras tabelas). Trigger `set_updated_at` no pacote.
+**Coluna nova em `procurement_pacote_artigos`**:
+- confianca (numeric)
+- motivo (texto)
+- sinalizado_revisao (bool) — para auditoria
 
-Não toca em `orcamento_artigos` nem na Decomposição — apenas cria uma camada nova de organização. Os dados são copiados para o pacote no momento da geração (snapshot) para permitir editar especialidade/preço estimado sem alterar o orçamento original.
+## 2. Motor de classificação (`src/lib/procurement/classifier.ts`)
 
-### 2. Sidebar
+Novo módulo orquestrador (mantém `especialidades.ts` como camada de regras):
 
-Remover `disabled` de **Procurement** e expandir para sub-itens:
-- Procurement
-  - Pacotes de Consulta → `/procurement/pacotes`
+**Pipeline para cada artigo**:
+1. **Aprendizagem** — procura na `classificacao_aprendizagem` por descrição normalizada igual ou muito semelhante (similaridade Jaccard sobre tokens). Se houver ≥3 ocorrências consistentes da mesma especialidade → confiança 0.98, motivo "aprendido com X correções".
+2. **Contexto estrutural** — usa código do capítulo + nome (ex.: cap. 12 → cobertura; cap. 3 → demolições; cap. 4.2 → terraplanagens). Bloqueia automaticamente pacotes incompatíveis.
+3. **Scoring multi-pacote** — corre regex existentes mas devolve `Map<Especialidade, score 0–100>` em vez de só um vencedor. Aplica pesos:
+   - palavra-chave forte no início da descrição: +30
+   - palavra-chave no capítulo: +25
+   - vizinhos imediatos (mesmo subcapítulo) com a mesma classificação: +15
+   - exclusões duras (ex.: "tela em fundações" para Cobertura): -100
+4. **Confiança híbrida** — se top1 < 0.85 OU top1−top2 < 0.10 (ambíguo): chama IA.
+5. **IA (Gemini via Lovable AI Gateway)** — server function que recebe descrição + capítulo + 2 vizinhos anteriores + 2 seguintes + lista de pacotes disponíveis. Devolve JSON estruturado com score por pacote + justificação curta. Cache por hash.
+6. **Resultado final**: especialidade, confiança, motivo, scores_alternativos[].
 
-### 3. Rotas novas
+## 3. Auditoria pós-geração
 
-- `src/routes/_app/procurement.pacotes.tsx` — lista de pacotes
-- `src/routes/_app/procurement.pacotes.$id.tsx` — detalhe do pacote
+Quando se cria um pacote, depois de inserir os artigos, corre uma segunda passagem:
 
-### 4. Página Lista (`/procurement/pacotes`)
+**Para cada artigo no pacote**: re-pergunta "este artigo pertence a esta especialidade?" Se confiança < 0.7 → marca `sinalizado_revisao=true`.
 
-Topo:
-- Filtro **Obra/Orçamento** (select dos orçamentos do utilizador).
-- Botões: **Novo pacote** · **Gerar pacotes automaticamente** (dialog que pede orçamento e cria 1 pacote por especialidade detectada).
+**Para cada artigo NÃO no pacote (no orçamento)**: corre classificador; se top1 == especialidade do pacote E confiança ≥ 0.85 → adiciona à lista de "artigos sugeridos em falta" mostrada na UI.
 
-Cards de resumo:
-- Total de pacotes · Por preparar · Enviados · Adjudicados · Valor total estimado em consulta.
+## 4. UI
 
-Tabela:
-| Nome | Especialidade | Nº artigos | Valor estimado | Estado | Criado | Atualizado | Ações |
+**Em `procurement.pacotes.$id.tsx`**:
+- Badge de confiança ao lado de cada artigo (verde ≥85%, amarelo 70–85%, vermelho <70%)
+- Tooltip mostra o motivo + scores alternativos
+- Botão **"Reanalisar pacote"** no topo — corre auditoria, mostra:
+  - artigos sinalizados para revisão (com sugestão de pacote alternativo)
+  - artigos em falta sugeridos (com botão "adicionar")
+- Quando utilizador move/remove/adiciona artigo → grava em `classificacao_aprendizagem`
 
-Ações por linha: Abrir · Editar nome/especialidade · Duplicar · Eliminar · Preparar envio (muda estado para `preparado`).
+**Em `procurement.pacotes.tsx`** (criação):
+- Usa novo motor em vez do filtro simples por capítulo
+- Mostra contagem prevista por especialidade com confiança média
 
-### 5. Página Detalhe (`/procurement/pacotes/$id`)
+## 5. Servidor
 
-Header: nome editável, obra/orçamento associado, especialidade (select), badge de estado, dropdown para mudar estado.
+Server functions novas (`src/lib/procurement/classifier.functions.ts`):
+- `reanalisarPacote({ pacoteId })` → corre auditoria, devolve sinalizados + sugestões
+- `classificarLote({ artigos, obraId })` → corre pipeline com IA quando preciso, usa cache
+- `registarCorrecao({ artigo, especialidadeAnterior, especialidadeFinal, acao })` → grava em `classificacao_aprendizagem`
 
-Bloco de observações internas (textarea).
+## Detalhes técnicos
 
-Tabela de artigos do pacote (código, descrição, capítulo/subcapítulo, un., qtd, preço seco estimado, total, ações).
+- IA: `google/gemini-2.5-flash` via `https://ai.gateway.lovable.dev/v1/chat/completions`, JSON mode, prompt em PT-PT
+- Normalização: `descricao.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'').replace(/\d+/g,' ').replace(/\s+/g,' ').trim()`
+- Cache: `crypto.createHash('sha256').update(desc+chap+vizinhos).digest('hex')`
+- Similaridade: Jaccard sobre tokens com stopwords PT removidas
 
-Ações:
-- **Adicionar artigos**: dialog com a lista de artigos do orçamento de origem que ainda não estão no pacote (com pesquisa, checkboxes para multi-add).
-- **Remover artigo**.
-- **Editar quantidade / preço seco** inline.
-- Botão **Preparar pedido de orçamento para subempreiteiros** (apenas marca `preparado` por agora — o envio real entra no próximo módulo).
+## Ordem de execução
 
-Totais no rodapé: nº artigos, valor total estimado.
+1. Migration (tabelas + colunas)
+2. Server functions + cliente IA
+3. Refactor `classifier.ts` orquestrador
+4. UI: badges, botão reanalisar, painel auditoria
+5. Hooks de aprendizagem em todas as ações (move/add/remove)
 
-### 6. Geração automática por especialidade
-
-Função client-side `inferirEspecialidade(artigo)` que devolve uma das especialidades-alvo (Demolições, Estruturas, Alvenarias, Cobertura, Caixilharias, Eletricidade/ITED, AVAC, Canalizações, Carpintarias, Pinturas, Outros) com base em:
-
-1. `especialidade` ou `categoria_custo` já presentes na Decomposição (prioridade máxima);
-2. `capitulo` / `subcapitulo` (regras por prefixo/contém);
-3. Palavras-chave na `descricao` (mapa keyword → especialidade, ex.: `tomada|cabo|quadro elétrico|ITED → Eletricidade/ITED`, `tubo|esgoto|sanita|lavatório → Canalizações`, etc.).
-
-O **preço seco estimado** = `custo_total_decomposicao` do artigo (soma dos 7 componentes). Se a decomposição não estiver preenchida, usa `preco_unitario` como fallback e marca o artigo no pacote com aviso.
-
-A geração automática:
-- agrupa artigos por especialidade detectada;
-- cria um pacote por grupo com `nome = "{Especialidade} – {nome do orçamento}"`, `estado = por_preparar`;
-- ignora artigos que já pertencem a outro pacote do mesmo orçamento (evita duplicação) — confirmação no dialog.
-
-### 7. Ficheiros
-
-Novos:
-- `supabase/migrations/<timestamp>_procurement_pacotes.sql`
-- `src/routes/_app/procurement.pacotes.tsx`
-- `src/routes/_app/procurement.pacotes.$id.tsx`
-- `src/lib/procurement/especialidades.ts` (lista canónica + `inferirEspecialidade`)
-- `src/components/procurement/GerarPacotesDialog.tsx`
-- `src/components/procurement/AdicionarArtigosDialog.tsx`
-
-Alterados:
-- `src/components/AppSidebar.tsx` (ativar Procurement + sub-item)
-
-### Fora do âmbito desta entrega (próximos módulos da Fase 3)
-
-- Pedidos de orçamento a subempreiteiros (envio por email, links públicos de resposta)
-- Grelha de comparação de propostas e adjudicação
-- Histórico de preços por artigo/especialidade/subempreiteiro
-- Relatórios de poupança e margem real vs orçamentada
+Sem alterações à formatação do Excel nem aos pacotes especiais já existentes (Betão continua com `isBetaoArtigo`, mas agora também passa pela auditoria).

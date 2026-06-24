@@ -20,11 +20,14 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Save, Send, Trash2, Search, FileSpreadsheet, FileText, Users } from "lucide-react";
+import { ArrowLeft, Plus, Save, Send, Trash2, Search, FileSpreadsheet, FileText, Users, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useServerFn } from "@tanstack/react-start";
 import { ESPECIALIDADES, validarArtigoParaEspecialidade } from "@/lib/procurement/especialidades";
+import { reanalisarPacote, registarCorrecao } from "@/lib/procurement/classifier.functions";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/_app/procurement/pacotes/$id")({
   head: () => ({ meta: [{ title: "Pacote — Procurement — MV OS" }] }),
@@ -173,6 +176,13 @@ function PacoteDetailPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [adicionarOpen, setAdicionarOpen] = useState(false);
+  const [auditoriaOpen, setAuditoriaOpen] = useState(false);
+  const [auditoria, setAuditoria] = useState<{ sinalizados: any[]; sugeridos: any[] } | null>(null);
+  const [reanalising, setReanalising] = useState(false);
+  const reanalisar = useServerFn(reanalisarPacote);
+  const registar = useServerFn(registarCorrecao);
+
+
 
   const { data: pacote, isLoading } = useQuery({
     queryKey: ["procurement-pacote", id],
@@ -225,8 +235,19 @@ function PacoteDetailPage() {
   }
 
   async function removerArtigo(artigoId: string) {
+    const art = artigos.find((a: any) => a.id === artigoId);
     const { error } = await supabase.from("procurement_pacote_artigos").delete().eq("id", artigoId);
     if (error) { toast.error(error.message); return; }
+    if (art) {
+      registar({ data: {
+        artigo: { codigo: art.codigo, descricao: art.descricao, capitulo: art.capitulo, subcapitulo: art.subcapitulo },
+        especialidadeAnterior: especialidade,
+        especialidadeFinal: "__removido__",
+        confiancaAnterior: art.confianca ?? null,
+        obraId: (pacote?.orcamento as any)?.obra?.id ?? null,
+        acao: "remove",
+      }}).catch(() => {});
+    }
     qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] });
   }
 
@@ -235,6 +256,26 @@ function PacoteDetailPage() {
     if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] });
   }
+
+  async function correrAuditoria() {
+    setReanalising(true);
+    try {
+      const res: any = await reanalisar({ data: { pacoteId: id } });
+      setAuditoria(res);
+      setAuditoriaOpen(true);
+      qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] });
+      if (res.sinalizados.length === 0 && res.sugeridos.length === 0) {
+        toast.success("Pacote tecnicamente correto — sem sinalizações");
+      } else {
+        toast.info(`${res.sinalizados.length} artigo(s) a rever · ${res.sugeridos.length} sugestão(ões) em falta`);
+      }
+    } catch (e: any) {
+      toast.error(e.message ?? "Falha na auditoria");
+    } finally {
+      setReanalising(false);
+    }
+  }
+
 
   async function prepararEnvio() {
     setEstado("preparado");
@@ -267,6 +308,9 @@ function PacoteDetailPage() {
             </Button>
             <Button variant="outline" onClick={() => exportarPDF(nome || "pacote", especialidade, pacote.orcamento?.nome, artigos)} disabled={artigos.length === 0}>
               <FileText className="h-4 w-4 mr-2" /> PDF
+            </Button>
+            <Button variant="outline" onClick={correrAuditoria} disabled={reanalising || artigos.length === 0}>
+              <Sparkles className="h-4 w-4 mr-2" /> {reanalising ? "A reanalisar..." : "Reanalisar pacote"}
             </Button>
             <Button onClick={salvarHeader}><Save className="h-4 w-4 mr-2" /> Guardar</Button>
             <Button variant="default" onClick={prepararEnvio} disabled={artigos.length === 0}>
@@ -333,14 +377,40 @@ function PacoteDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {artigos.map((a: any) => (
-                  <TableRow key={a.id}>
+                {artigos.map((a: any) => {
+                  const conf = a.confianca != null ? Number(a.confianca) : null;
+                  const confTone =
+                    conf == null ? "bg-muted text-muted-foreground"
+                    : conf >= 0.85 ? "bg-emerald-500/15 text-emerald-700"
+                    : conf >= 0.7 ? "bg-amber-500/15 text-amber-700"
+                    : "bg-red-500/15 text-red-700";
+                  return (
+                  <TableRow key={a.id} className={a.sinalizado_revisao ? "bg-red-500/5" : undefined}>
                     <TableCell className="font-mono text-xs">{a.codigo ?? "—"}</TableCell>
                     <TableCell className="max-w-md">
                       <p className="text-sm">{a.descricao}</p>
-                      {a.especialidade && a.especialidade !== especialidade && (
-                        <Badge variant="outline" className="mt-1 text-[10px]">Sugerida: {a.especialidade}</Badge>
-                      )}
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {a.sinalizado_revisao && (
+                          <Badge variant="outline" className="text-[10px] border-red-500/40 text-red-600">
+                            <AlertTriangle className="h-3 w-3 mr-1" /> Rever
+                          </Badge>
+                        )}
+                        {conf != null && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded ${confTone}`}>
+                                  {Math.round(conf * 100)}%
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs">{a.motivo ?? "Sem motivo registado"}</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        {a.especialidade && a.especialidade !== especialidade && (
+                          <Badge variant="outline" className="text-[10px]">Sugerida: {a.especialidade}</Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{a.capitulo ?? "—"}</TableCell>
                     <TableCell className="text-sm">{a.unidade ?? "—"}</TableCell>
@@ -373,7 +443,8 @@ function PacoteDetailPage() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -386,7 +457,83 @@ function PacoteDetailPage() {
         artigosJaIncluidos={new Set(artigos.map((a: any) => a.artigo_id).filter(Boolean))}
         onAdded={() => qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] })}
       />
+
+      <Dialog open={auditoriaOpen} onOpenChange={setAuditoriaOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Auditoria do pacote — {especialidade}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 max-h-[60vh] overflow-auto">
+            <div>
+              <h3 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                Artigos a rever ({auditoria?.sinalizados.length ?? 0})
+              </h3>
+              {auditoria && auditoria.sinalizados.length > 0 ? (
+                <div className="space-y-2">
+                  {auditoria.sinalizados.map((s: any) => (
+                    <div key={s.pacoteArtigoId} className="rounded-md border p-3 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-mono text-xs text-muted-foreground">{s.codigo}</div>
+                          <div>{s.descricao}</div>
+                          <div className="text-xs text-muted-foreground mt-1">{s.motivo}</div>
+                          {s.sugestao && (
+                            <Badge variant="outline" className="mt-1 text-[10px]">Sugestão: {s.sugestao}</Badge>
+                          )}
+                        </div>
+                        <Button size="sm" variant="ghost" onClick={() => removerArtigo(s.pacoteArtigoId)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Nenhum artigo a rever.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                <Plus className="h-4 w-4 text-emerald-600" />
+                Artigos em falta sugeridos ({auditoria?.sugeridos.length ?? 0})
+              </h3>
+              {auditoria && auditoria.sugeridos.length > 0 ? (
+                <div className="space-y-2">
+                  {auditoria.sugeridos.map((s: any) => (
+                    <div key={s.artigoId} className="rounded-md border p-3 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-mono text-xs text-muted-foreground">{s.codigo}</div>
+                          <div>{s.descricao}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Confiança {Math.round(s.confianca * 100)}% · {s.motivo}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground">
+                    Usa "Adicionar artigos" para os incluir manualmente.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Nenhum artigo em falta.
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setAuditoriaOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
+
   );
 }
 
@@ -438,25 +585,45 @@ function AdicionarArtigosDialog({
     });
   }
 
+  const registar = useServerFn(registarCorrecao);
+
   async function adicionar() {
     if (selecionados.size === 0) return;
     setSaving(true);
-    const rows = artigos.filter((a: any) => selecionados.has(a.id)).map((a: any) => {
+    const { pertenceAoPacote } = await import("@/lib/procurement/classifier");
+    const escolhidos = artigos.filter((a: any) => selecionados.has(a.id));
+    const rows = escolhidos.map((a: any) => {
       const custoTotal = Number(a.custo_mao_obra ?? 0) + Number(a.custo_tarefeiros ?? 0)
         + Number(a.custo_subempreitadas ?? 0) + Number(a.custo_materiais ?? 0)
         + Number(a.custo_equipamentos ?? 0) + Number(a.custo_transportes ?? 0)
         + Number(a.custo_encargos_gerais ?? 0) + Number(a.custo_outros ?? 0);
+      const r = pertenceAoPacote({
+        descricao: a.descricao, codigo: a.codigo,
+        capitulo: a.capitulo?.descricao, capituloCodigo: a.capitulo?.codigo,
+      }, especialidade);
       return {
         pacote_id: pacoteId, artigo_id: a.id, codigo: a.codigo, descricao: a.descricao,
         unidade: a.unidade, quantidade: a.quantidade,
         capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
         preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
         categoria_custo: null, especialidade,
+        confianca: r.confianca, motivo: r.motivo, sinalizado_revisao: !r.pertence,
       };
     });
     const { error } = await supabase.from("procurement_pacote_artigos").insert(rows);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
+    // Aprendizagem: cada adição manual é uma decisão do utilizador
+    for (const a of escolhidos) {
+      registar({ data: {
+        artigo: { codigo: a.codigo, descricao: a.descricao, capitulo: a.capitulo?.descricao, subcapitulo: null },
+        especialidadeAnterior: null,
+        especialidadeFinal: especialidade,
+        confiancaAnterior: null,
+        obraId: null,
+        acao: "add",
+      }}).catch(() => {});
+    }
     toast.success(`${rows.length} artigo(s) adicionado(s)`);
     setSelecionados(new Set()); setSearch("");
     onAdded(); onOpenChange(false);
