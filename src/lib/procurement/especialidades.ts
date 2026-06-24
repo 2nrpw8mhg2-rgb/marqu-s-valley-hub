@@ -1,7 +1,9 @@
 // Catálogo canónico de especialidades e classificador automático
+// com palavras-chave positivas e negativas por especialidade.
 
 export const ESPECIALIDADES = [
   "Demolições",
+  "Terraplanagens",
   "Estruturas",
   "Alvenarias",
   "Cobertura",
@@ -11,35 +13,135 @@ export const ESPECIALIDADES = [
   "Canalizações",
   "Carpintarias",
   "Pinturas",
+  "Arranjos Exteriores",
   "Outros",
 ] as const;
 
 export type Especialidade = (typeof ESPECIALIDADES)[number];
 
-const KEYWORDS: Array<{ esp: Especialidade; words: RegExp }> = [
-  { esp: "Demolições", words: /\b(demoli|picag|remov|desmant|arrombam)/i },
-  { esp: "Estruturas", words: /\b(beton|bet[ãa]o|armadura|a[çc]o|pilar|viga|laje|funda|sapata|micro\s*estaca|cofrag)/i },
-  { esp: "Alvenarias", words: /\b(alvenaria|tijolo|bloco|reboco|chap|estuque|gesso\s*cart|pladur)/i },
-  { esp: "Cobertura", words: /\b(cobertura|telha|telhad|impermeab|isolamento\s*t[ée]rm|chapa\s*sandu|c[ãa]l|fibrocim)/i },
-  { esp: "Caixilharias", words: /\b(caixilh|janela|porta\s*alum|alum[íi]nio|pvc|vidro|estor|persian|portad)/i },
-  { esp: "Eletricidade/ITED", words: /\b(electric|el[ée]tric|tomada|interruptor|quadro\s*el[ée]ctr|cabo|iluminaç|lumin[áa]ria|ited|cctv|dom[óo]tica|ups|fotovolt)/i },
-  { esp: "AVAC", words: /\b(avac|ar\s*condic|climatiz|ventila|extrac|recupera[çc][ãa]o\s*calor|chiller|vrv|vrf|condut|ducto|grelha)/i },
-  { esp: "Canalizações", words: /\b(canaliz|tubo|esgoto|[áa]gua\s*(fria|quente)|sanit[áa]|lavat[óo]rio|bid[ée]|chuveir|banheira|autoclism|sif[ãa]o|ppr|pex|multicam)/i },
-  { esp: "Carpintarias", words: /\b(carpintar|madeir|porta\s*interior|roupeir|arm[áa]rio|mobili[áa]rio|sob[ãa]do|pavimento\s*madeir|deck)/i },
-  { esp: "Pinturas", words: /\b(pintura|tinta|verniz|primario|prim[áa]rio|barram|massa\s*areada)/i },
+type Rule = {
+  esp: Especialidade;
+  positive: RegExp[];
+  negative?: RegExp[];
+};
+
+// Palavras-chave por especialidade. Cada match positivo soma 1 ponto,
+// cada match negativo subtrai 2 pontos (negativos fortes "vetam" a especialidade).
+const RULES: Rule[] = [
+  {
+    esp: "Demolições",
+    positive: [/\bdemoli/i, /\bpicag/i, /\barrombam/i, /\bdesmant/i, /\bremo[çc][ãa]o\s+(de\s+)?(parede|teto|pavimento|reboco)/i],
+  },
+  {
+    esp: "Terraplanagens",
+    positive: [
+      /\bterraplan/i, /\bescava[çc]/i, /\baterro/i, /\bdesaterro/i, /\bcompacta[çc]/i,
+      /\bmovimento\s+de\s+terras/i, /\bdesmatag/i, /\bdecapag/i, /\bvala\b/i,
+      /\bdrenagem\s+(do\s+)?terreno/i, /\brede\s+enterrada/i,
+    ],
+  },
+  {
+    esp: "Estruturas",
+    positive: [
+      /\bbet[ãa]o\b/i, /\barmadura/i, /\ba[çc]o\s+(em|para|de)\s+(viga|pilar|laje|arma)/i,
+      /\bpilar\b/i, /\bviga\b/i, /\blaje\b/i, /\bfunda[çc]/i, /\bsapata/i,
+      /\bmicro\s*estaca/i, /\bcofrag/i, /\bmuro\s+de\s+suporte/i,
+    ],
+    negative: [/\bcobertura/i, /\btelha/i],
+  },
+  {
+    esp: "Alvenarias",
+    positive: [
+      /\balvenaria/i, /\btijolo/i, /\bbloco\s+(de\s+)?(bet[ãa]o|t[ée]rmico|cer[âa]mic)/i,
+      /\breboco/i, /\bestuque/i, /\bgesso\s*cart/i, /\bpladur/i,
+    ],
+    negative: [/\bcobertura/i],
+  },
+  {
+    esp: "Cobertura",
+    positive: [
+      /\bcobertura/i, /\btelhad/i, /\btelha\b/i, /\bsubtelha/i, /\bcumeeira/i,
+      /\bbeirado/i, /\bcaleira/i, /\brufo/i, /\balgeroz/i, /\bclarab[oó]ia/i,
+      /\bremate\s+(de\s+)?cobertura/i, /\bimpermeabiliza[çc][ãa]o\s+(de\s+)?cobertura/i,
+      /\bisolamento\s+(t[ée]rmico\s+)?(de\s+)?cobertura/i, /\bchapa\s+(sandu|de\s+cobertura)/i,
+      /\bpainel\s+sandu/i, /\btubo\s+de\s+queda\s+(da\s+)?cobertura/i,
+      /\bplatibanda/i, /\bfibrocimento/i,
+    ],
+    negative: [
+      /\bterraplan/i, /\bescava[çc]/i, /\baterro/i, /\bdesaterro/i, /\bcompacta[çc]/i,
+      /\bfunda[çc]/i, /\bsapata/i, /\bdemoli/i, /\bpavimento\s+(t[ée]rreo|exterior)/i,
+      /\bmuro\b/i, /\barranjo\s+exterior/i, /\bdrenagem\s+(do\s+)?terreno/i,
+      /\bpintura\s+interior/i, /\bcarpintar/i, /\bcaixilh/i,
+      /\binstala[çc][ãa]o\s+el[ée]ctric/i, /\bcanaliza[çc]/i,
+    ],
+  },
+  {
+    esp: "Caixilharias",
+    positive: [
+      /\bcaixilh/i, /\bjanela/i, /\bporta\s+(de\s+)?alum[íi]nio/i, /\balum[íi]nio/i,
+      /\bpvc\b/i, /\bvidro\s+(duplo|simples|laminad|temperad)/i, /\bestor/i, /\bpersian/i, /\bportad/i,
+    ],
+  },
+  {
+    esp: "Eletricidade/ITED",
+    positive: [
+      /\bel[ée]tric/i, /\belectric/i, /\btomada/i, /\binterruptor/i, /\bquadro\s+el[ée]ctr/i,
+      /\bilumina[çc]/i, /\blumin[áa]ria/i, /\bited\b/i, /\bcctv/i, /\bdom[óo]tica/i,
+      /\bups\b/i, /\bfotovolt/i,
+    ],
+  },
+  {
+    esp: "AVAC",
+    positive: [
+      /\bavac\b/i, /\bar\s*condic/i, /\bclimatiz/i, /\bventila[çc]/i, /\bextrac[çc]/i,
+      /\brecupera[çc][ãa]o\s*calor/i, /\bchiller/i, /\bvrv\b/i, /\bvrf\b/i, /\bconduta\b/i, /\bgrelha\s+(de\s+)?(ar|ventila)/i,
+    ],
+  },
+  {
+    esp: "Canalizações",
+    positive: [
+      /\bcanaliza[çc]/i, /\bhidr[áa]ulic/i, /\besgoto/i, /\b[áa]gua\s+(fria|quente)/i,
+      /\bsanit[áa]/i, /\blavat[óo]rio/i, /\bbid[ée]/i, /\bchuveir/i, /\bbanheira/i,
+      /\bautoclism/i, /\bsif[ãa]o/i, /\bppr\b/i, /\bpex\b/i, /\bmulticam/i,
+    ],
+    negative: [/\btubo\s+de\s+queda\s+(da\s+)?cobertura/i],
+  },
+  {
+    esp: "Carpintarias",
+    positive: [
+      /\bcarpintar/i, /\bporta\s+interior/i, /\broupeir/i, /\barm[áa]rio/i,
+      /\bmobili[áa]rio/i, /\bsob[ãa]do/i, /\bpavimento\s+(em\s+)?madeira/i, /\bdeck\b/i,
+    ],
+  },
+  {
+    esp: "Pinturas",
+    positive: [
+      /\bpintura/i, /\btinta\b/i, /\bverniz/i, /\bprim[áa]rio/i, /\bbarram/i, /\bmassa\s+areada/i,
+    ],
+  },
+  {
+    esp: "Arranjos Exteriores",
+    positive: [
+      /\barranjo\s+exterior/i, /\bpavimento\s+exterior/i, /\bcal[çc]ada/i,
+      /\blancil/i, /\bjardin/i, /\brelvad/i, /\bmuro\b/i,
+    ],
+    negative: [/\bcobertura/i, /\btelha/i],
+  },
 ];
 
 const CHAPTER_HINTS: Array<{ esp: Especialidade; rx: RegExp }> = [
   { esp: "Demolições", rx: /demoli/i },
-  { esp: "Estruturas", rx: /estrutur|funda|bet[ãa]o/i },
-  { esp: "Alvenarias", rx: /alvenari|paredes|revestiment/i },
+  { esp: "Terraplanagens", rx: /terraplan|movimento\s+de\s+terras|escava/i },
+  { esp: "Estruturas", rx: /estrutur|funda[çc]/i },
+  { esp: "Alvenarias", rx: /alvenari|paredes\s+divis/i },
   { esp: "Cobertura", rx: /cobertur/i },
-  { esp: "Caixilharias", rx: /caixilh|v[ãa]os|janel/i },
+  { esp: "Caixilharias", rx: /caixilh|v[ãa]os\s+exteri/i },
   { esp: "Eletricidade/ITED", rx: /electric|el[ée]tr|ited/i },
   { esp: "AVAC", rx: /avac|climatiz|ventila/i },
-  { esp: "Canalizações", rx: /canaliz|hidr[áa]ul|[áa]guas/i },
-  { esp: "Carpintarias", rx: /carpintar|madeir/i },
+  { esp: "Canalizações", rx: /canaliza|hidr[áa]ulic|[áa]guas/i },
+  { esp: "Carpintarias", rx: /carpintar/i },
   { esp: "Pinturas", rx: /pintur/i },
+  { esp: "Arranjos Exteriores", rx: /arranjo|exteri/i },
 ];
 
 export type ArtigoInput = {
@@ -51,16 +153,67 @@ export type ArtigoInput = {
   especialidade?: string | null;
 };
 
-export function inferirEspecialidade(a: ArtigoInput): Especialidade {
+export type ClassificacaoResultado = {
+  especialidade: Especialidade;
+  confianca: number; // 0..1
+  motivo: string;
+};
+
+export function classificarArtigo(a: ArtigoInput): ClassificacaoResultado {
+  // 1) Especialidade já atribuída manualmente → respeita
   if (a.especialidade) {
     const m = ESPECIALIDADES.find(e => e.toLowerCase() === a.especialidade!.toLowerCase());
-    if (m) return m;
+    if (m) return { especialidade: m, confianca: 1, motivo: "Especialidade atribuída manualmente" };
   }
-  const hay = [a.capitulo, a.subcapitulo].filter(Boolean).join(" ");
-  if (hay) {
-    for (const h of CHAPTER_HINTS) if (h.rx.test(hay)) return h.esp;
+
+  const desc = (a.descricao ?? "").toString();
+  const chap = [a.capitulo, a.subcapitulo].filter(Boolean).join(" ");
+  const hay = `${desc} ${chap}`;
+
+  // 2) Score por palavras-chave (positivas/negativas) na descrição+capítulo
+  const scores = new Map<Especialidade, number>();
+  for (const rule of RULES) {
+    let s = 0;
+    for (const rx of rule.positive) if (rx.test(hay)) s += 1;
+    if (rule.negative) for (const rx of rule.negative) if (rx.test(hay)) s -= 2;
+    if (s !== 0) scores.set(rule.esp, s);
   }
-  const desc = a.descricao ?? "";
-  for (const k of KEYWORDS) if (k.words.test(desc)) return k.esp;
-  return "Outros";
+
+  // 3) Reforço pelo capítulo (peso adicional)
+  for (const h of CHAPTER_HINTS) {
+    if (chap && h.rx.test(chap)) {
+      scores.set(h.esp, (scores.get(h.esp) ?? 0) + 2);
+    }
+  }
+
+  // Sem nenhum sinal
+  if (scores.size === 0) {
+    return { especialidade: "Outros", confianca: 0.1, motivo: "Sem palavras-chave reconhecidas" };
+  }
+
+  // Escolher a maior pontuação positiva
+  const ordered = [...scores.entries()].sort((a, b) => b[1] - a[1]);
+  const [topEsp, topScore] = ordered[0];
+  const second = ordered[1]?.[1] ?? 0;
+
+  if (topScore <= 0) {
+    return { especialidade: "Outros", confianca: 0.2, motivo: "Palavras-chave negativas anularam a classificação" };
+  }
+
+  // Confiança = combinação do score e da margem face ao segundo
+  const margem = topScore - Math.max(second, 0);
+  const confianca = Math.min(1, 0.5 + 0.15 * topScore + 0.1 * margem);
+
+  return {
+    especialidade: topEsp,
+    confianca,
+    motivo: `Score ${topScore} (margem ${margem}) por palavras-chave de ${topEsp}`,
+  };
 }
+
+// Compatibilidade com chamadas existentes
+export function inferirEspecialidade(a: ArtigoInput): Especialidade {
+  return classificarArtigo(a).especialidade;
+}
+
+export const CONFIANCA_MINIMA = 0.8;
