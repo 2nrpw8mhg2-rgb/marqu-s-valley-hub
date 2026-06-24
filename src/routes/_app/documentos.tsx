@@ -191,7 +191,7 @@ function DocumentosPage() {
 
     let sucesso = 0;
     for (const file of validos) {
-      const path = `${user?.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${file.name}`;
+      const path = `${user?.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${sanitizarNome(file.name)}`;
       const { error: upErr } = await supabase.storage.from("documentos").upload(path, file);
       if (upErr) {
         toast.error(`${file.name}: ${upErr.message}`);
