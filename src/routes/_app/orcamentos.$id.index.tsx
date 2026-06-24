@@ -15,7 +15,7 @@ import type { ParsedRow } from "@/lib/mq-parser";
 import { Upload, FileDown, FileSpreadsheet, Trash2, Plus, ArrowLeft, GitBranch, Save, Layers } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_app/orcamentos/$id")({
+export const Route = createFileRoute("/_app/orcamentos/$id/")({
   head: () => ({ meta: [{ title: "Editor de orçamento — MV OS" }] }),
   beforeLoad: ({ params }) => {
     if (params.id === "decomposicao") {

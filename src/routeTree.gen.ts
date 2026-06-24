@@ -20,7 +20,7 @@ import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppBibliotecaRouteImport } from './routes/_app/biblioteca'
 import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos.index'
 import { Route as AppOrcamentosDecomposicaoRouteImport } from './routes/_app/orcamentos.decomposicao'
-import { Route as AppOrcamentosIdRouteImport } from './routes/_app/orcamentos.$id'
+import { Route as AppOrcamentosIdIndexRouteImport } from './routes/_app/orcamentos.$id.index'
 import { Route as AppOrcamentosIdDecomposicaoRouteImport } from './routes/_app/orcamentos.$id.decomposicao'
 
 const AuthRoute = AuthRouteImport.update({
@@ -78,16 +78,16 @@ const AppOrcamentosDecomposicaoRoute =
     path: '/orcamentos/decomposicao',
     getParentRoute: () => AppRoute,
   } as any)
-const AppOrcamentosIdRoute = AppOrcamentosIdRouteImport.update({
-  id: '/orcamentos/$id',
-  path: '/orcamentos/$id',
+const AppOrcamentosIdIndexRoute = AppOrcamentosIdIndexRouteImport.update({
+  id: '/orcamentos/$id/',
+  path: '/orcamentos/$id/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppOrcamentosIdDecomposicaoRoute =
   AppOrcamentosIdDecomposicaoRouteImport.update({
-    id: '/decomposicao',
-    path: '/decomposicao',
-    getParentRoute: () => AppOrcamentosIdRoute,
+    id: '/orcamentos/$id/decomposicao',
+    path: '/orcamentos/$id/decomposicao',
+    getParentRoute: () => AppRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -99,10 +99,10 @@ export interface FileRoutesByFullPath {
   '/documentos': typeof AppDocumentosRoute
   '/obras': typeof AppObrasRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
-  '/orcamentos/$id': typeof AppOrcamentosIdRouteWithChildren
   '/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/orcamentos/': typeof AppOrcamentosIndexRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
+  '/orcamentos/$id/': typeof AppOrcamentosIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -113,10 +113,10 @@ export interface FileRoutesByTo {
   '/documentos': typeof AppDocumentosRoute
   '/obras': typeof AppObrasRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
-  '/orcamentos/$id': typeof AppOrcamentosIdRouteWithChildren
   '/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/orcamentos': typeof AppOrcamentosIndexRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
+  '/orcamentos/$id': typeof AppOrcamentosIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -129,10 +129,10 @@ export interface FileRoutesById {
   '/_app/documentos': typeof AppDocumentosRoute
   '/_app/obras': typeof AppObrasRoute
   '/_app/subempreiteiros': typeof AppSubempreiteirosRoute
-  '/_app/orcamentos/$id': typeof AppOrcamentosIdRouteWithChildren
   '/_app/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/_app/orcamentos/': typeof AppOrcamentosIndexRoute
   '/_app/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
+  '/_app/orcamentos/$id/': typeof AppOrcamentosIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -145,10 +145,10 @@ export interface FileRouteTypes {
     | '/documentos'
     | '/obras'
     | '/subempreiteiros'
-    | '/orcamentos/$id'
     | '/orcamentos/decomposicao'
     | '/orcamentos/'
     | '/orcamentos/$id/decomposicao'
+    | '/orcamentos/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -159,10 +159,10 @@ export interface FileRouteTypes {
     | '/documentos'
     | '/obras'
     | '/subempreiteiros'
-    | '/orcamentos/$id'
     | '/orcamentos/decomposicao'
     | '/orcamentos'
     | '/orcamentos/$id/decomposicao'
+    | '/orcamentos/$id'
   id:
     | '__root__'
     | '/'
@@ -174,10 +174,10 @@ export interface FileRouteTypes {
     | '/_app/documentos'
     | '/_app/obras'
     | '/_app/subempreiteiros'
-    | '/_app/orcamentos/$id'
     | '/_app/orcamentos/decomposicao'
     | '/_app/orcamentos/'
     | '/_app/orcamentos/$id/decomposicao'
+    | '/_app/orcamentos/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -265,34 +265,22 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrcamentosDecomposicaoRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/orcamentos/$id': {
-      id: '/_app/orcamentos/$id'
+    '/_app/orcamentos/$id/': {
+      id: '/_app/orcamentos/$id/'
       path: '/orcamentos/$id'
-      fullPath: '/orcamentos/$id'
-      preLoaderRoute: typeof AppOrcamentosIdRouteImport
+      fullPath: '/orcamentos/$id/'
+      preLoaderRoute: typeof AppOrcamentosIdIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/orcamentos/$id/decomposicao': {
       id: '/_app/orcamentos/$id/decomposicao'
-      path: '/decomposicao'
+      path: '/orcamentos/$id/decomposicao'
       fullPath: '/orcamentos/$id/decomposicao'
       preLoaderRoute: typeof AppOrcamentosIdDecomposicaoRouteImport
-      parentRoute: typeof AppOrcamentosIdRoute
+      parentRoute: typeof AppRoute
     }
   }
 }
-
-interface AppOrcamentosIdRouteChildren {
-  AppOrcamentosIdDecomposicaoRoute: typeof AppOrcamentosIdDecomposicaoRoute
-}
-
-const AppOrcamentosIdRouteChildren: AppOrcamentosIdRouteChildren = {
-  AppOrcamentosIdDecomposicaoRoute: AppOrcamentosIdDecomposicaoRoute,
-}
-
-const AppOrcamentosIdRouteWithChildren = AppOrcamentosIdRoute._addFileChildren(
-  AppOrcamentosIdRouteChildren,
-)
 
 interface AppRouteChildren {
   AppBibliotecaRoute: typeof AppBibliotecaRoute
@@ -301,9 +289,10 @@ interface AppRouteChildren {
   AppDocumentosRoute: typeof AppDocumentosRoute
   AppObrasRoute: typeof AppObrasRoute
   AppSubempreiteirosRoute: typeof AppSubempreiteirosRoute
-  AppOrcamentosIdRoute: typeof AppOrcamentosIdRouteWithChildren
   AppOrcamentosDecomposicaoRoute: typeof AppOrcamentosDecomposicaoRoute
   AppOrcamentosIndexRoute: typeof AppOrcamentosIndexRoute
+  AppOrcamentosIdDecomposicaoRoute: typeof AppOrcamentosIdDecomposicaoRoute
+  AppOrcamentosIdIndexRoute: typeof AppOrcamentosIdIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -313,9 +302,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppDocumentosRoute: AppDocumentosRoute,
   AppObrasRoute: AppObrasRoute,
   AppSubempreiteirosRoute: AppSubempreiteirosRoute,
-  AppOrcamentosIdRoute: AppOrcamentosIdRouteWithChildren,
   AppOrcamentosDecomposicaoRoute: AppOrcamentosDecomposicaoRoute,
   AppOrcamentosIndexRoute: AppOrcamentosIndexRoute,
+  AppOrcamentosIdDecomposicaoRoute: AppOrcamentosIdDecomposicaoRoute,
+  AppOrcamentosIdIndexRoute: AppOrcamentosIdIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
