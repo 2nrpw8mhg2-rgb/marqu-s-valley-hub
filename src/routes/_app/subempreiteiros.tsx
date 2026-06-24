@@ -312,6 +312,7 @@ type ImportRow = {
 
 type ImportReport = { criados: number; atualizados: number; duplicados: number; erros: { linha: number; motivo: string }[] };
 type RawImportRow = { linha: number; values: Record<string, unknown> };
+type ImportProgress = { phase: string; done: number; total: number };
 
 const HEADER_MAP: Record<string, keyof ImportRow | "skip"> = {
   tipo: "tipo",
@@ -474,16 +475,28 @@ function parseRow(raw: Record<string, unknown>, headers: string[]): ImportRow | 
   return r;
 }
 
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
+
+function waitForUi() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 function ImportDialog({ onClose }: { onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<ImportReport | null>(null);
   const [filename, setFilename] = useState<string>("");
+  const [progress, setProgress] = useState<ImportProgress | null>(null);
 
   const handleFile = async (file: File) => {
     setBusy(true);
     setReport(null);
     setFilename(file.name);
+    setProgress({ phase: "A ler ficheiro", done: 0, total: 0 });
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
@@ -496,12 +509,21 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
       }
       const headers = Object.keys(rows[0].values);
 
-      const { data: existing } = await supabase
-        .from("subempreiteiros")
-        .select("id, nif, email");
+      setProgress({ phase: "A comparar com registos existentes", done: 0, total: rows.length });
+
+      const existing: { id: string; nif: string | null; email: string | null }[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase
+          .from("subempreiteiros")
+          .select("id, nif, email")
+          .range(from, from + 999);
+        if (error) throw error;
+        existing.push(...(data ?? []));
+        if (!data || data.length < 1000) break;
+      }
       const byNif = new Map<string, string>();
       const byEmail = new Map<string, string>();
-      for (const e of existing ?? []) {
+      for (const e of existing) {
         if (e.nif) byNif.set(String(e.nif).trim(), e.id);
         if (e.email) byEmail.set(String(e.email).trim().toLowerCase(), e.id);
       }
@@ -509,6 +531,8 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
 
       const { data: { user } } = await supabase.auth.getUser();
       const rep: ImportReport = { criados: 0, atualizados: 0, duplicados: 0, erros: [] };
+      const inserts: any[] = [];
+      const updates: any[] = [];
 
       for (let i = 0; i < rows.length; i++) {
         const parsed = parseRow(rows[i].values, headers);
@@ -546,24 +570,37 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
         };
 
         if (existingId) {
-          const { error } = await supabase.from("subempreiteiros").update(payload).eq("id", existingId);
-          if (error) rep.erros.push({ linha: rows[i].linha, motivo: error.message });
-          else rep.atualizados++;
+          updates.push({ ...payload, id: existingId, _linha: rows[i].linha });
         } else {
           payload.created_by = user?.id ?? null;
-          const { data, error } = await supabase
-            .from("subempreiteiros")
-            .insert(payload)
-            .select("id")
-            .single();
-          if (error) {
-            rep.erros.push({ linha: rows[i].linha, motivo: error.message });
-          } else {
-            rep.criados++;
-            if (parsed.nif && data?.id) byNif.set(parsed.nif, data.id);
-            if (parsed.email && data?.id) byEmail.set(parsed.email.toLowerCase(), data.id);
-          }
+          inserts.push({ ...payload, _linha: rows[i].linha });
         }
+      }
+
+      const totalWrites = inserts.length + updates.length;
+      let doneWrites = 0;
+      setProgress({ phase: "A gravar registos", done: doneWrites, total: totalWrites });
+
+      for (const batch of chunkArray(updates, 100)) {
+        const linhas = batch.map((item) => item._linha);
+        const payload = batch.map(({ _linha, ...item }) => item);
+        const { error } = await supabase.from("subempreiteiros").upsert(payload, { onConflict: "id" });
+        if (error) rep.erros.push({ linha: linhas[0], motivo: `Erro ao atualizar ${batch.length} registos: ${error.message}` });
+        else rep.atualizados += batch.length;
+        doneWrites += batch.length;
+        setProgress({ phase: "A gravar registos", done: doneWrites, total: totalWrites });
+        await waitForUi();
+      }
+
+      for (const batch of chunkArray(inserts, 100)) {
+        const linhas = batch.map((item) => item._linha);
+        const payload = batch.map(({ _linha, ...item }) => item);
+        const { error } = await supabase.from("subempreiteiros").insert(payload);
+        if (error) rep.erros.push({ linha: linhas[0], motivo: `Erro ao criar ${batch.length} registos: ${error.message}` });
+        else rep.criados += batch.length;
+        doneWrites += batch.length;
+        setProgress({ phase: "A gravar registos", done: doneWrites, total: totalWrites });
+        await waitForUi();
       }
 
       setReport(rep);
@@ -572,6 +609,7 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
       toast.error(e.message ?? "Falha ao ler ficheiro");
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -613,7 +651,22 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
           />
         </div>
 
-        {busy && <p className="text-sm text-muted-foreground">A processar...</p>}
+        {busy && progress && (
+          <div className="space-y-2 rounded border border-border bg-muted/20 p-3 text-sm">
+            <div className="flex items-center justify-between gap-3 text-muted-foreground">
+              <span>{progress.phase}...</span>
+              {progress.total > 0 && <span>{progress.done} / {progress.total}</span>}
+            </div>
+            {progress.total > 0 && (
+              <div className="h-2 overflow-hidden rounded bg-muted">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${Math.max(4, Math.round((progress.done / progress.total) * 100))}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {report && (
           <div className="space-y-2 text-sm">
