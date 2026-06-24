@@ -664,6 +664,19 @@ function DocumentosPage() {
           }}
         />
       )}
+      {novaObraOpen && (
+        <NovaObraDialog
+          onClose={(novoId) => {
+            setNovaObraOpen(false);
+            if (novoId) {
+              qc.invalidateQueries({ queryKey: ["obras-doc"] });
+              qc.invalidateQueries({ queryKey: ["obras-min"] });
+              qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+              navigate({ search: { obraId: novoId, pastaId: undefined } });
+            }
+          }}
+        />
+      )}
     </>
   );
 }
