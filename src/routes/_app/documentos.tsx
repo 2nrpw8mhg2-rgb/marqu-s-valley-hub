@@ -626,9 +626,42 @@ function DocumentosPage() {
 
                   {/* Ficheiros */}
                   <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">
-                      Ficheiros
-                    </p>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                        Ficheiros
+                      </p>
+                      {selecionados.size > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            {selecionados.size} selecionado(s)
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => setBulkMoveOpen(true)}
+                          >
+                            <FolderInput className="h-3.5 w-3.5 mr-1" /> Mover
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs text-destructive border-destructive/40 hover:bg-destructive/10"
+                            onClick={eliminarSelecionados}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => setSelecionados(new Set())}
+                          >
+                            Limpar
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                     {docs.length === 0 ? (
                       <div className="border border-dashed border-border rounded-lg py-12 text-center">
                         <Upload className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
@@ -638,11 +671,26 @@ function DocumentosPage() {
                       </div>
                     ) : (
                       <Card className="bg-card border-border overflow-hidden divide-y divide-border">
+                        <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 text-xs text-muted-foreground">
+                          <Checkbox
+                            checked={selecionados.size === docs.length && docs.length > 0}
+                            onCheckedChange={toggleSelAll}
+                            aria-label="Selecionar todos"
+                          />
+                          <span>Selecionar todos</span>
+                        </div>
                         {docs.map((d) => (
                           <div
                             key={d.id}
-                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 group"
+                            className={`flex items-center gap-3 px-4 py-2.5 group ${
+                              selecionados.has(d.id) ? "bg-primary/5" : "hover:bg-muted/40"
+                            }`}
                           >
+                            <Checkbox
+                              checked={selecionados.has(d.id)}
+                              onCheckedChange={() => toggleSel(d.id)}
+                              aria-label={`Selecionar ${d.nome}`}
+                            />
                             <FileIcon mime={d.mime_type} nome={d.nome} />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{d.nome}</p>
@@ -701,6 +749,7 @@ function DocumentosPage() {
                       </Card>
                     )}
                   </div>
+
                 </div>
               </ScrollArea>
             </>
