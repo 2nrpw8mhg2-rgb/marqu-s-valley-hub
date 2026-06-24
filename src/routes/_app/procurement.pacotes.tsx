@@ -345,45 +345,99 @@ function SummaryCard({ label, value, tone = "default" }: { label: string; value:
   );
 }
 
+// Subempreitada = top-level chapter of the orçamento (códigos como "1", "2", "12"...).
+// Cada subempreitada agrega todos os artigos do capítulo e dos seus sub-capítulos.
+type Subempreitada = {
+  key: string;          // top-level chapter codigo (ex: "12")
+  nome: string;         // chapter descricao (ex: "COBERTURAS")
+  capituloIds: Set<string>;
+  artigoCount: number;
+};
+
+function isTopLevelCode(codigo: string | null | undefined): boolean {
+  if (!codigo) return false;
+  return /^\d+$/.test(codigo.trim());
+}
+
+function isChildOf(childCode: string | null | undefined, parentCode: string): boolean {
+  if (!childCode) return false;
+  const c = childCode.trim();
+  return c === parentCode || c.startsWith(parentCode + ".");
+}
+
+async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitada[]> {
+  const { data: capitulos, error: e1 } = await supabase
+    .from("orcamento_capitulos")
+    .select("id, codigo, descricao, ordem")
+    .eq("orcamento_id", orcamentoId)
+    .order("ordem", { ascending: true });
+  if (e1) throw e1;
+  const { data: artigos, error: e2 } = await supabase
+    .from("orcamento_artigos")
+    .select("id, capitulo_id")
+    .eq("orcamento_id", orcamentoId);
+  if (e2) throw e2;
+
+  const caps = capitulos ?? [];
+  const arts = artigos ?? [];
+
+  // Para cada top-level chapter, encontra todos os capitulo_ids descendentes
+  const subs: Subempreitada[] = caps
+    .filter((c: any) => isTopLevelCode(c.codigo))
+    .map((top: any) => {
+      const ids = new Set<string>();
+      caps.forEach((c: any) => {
+        if (isChildOf(c.codigo, top.codigo)) ids.add(c.id);
+      });
+      ids.add(top.id);
+      const artigoCount = arts.filter((a: any) => a.capitulo_id && ids.has(a.capitulo_id)).length;
+      return {
+        key: top.codigo.trim(),
+        nome: (top.descricao ?? "").trim() || `Capítulo ${top.codigo}`,
+        capituloIds: ids,
+        artigoCount,
+      };
+    });
+
+  return subs;
+}
+
 function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
   const [nomeGeral, setNomeGeral] = useState("");
   const [orcamentoId, setOrcamentoId] = useState<string>("");
-  const [selecionadas, setSelecionadas] = useState<Set<Especialidade>>(new Set());
-  const [counts, setCounts] = useState<Record<string, number> | null>(null);
+  const [subs, setSubs] = useState<Subempreitada[] | null>(null);
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [carregando, setCarregando] = useState(false);
 
   function resetState() {
-    setNomeGeral(""); setOrcamentoId(""); setSelecionadas(new Set()); setCounts(null);
+    setNomeGeral(""); setOrcamentoId(""); setSubs(null); setSelecionadas(new Set());
   }
 
   async function onOrcamentoChange(id: string) {
     setOrcamentoId(id);
-    setCounts(null);
+    setSubs(null);
     setSelecionadas(new Set());
     if (!id) return;
     const orc = orcamentos.find((o: any) => o.id === id);
     if (orc && !nomeGeral.trim()) {
       setNomeGeral(`Consulta ao Mercado — ${orc.obra?.nome ?? orc.nome} — V1`);
     }
-    const { data: artigos, error } = await supabase
-      .from("orcamento_artigos")
-      .select("descricao, codigo, capitulo:orcamento_capitulos(codigo, descricao)")
-      .eq("orcamento_id", id);
-    if (error) { toast.error(error.message); return; }
-    const c: Record<string, number> = {};
-    (artigos ?? []).forEach((a: any) => {
-      const esp = inferirEspecialidade({
-        descricao: a.descricao, codigo: a.codigo, capituloCodigo: a.capitulo?.codigo, capitulo: a.capitulo?.descricao,
-      });
-      c[esp] = (c[esp] ?? 0) + 1;
-    });
-    setCounts(c);
+    setCarregando(true);
+    try {
+      const lista = await carregarSubempreitadas(id);
+      setSubs(lista);
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro a carregar subempreitadas");
+    } finally {
+      setCarregando(false);
+    }
   }
 
-  function toggleEsp(esp: Especialidade) {
+  function toggleSub(key: string) {
     setSelecionadas(prev => {
       const next = new Set(prev);
-      if (next.has(esp)) next.delete(esp); else next.add(esp);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   }
@@ -391,43 +445,27 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
   async function submit() {
     if (!orcamentoId) { toast.error("Seleciona um orçamento"); return; }
     if (!nomeGeral.trim()) { toast.error("Define o nome do pacote geral"); return; }
-    if (selecionadas.size === 0) { toast.error("Seleciona pelo menos uma especialidade"); return; }
+    if (!subs || selecionadas.size === 0) { toast.error("Seleciona pelo menos uma subempreitada"); return; }
     setLoading(true);
     try {
       const orc = orcamentos.find((o: any) => o.id === orcamentoId);
       const { data: artigos, error } = await supabase
         .from("orcamento_artigos")
-        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(codigo, descricao)")
+        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, capitulo_id, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(codigo, descricao)")
         .eq("orcamento_id", orcamentoId);
       if (error) throw error;
 
-      const grupos = new Map<Especialidade, any[]>();
-      const revisaoManual: Array<{ artigo: any; sugerida: Especialidade; confianca: number; motivo: string; pacote: Especialidade }> = [];
-      let excluidos = 0;
-      (artigos ?? []).forEach((a: any) => {
-        const res = classificarArtigo({
-          descricao: a.descricao, codigo: a.codigo, capituloCodigo: a.capitulo?.codigo, capitulo: a.capitulo?.descricao,
-        });
-        // Só inclui no pacote se a especialidade classificada coincide e a confiança é alta
-        if (!selecionadas.has(res.especialidade)) { excluidos++; return; }
-        if (res.confianca < CONFIANCA_MINIMA) {
-          revisaoManual.push({ artigo: a, sugerida: res.especialidade, confianca: res.confianca, motivo: res.motivo, pacote: res.especialidade });
-          return;
-        }
-        if (!grupos.has(res.especialidade)) grupos.set(res.especialidade, []);
-        grupos.get(res.especialidade)!.push(a);
-      });
-
       let criados = 0;
       let totalIncluidos = 0;
-      for (const esp of selecionadas) {
-        const items = grupos.get(esp) ?? [];
+      const escolhidas = subs.filter(s => selecionadas.has(s.key));
+      for (const sub of escolhidas) {
+        const items = (artigos ?? []).filter((a: any) => a.capitulo_id && sub.capituloIds.has(a.capitulo_id));
         const { data: novo, error: e1 } = await supabase
           .from("procurement_pacotes")
           .insert({
             orcamento_id: orcamentoId, obra_id: (orc as any)?.obra?.id ?? null,
-            nome: `${nomeGeral.trim()} — ${esp}`,
-            especialidade: esp, estado: "por_preparar",
+            nome: sub.nome,
+            especialidade: sub.nome as any, estado: "por_preparar",
             grupo_consulta: nomeGeral.trim(),
           } as any).select("id").single();
         if (e1) throw e1;
@@ -442,7 +480,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
               unidade: a.unidade, quantidade: a.quantidade,
               capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
               preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
-              categoria_custo: null, especialidade: esp,
+              categoria_custo: null, especialidade: sub.nome,
             };
           });
           const { error: e2 } = await supabase.from("procurement_pacote_artigos").insert(rows);
@@ -451,13 +489,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
         }
         criados++;
       }
-      const partes = [`${criados} pacote(s) criado(s)`, `${totalIncluidos} artigo(s) incluído(s)`];
-      if (revisaoManual.length) partes.push(`${revisaoManual.length} para revisão manual`);
-      if (excluidos) partes.push(`${excluidos} excluído(s) (outras especialidades)`);
-      toast.success(partes.join(" · "));
-      if (revisaoManual.length) {
-        console.warn("[Procurement] Artigos com baixa confiança (revisão manual):", revisaoManual);
-      }
+      toast.success(`${criados} pacote(s) criado(s) · ${totalIncluidos} artigo(s) incluído(s)`);
       onCreated?.();
       onOpenChange(false);
       resetState();
@@ -474,7 +506,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
         <DialogHeader>
           <DialogTitle>Novo pacote de consulta</DialogTitle>
           <DialogDescription>
-            Escolhe o orçamento, dá um nome ao pacote geral e seleciona as especialidades. O sistema cria um pacote independente por especialidade, com os artigos do mapa de quantidades correspondentes.
+            Escolhe o orçamento, dá um nome ao pacote geral e seleciona as subempreitadas. A lista é construída dinamicamente a partir dos capítulos do mapa de quantidades carregado para a obra. Cada subempreitada gera um pacote independente com o nome do capítulo correspondente.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -494,36 +526,40 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
             <Input value={nomeGeral} onChange={e => setNomeGeral(e.target.value)} placeholder='Ex.: "Consulta ao Mercado — Moradia Sonega — V1"' />
           </div>
           <div>
-            <Label>Especialidades a consultar</Label>
+            <Label>Subempreitadas a consultar</Label>
             {!orcamentoId ? (
-              <p className="text-xs text-muted-foreground mt-2">Seleciona primeiro um orçamento para ver as especialidades disponíveis.</p>
+              <p className="text-xs text-muted-foreground mt-2">Seleciona primeiro um orçamento para ver as subempreitadas disponíveis.</p>
+            ) : carregando ? (
+              <p className="text-xs text-muted-foreground mt-2">A carregar subempreitadas...</p>
+            ) : !subs || subs.length === 0 ? (
+              <p className="text-xs text-muted-foreground mt-2">Não foram encontrados capítulos neste orçamento.</p>
             ) : (
-              <div className="mt-2 rounded-md border max-h-64 overflow-auto divide-y">
-                {ESPECIALIDADES.map(esp => {
-                  const n = counts?.[esp] ?? 0;
-                  const checked = selecionadas.has(esp);
+              <div className="mt-2 rounded-md border max-h-72 overflow-auto divide-y">
+                {subs.map(sub => {
+                  const checked = selecionadas.has(sub.key);
                   return (
                     <label
-                      key={esp}
+                      key={sub.key}
                       className="flex items-center justify-between gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50"
                     >
                       <span className="flex items-center gap-2">
                         <input
                           type="checkbox"
                           checked={checked}
-                          onChange={() => toggleEsp(esp)}
+                          onChange={() => toggleSub(sub.key)}
                         />
-                        {esp}
+                        <span className="text-muted-foreground tabular-nums w-8">{sub.key}</span>
+                        <span>{sub.nome}</span>
                       </span>
-                      <Badge variant={n > 0 ? "secondary" : "outline"}>{n} art.</Badge>
+                      <Badge variant={sub.artigoCount > 0 ? "secondary" : "outline"}>{sub.artigoCount} art.</Badge>
                     </label>
                   );
                 })}
               </div>
             )}
-            {orcamentoId && counts && (
+            {subs && subs.length > 0 && (
               <div className="flex gap-2 mt-2">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setSelecionadas(new Set(ESPECIALIDADES))}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setSelecionadas(new Set(subs.map(s => s.key)))}>
                   Selecionar todas
                 </Button>
                 <Button type="button" variant="ghost" size="sm" onClick={() => setSelecionadas(new Set())}>
