@@ -204,7 +204,7 @@ function codigoComecaPor(codigo: string, prefixo: string) {
   return codigo === prefixo || codigo.startsWith(`${prefixo}.`);
 }
 
-function canonizarEspecialidade(nome?: string | null): Especialidade | null {
+export function canonizarEspecialidade(nome?: string | null): Especialidade | null {
   const n = (nome ?? "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").trim();
   const exact = ESPECIALIDADES.find((e) => e.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "") === n);
   if (exact) return exact;
