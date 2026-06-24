@@ -191,7 +191,7 @@ function DocumentosPage() {
 
     let sucesso = 0;
     for (const file of validos) {
-      const path = `${user?.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${file.name}`;
+      const path = `${user?.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${sanitizarNome(file.name)}`;
       const { error: upErr } = await supabase.storage.from("documentos").upload(path, file);
       if (upErr) {
         toast.error(`${file.name}: ${upErr.message}`);
@@ -300,7 +300,7 @@ function DocumentosPage() {
     if (!d.storage_path) return;
     setUploading(true);
     try {
-      const novoPath = `${d.storage_path.split("/")[0]}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${d.nome}`;
+      const novoPath = `${d.storage_path.split("/")[0]}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${sanitizarNome(d.nome)}`;
       const { error: copyErr } = await supabase.storage
         .from("documentos")
         .copy(d.storage_path, novoPath);
@@ -1060,7 +1060,7 @@ async function duplicarPastaRecursivo(
     .eq("pasta_id", pasta.id);
   for (const d of (docs ?? []) as Documento[]) {
     if (!d.storage_path) continue;
-    const novoPath = `${d.storage_path.split("/")[0]}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${d.nome}`;
+    const novoPath = `${d.storage_path.split("/")[0]}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${sanitizarNome(d.nome)}`;
     const { error: copyErr } = await supabase.storage
       .from("documentos")
       .copy(d.storage_path, novoPath);
@@ -1091,6 +1091,13 @@ function nomeCopia(nome: string) {
   const idx = nome.lastIndexOf(".");
   if (idx <= 0) return `${nome} (cópia)`;
   return `${nome.slice(0, idx)} (cópia)${nome.slice(idx)}`;
+}
+
+function sanitizarNome(nome: string) {
+  // Storage Supabase só aceita ASCII + alguns símbolos. Remove acentos e
+  // substitui caracteres não permitidos por "_".
+  const semAcentos = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return semAcentos.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/_+/g, "_");
 }
 
 function formatBytes(n: number | null) {
