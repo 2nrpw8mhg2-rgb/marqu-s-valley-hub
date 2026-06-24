@@ -380,10 +380,18 @@ function DocumentosPage() {
       <div className="grid grid-cols-[260px_1fr] gap-0 h-[calc(100vh-5rem)]">
         {/* Sidebar de obras */}
         <aside className="border-r border-border bg-card/30 overflow-hidden flex flex-col">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
             <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
               Obras
             </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs"
+              onClick={() => setNovaObraOpen(true)}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" /> Nova
+            </Button>
           </div>
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
