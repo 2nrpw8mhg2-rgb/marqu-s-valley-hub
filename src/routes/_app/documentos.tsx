@@ -185,12 +185,29 @@ function DocumentosPage() {
     const validos = files.filter((f) => f.size <= MAX_BYTES);
     if (!validos.length) return;
 
+    // Detecta ficheiros já existentes nesta pasta (por nome) para evitar duplicados
+    const { data: existentes } = await supabase
+      .from("documentos")
+      .select("nome")
+      .eq("pasta_id", pastaActualId);
+    const nomesExistentes = new Set((existentes ?? []).map((d: any) => d.nome.toLowerCase()));
+    const novos = validos.filter((f) => !nomesExistentes.has(f.name.toLowerCase()));
+    const ignorados = validos.length - novos.length;
+
+    if (!novos.length) {
+      toast.info(`Todos os ${validos.length} ficheiro(s) já existem nesta pasta`);
+      return;
+    }
+    if (ignorados > 0) {
+      toast.info(`${ignorados} ficheiro(s) já existem e foram ignorados`);
+    }
+
     setUploading(true);
-    setUploadProgress({ done: 0, total: validos.length });
+    setUploadProgress({ done: 0, total: novos.length });
     const { data: { user } } = await supabase.auth.getUser();
 
     let sucesso = 0;
-    for (const file of validos) {
+    for (const file of novos) {
       const path = `${user?.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${sanitizarNome(file.name)}`;
       const { error: upErr } = await supabase.storage.from("documentos").upload(path, file);
       if (upErr) {
