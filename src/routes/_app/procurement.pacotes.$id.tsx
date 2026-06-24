@@ -24,7 +24,7 @@ import { ArrowLeft, Plus, Save, Send, Trash2, Search, FileSpreadsheet, FileText,
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { ESPECIALIDADES } from "@/lib/procurement/especialidades";
+import { ESPECIALIDADES, classificarArtigo, CONFIANCA_MINIMA } from "@/lib/procurement/especialidades";
 
 export const Route = createFileRoute("/_app/procurement/pacotes/$id")({
   head: () => ({ meta: [{ title: "Pacote — Procurement — MV OS" }] }),
@@ -328,7 +328,7 @@ function AdicionarArtigosDialog({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orcamento_artigos")
-        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(descricao)")
+        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(codigo, descricao)")
         .eq("orcamento_id", orcamentoId);
       if (error) throw error;
       return data ?? [];
@@ -340,6 +340,15 @@ function AdicionarArtigosDialog({
     const q = search.toLowerCase();
     return artigos
       .filter((a: any) => !artigosJaIncluidos.has(a.id))
+      .filter((a: any) => {
+        const res = classificarArtigo({
+          descricao: a.descricao,
+          codigo: a.codigo,
+          capituloCodigo: a.capitulo?.codigo,
+          capitulo: a.capitulo?.descricao,
+        });
+        return res.especialidade === especialidade && res.confianca >= CONFIANCA_MINIMA;
+      })
       .filter((a: any) => !q || a.descricao?.toLowerCase().includes(q) || a.codigo?.toLowerCase().includes(q));
   }, [artigos, artigosJaIncluidos, search]);
 
