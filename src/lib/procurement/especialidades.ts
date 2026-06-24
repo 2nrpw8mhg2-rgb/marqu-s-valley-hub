@@ -147,6 +147,7 @@ const CHAPTER_HINTS: Array<{ esp: Especialidade; rx: RegExp }> = [
 export type ArtigoInput = {
   descricao?: string | null;
   codigo?: string | null;
+  capituloCodigo?: string | null;
   capitulo?: string | null;
   subcapitulo?: string | null;
   categoria_custo?: string | null;
@@ -159,6 +160,18 @@ export type ClassificacaoResultado = {
   motivo: string;
 };
 
+const TERRAPLANAGEM_RX = /\b(terraplenagens?|terraplanagens?|movimentos?\s+de\s+terras?|escava[çc][ãa]o|escava[çc]|aterro|desaterro|enrocamento|tout-?venant|compacta[çc][ãa]o|decapagem|desmatagem)\b/i;
+const BASE_PAVIMENTO_RX = /\bbase(?:s)?\s+de\s+pavimentos?\b|\bpavimentos?\s+(interiores?|exteriores?|flutuantes?)\b/i;
+const COBERTURA_RX = /\b(coberturas?|telhados?|telhas?|subtelha|cumeeira|beirado|caleira|rufos?|algeroz|clarab[oó]ia|platibanda|fibrocimento|onduline|painel\s+sandu(?:í|i)che|barreira\s+para-?vapor)\b/i;
+
+function normalizarCodigo(codigo?: string | null) {
+  return (codigo ?? "").trim();
+}
+
+function codigoComecaPor(codigo: string, prefixo: string) {
+  return codigo === prefixo || codigo.startsWith(`${prefixo}.`);
+}
+
 export function classificarArtigo(a: ArtigoInput): ClassificacaoResultado {
   // 1) Especialidade já atribuída manualmente → respeita
   if (a.especialidade) {
@@ -167,10 +180,26 @@ export function classificarArtigo(a: ArtigoInput): ClassificacaoResultado {
   }
 
   const desc = (a.descricao ?? "").toString();
+  const codigo = normalizarCodigo(a.codigo);
+  const capituloCodigo = normalizarCodigo(a.capituloCodigo);
   const chap = [a.capitulo, a.subcapitulo].filter(Boolean).join(" ");
   const hay = `${desc} ${chap}`;
 
-  // 2) Score por palavras-chave (positivas/negativas) na descrição+capítulo
+  // 2) Guardas estruturais: quando o capítulo/código do mapa identifica claramente
+  // a família do trabalho, isto prevalece sobre palavras soltas na descrição.
+  // Ex.: 4.2.1/4.2.2 em TERRAPLENAGENS nunca podem cair em Cobertura.
+  if (TERRAPLANAGEM_RX.test(hay) || codigoComecaPor(capituloCodigo, "4.2") || codigoComecaPor(codigo, "4.2")) {
+    return { especialidade: "Terraplanagens", confianca: 1, motivo: "Capítulo/código de terraplenagens" };
+  }
+
+  if ((codigoComecaPor(codigo, "8") || codigoComecaPor(capituloCodigo, "8")) && BASE_PAVIMENTO_RX.test(hay)) {
+    return { especialidade: "Outros", confianca: 0.95, motivo: "Base de pavimentos — não pertence a Cobertura" };
+  }
+
+  const capituloIndicaCobertura = COBERTURA_RX.test(chap) || codigoComecaPor(capituloCodigo, "12") || codigoComecaPor(codigo, "12");
+  const descricaoIndicaCobertura = COBERTURA_RX.test(desc);
+
+  // 3) Score por palavras-chave (positivas/negativas) na descrição+capítulo
   const scores = new Map<Especialidade, number>();
   for (const rule of RULES) {
     let s = 0;
@@ -179,7 +208,13 @@ export function classificarArtigo(a: ArtigoInput): ClassificacaoResultado {
     if (s !== 0) scores.set(rule.esp, s);
   }
 
-  // 3) Reforço pelo capítulo (peso adicional)
+  if (capituloIndicaCobertura || descricaoIndicaCobertura) {
+    scores.set("Cobertura", Math.max(scores.get("Cobertura") ?? 0, 3));
+  } else {
+    scores.delete("Cobertura");
+  }
+
+  // 4) Reforço pelo capítulo (peso adicional)
   for (const h of CHAPTER_HINTS) {
     if (chap && h.rx.test(chap)) {
       scores.set(h.esp, (scores.get(h.esp) ?? 0) + 2);
