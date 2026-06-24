@@ -735,12 +735,17 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
             + Number(a.custo_subempreitadas ?? 0) + Number(a.custo_materiais ?? 0)
             + Number(a.custo_equipamentos ?? 0) + Number(a.custo_transportes ?? 0)
             + Number(a.custo_encargos_gerais ?? 0) + Number(a.custo_outros ?? 0);
+          const r = pertenceAoPacote({
+            descricao: a.descricao, codigo: a.codigo,
+            capitulo: a.capitulo?.descricao, capituloCodigo: a.capitulo?.codigo,
+          }, especialidade);
           return {
             pacote_id: novo.id, artigo_id: a.id, codigo: a.codigo, descricao: a.descricao,
             unidade: a.unidade, quantidade: a.quantidade,
             capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
             preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
             categoria_custo: null, especialidade,
+            confianca: r.confianca, motivo: r.motivo, sinalizado_revisao: !r.pertence,
           };
         });
 
