@@ -269,41 +269,53 @@ function PacoteDetailPage() {
       const { data, error } = await supabase
         .from("procurement_pacotes")
         .select("id, nome, especialidade")
-        .eq("orcamento_id", pacote!.orcamento_id)
-        .neq("id", id)
-        .order("nome");
+        .eq("orcamento_id", pacote!.orcamento_id);
       if (error) throw error;
       return data ?? [];
     },
   });
 
-  // Lista combinada: todas as especialidades, sinalizando quais já têm pacote no orçamento.
-  // O valor do select é a especialidade; se não existir pacote, cria-se ao confirmar.
+  const { data: subempreitadas = [] } = useQuery({
+    queryKey: ["procurement-subempreitadas", pacote?.orcamento_id],
+    enabled: !!pacote?.orcamento_id,
+    queryFn: async () => {
+      const { carregarSubempreitadas } = await import("./procurement.pacotes");
+      return carregarSubempreitadas(pacote!.orcamento_id);
+    },
+  });
+
+  // Opções: todas as subempreitadas do orçamento, exceto a actual (mesmo nome).
   const opcoesDestino = useMemo(() => {
-    const porEsp = new Map<string, any>();
-    for (const p of outrosPacotes as any[]) {
-      if (!porEsp.has(p.especialidade)) porEsp.set(p.especialidade, p);
-    }
-    return ESPECIALIDADES
-      .filter((e) => e !== especialidade)
-      .map((e) => ({ especialidade: e, pacote: porEsp.get(e) ?? null }));
-  }, [outrosPacotes, especialidade]);
+    const porNome = new Map<string, any>();
+    for (const p of outrosPacotes as any[]) porNome.set(p.nome.toLowerCase(), p);
+    return (subempreitadas as any[])
+      .filter((s) => s.nome.toLowerCase() !== (nome || "").toLowerCase())
+      .map((s) => ({
+        key: s.key,
+        nome: s.nome,
+        codigo: s.codigo,
+        artigoCount: s.artigoCount,
+        pacote: porNome.get(s.nome.toLowerCase()) ?? null,
+      }));
+  }, [subempreitadas, outrosPacotes, nome]);
 
   async function confirmarMover() {
     const art = moverState.artigo;
-    const destinoEsp = moverState.destinoId; // agora guarda a especialidade
-    if (!art || !destinoEsp) return;
+    const destinoKey = moverState.destinoId; // chave da subempreitada
+    if (!art || !destinoKey) return;
+    const sub = opcoesDestino.find((o) => o.key === destinoKey);
+    if (!sub) return;
     setMovendo(true);
     try {
-      // 1) garantir pacote de destino (existente ou criar)
-      let destinoPacote = (outrosPacotes as any[]).find((p) => p.especialidade === destinoEsp);
+      // 1) garantir pacote de destino (existente ou criar) — match por nome da subempreitada
+      let destinoPacote = sub.pacote;
       if (!destinoPacote) {
         const { data: novo, error: errCria } = await supabase
           .from("procurement_pacotes")
           .insert({
             orcamento_id: pacote!.orcamento_id,
-            nome: destinoEsp,
-            especialidade: destinoEsp,
+            nome: sub.nome,
+            especialidade: sub.nome,
             estado: "por_preparar",
           })
           .select("id, nome, especialidade")
@@ -658,11 +670,14 @@ function PacoteDetailPage() {
                   value={moverState.destinoId}
                   onValueChange={(v) => setMoverState((s) => ({ ...s, destinoId: v }))}
                 >
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Escolher especialidade..." /></SelectTrigger>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Escolher subempreitada..." /></SelectTrigger>
                   <SelectContent>
-                    {opcoesDestino.map((o) => (
-                      <SelectItem key={o.especialidade} value={o.especialidade}>
-                        {o.especialidade}
+                    {opcoesDestino.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">Sem subempreitadas no orçamento.</div>
+                    ) : opcoesDestino.map((o) => (
+                      <SelectItem key={o.key} value={o.key}>
+                        <span className="tabular-nums text-muted-foreground mr-2">{o.codigo}</span>
+                        {o.nome}
                         {o.pacote ? (
                           <span className="text-muted-foreground"> · pacote existente</span>
                         ) : (
@@ -674,7 +689,7 @@ function PacoteDetailPage() {
                 </Select>
               </div>
               <p className="text-xs text-muted-foreground">
-                Se o pacote da especialidade escolhida ainda não existir neste orçamento, será criado automaticamente. A correção é guardada na base de aprendizagem para melhorar a classificação em obras futuras.
+                Se a subempreitada escolhida ainda não tiver pacote neste orçamento, será criado automaticamente. A correção é guardada na base de aprendizagem para melhorar a classificação em obras futuras.
               </p>
             </div>
           )}

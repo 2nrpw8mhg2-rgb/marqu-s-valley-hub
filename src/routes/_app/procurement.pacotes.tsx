@@ -31,7 +31,7 @@ import {
 import { ESPECIALIDADES, inferirEspecialidade, classificarArtigo, CONFIANCA_MINIMA, validarArtigoParaEspecialidade, isBetaoArtigo, type Especialidade } from "@/lib/procurement/especialidades";
 import { pertenceAoPacote } from "@/lib/procurement/classifier";
 
-const BETAO_KEY = "__betao__";
+export const BETAO_KEY = "__betao__";
 
 export const Route = createFileRoute("/_app/procurement/pacotes")({
   head: () => ({ meta: [{ title: "Pacotes de Consulta — Procurement — MV OS" }] }),
@@ -350,7 +350,7 @@ function SummaryCard({ label, value, tone = "default" }: { label: string; value:
 
 // Subempreitada = top-level chapter of the orçamento (códigos como "1", "2", "12"...).
 // Cada subempreitada agrega todos os artigos do capítulo e dos seus sub-capítulos.
-type Subempreitada = {
+export type Subempreitada = {
   key: string;          // unique key: top chapter id, or BETAO_KEY
   codigo: string;       // display code (ex: "12")
   nome: string;         // chapter descricao (ex: "COBERTURAS")
@@ -371,7 +371,7 @@ function isChildOf(childCode: string | null | undefined, parentCode: string): bo
   return c === parentCode || c.startsWith(parentCode + ".");
 }
 
-async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitada[]> {
+export async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitada[]> {
   const { data: capitulos, error: e1 } = await supabase
     .from("orcamento_capitulos")
     .select("id, codigo, descricao, ordem")
