@@ -494,9 +494,30 @@ function PacoteDetailPage() {
                       {fmtEUR(Number(a.quantidade ?? 0) * Number(a.preco_seco_estimado ?? 0))}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => removerArtigo(a.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => setMoverState({ artigo: a, destinoId: "" })}
+                            disabled={outrosPacotes.length === 0}
+                          >
+                            <ArrowRightLeft className="h-4 w-4 mr-2" />
+                            Mover para outro pacote
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => removerArtigo(a.id)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Remover do pacote
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                   );
