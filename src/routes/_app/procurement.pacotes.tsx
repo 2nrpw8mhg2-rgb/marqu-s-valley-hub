@@ -31,7 +31,7 @@ import {
 import { ESPECIALIDADES, inferirEspecialidade, classificarArtigo, CONFIANCA_MINIMA, validarArtigoParaEspecialidade, isBetaoArtigo, type Especialidade } from "@/lib/procurement/especialidades";
 import { pertenceAoPacote } from "@/lib/procurement/classifier";
 
-const BETAO_KEY = "__betao__";
+export const BETAO_KEY = "__betao__";
 
 export const Route = createFileRoute("/_app/procurement/pacotes")({
   head: () => ({ meta: [{ title: "Pacotes de Consulta — Procurement — MV OS" }] }),
