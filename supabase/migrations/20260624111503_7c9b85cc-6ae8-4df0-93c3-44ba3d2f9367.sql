@@ -1,0 +1,2 @@
+ALTER TABLE public.orcamento_artigos ADD COLUMN IF NOT EXISTS preco_seco numeric NOT NULL DEFAULT 0;
+UPDATE public.orcamento_artigos SET preco_seco = preco_unitario WHERE preco_seco = 0 AND preco_unitario > 0;
