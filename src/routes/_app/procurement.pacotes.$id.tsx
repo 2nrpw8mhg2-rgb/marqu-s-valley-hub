@@ -277,41 +277,72 @@ function PacoteDetailPage() {
     },
   });
 
+  // Lista combinada: todas as especialidades, sinalizando quais já têm pacote no orçamento.
+  // O valor do select é a especialidade; se não existir pacote, cria-se ao confirmar.
+  const opcoesDestino = useMemo(() => {
+    const porEsp = new Map<string, any>();
+    for (const p of outrosPacotes as any[]) {
+      if (!porEsp.has(p.especialidade)) porEsp.set(p.especialidade, p);
+    }
+    return ESPECIALIDADES
+      .filter((e) => e !== especialidade)
+      .map((e) => ({ especialidade: e, pacote: porEsp.get(e) ?? null }));
+  }, [outrosPacotes, especialidade]);
+
   async function confirmarMover() {
     const art = moverState.artigo;
-    const destinoId = moverState.destinoId;
-    if (!art || !destinoId) return;
-    const destino = outrosPacotes.find((p: any) => p.id === destinoId);
-    if (!destino) return;
+    const destinoEsp = moverState.destinoId; // agora guarda a especialidade
+    if (!art || !destinoEsp) return;
     setMovendo(true);
-    // 1) update pacote_id + especialidade do artigo
-    const { error } = await supabase
-      .from("procurement_pacote_artigos")
-      .update({
-        pacote_id: destinoId,
-        especialidade: destino.especialidade,
-        sinalizado_revisao: false,
-        motivo: `Movido manualmente de "${especialidade}" para "${destino.especialidade}"`,
-        confianca: 1,
-      })
-      .eq("id", art.id);
-    setMovendo(false);
-    if (error) { toast.error(error.message); return; }
-    // 2) aprendizagem
-    registar({ data: {
-      artigo: { codigo: art.codigo, descricao: art.descricao, capitulo: art.capitulo, subcapitulo: art.subcapitulo },
-      especialidadeAnterior: especialidade,
-      especialidadeFinal: destino.especialidade,
-      confiancaAnterior: art.confianca ?? null,
-      obraId: (pacote?.orcamento as any)?.obra?.id ?? null,
-      acao: "move",
-    }}).catch(() => {});
-    toast.success(`Artigo movido para "${destino.nome}"`);
-    setMoverState({ artigo: null, destinoId: "" });
-    qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] });
-    qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", destinoId] });
-    qc.invalidateQueries({ queryKey: ["procurement-pacotes"] });
+    try {
+      // 1) garantir pacote de destino (existente ou criar)
+      let destinoPacote = (outrosPacotes as any[]).find((p) => p.especialidade === destinoEsp);
+      if (!destinoPacote) {
+        const { data: novo, error: errCria } = await supabase
+          .from("procurement_pacotes")
+          .insert({
+            orcamento_id: pacote!.orcamento_id,
+            nome: destinoEsp,
+            especialidade: destinoEsp,
+            estado: "por_preparar",
+          })
+          .select("id, nome, especialidade")
+          .single();
+        if (errCria || !novo) { toast.error(errCria?.message ?? "Falha a criar pacote"); setMovendo(false); return; }
+        destinoPacote = novo;
+      }
+      // 2) mover o artigo
+      const { error } = await supabase
+        .from("procurement_pacote_artigos")
+        .update({
+          pacote_id: destinoPacote.id,
+          especialidade: destinoPacote.especialidade,
+          sinalizado_revisao: false,
+          motivo: `Movido manualmente de "${especialidade}" para "${destinoPacote.especialidade}"`,
+          confianca: 1,
+        })
+        .eq("id", art.id);
+      if (error) { toast.error(error.message); setMovendo(false); return; }
+      // 3) aprendizagem
+      registar({ data: {
+        artigo: { codigo: art.codigo, descricao: art.descricao, capitulo: art.capitulo, subcapitulo: art.subcapitulo },
+        especialidadeAnterior: especialidade,
+        especialidadeFinal: destinoPacote.especialidade,
+        confiancaAnterior: art.confianca ?? null,
+        obraId: (pacote?.orcamento as any)?.obra?.id ?? null,
+        acao: "move",
+      }}).catch(() => {});
+      toast.success(`Artigo movido para "${destinoPacote.nome}"`);
+      setMoverState({ artigo: null, destinoId: "" });
+      qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] });
+      qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", destinoPacote.id] });
+      qc.invalidateQueries({ queryKey: ["procurement-pacotes"] });
+      qc.invalidateQueries({ queryKey: ["procurement-pacotes-do-orcamento", pacote?.orcamento_id] });
+    } finally {
+      setMovendo(false);
+    }
   }
+
 
   async function correrAuditoria() {
     setReanalising(true);
