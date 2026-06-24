@@ -61,6 +61,75 @@ export type Database = {
           },
         ]
       }
+      classificacao_aprendizagem: {
+        Row: {
+          acao: string
+          capitulo: string | null
+          codigo_artigo: string | null
+          confianca_sugerida: number | null
+          created_at: string
+          descricao_normalizada: string
+          descricao_original: string
+          especialidade_final: string
+          especialidade_sugerida: string | null
+          id: string
+          obra_id: string | null
+          subcapitulo: string | null
+          user_id: string
+        }
+        Insert: {
+          acao: string
+          capitulo?: string | null
+          codigo_artigo?: string | null
+          confianca_sugerida?: number | null
+          created_at?: string
+          descricao_normalizada: string
+          descricao_original: string
+          especialidade_final: string
+          especialidade_sugerida?: string | null
+          id?: string
+          obra_id?: string | null
+          subcapitulo?: string | null
+          user_id: string
+        }
+        Update: {
+          acao?: string
+          capitulo?: string | null
+          codigo_artigo?: string | null
+          confianca_sugerida?: number | null
+          created_at?: string
+          descricao_normalizada?: string
+          descricao_original?: string
+          especialidade_final?: string
+          especialidade_sugerida?: string | null
+          id?: string
+          obra_id?: string | null
+          subcapitulo?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      classificacao_cache: {
+        Row: {
+          created_at: string
+          hash: string
+          modelo: string
+          resultado: Json
+        }
+        Insert: {
+          created_at?: string
+          hash: string
+          modelo?: string
+          resultado: Json
+        }
+        Update: {
+          created_at?: string
+          hash?: string
+          modelo?: string
+          resultado?: Json
+        }
+        Relationships: []
+      }
       documentos: {
         Row: {
           created_at: string
@@ -391,13 +460,16 @@ export type Database = {
           capitulo: string | null
           categoria_custo: string | null
           codigo: string | null
+          confianca: number | null
           created_at: string
           descricao: string
           especialidade: string | null
           id: string
+          motivo: string | null
           pacote_id: string
           preco_seco_estimado: number
           quantidade: number
+          sinalizado_revisao: boolean
           subcapitulo: string | null
           unidade: string | null
         }
@@ -406,13 +478,16 @@ export type Database = {
           capitulo?: string | null
           categoria_custo?: string | null
           codigo?: string | null
+          confianca?: number | null
           created_at?: string
           descricao: string
           especialidade?: string | null
           id?: string
+          motivo?: string | null
           pacote_id: string
           preco_seco_estimado?: number
           quantidade?: number
+          sinalizado_revisao?: boolean
           subcapitulo?: string | null
           unidade?: string | null
         }
@@ -421,13 +496,16 @@ export type Database = {
           capitulo?: string | null
           categoria_custo?: string | null
           codigo?: string | null
+          confianca?: number | null
           created_at?: string
           descricao?: string
           especialidade?: string | null
           id?: string
+          motivo?: string | null
           pacote_id?: string
           preco_seco_estimado?: number
           quantidade?: number
+          sinalizado_revisao?: boolean
           subcapitulo?: string | null
           unidade?: string | null
         }
