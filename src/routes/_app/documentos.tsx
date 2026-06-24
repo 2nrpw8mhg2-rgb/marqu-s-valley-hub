@@ -336,13 +336,14 @@ function DocumentosPage() {
         parentId = cache.get(key)!;
         continue;
       }
-      const { data: existing } = await supabase
+      const { data: matches } = await supabase
         .from("documento_pastas")
-        .select("id")
+        .select("id, nome")
         .eq("obra_id", obraId!)
-        .eq("parent_id", parentId)
-        .ilike("nome", seg)
-        .maybeSingle();
+        .eq("parent_id", parentId);
+      const existing = (matches ?? []).find(
+        (m: any) => (m.nome ?? "").toLowerCase() === seg.toLowerCase(),
+      );
       if (existing?.id) {
         parentId = existing.id;
       } else {
@@ -381,12 +382,13 @@ function DocumentosPage() {
           ? await ensurePastaPath(parts, pastaActualId, cache)
           : pastaActualId;
 
-        const { data: ex } = await supabase
+        const { data: dups } = await supabase
           .from("documentos")
-          .select("id")
-          .eq("pasta_id", destinoPastaId)
-          .ilike("nome", fileName)
-          .maybeSingle();
+          .select("id, nome")
+          .eq("pasta_id", destinoPastaId);
+        const ex = (dups ?? []).find(
+          (d: any) => (d.nome ?? "").toLowerCase() === fileName.toLowerCase(),
+        );
         if (ex?.id) {
           ignorados++;
           setUploadProgress((p) => ({ ...p, done: p.done + 1 }));
