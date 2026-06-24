@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,9 @@ import { fmtEUR } from "@/lib/orcamento-utils";
 
 export const Route = createFileRoute("/_app/orcamentos/decomposicao")({
   head: () => ({ meta: [{ title: "Decomposição de Preços — MV OS" }] }),
+  beforeLoad: () => {
+    throw redirect({ to: "/decomposicao-precos" });
+  },
   component: DecomposicaoListPage,
 });
 
