@@ -584,8 +584,8 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
                           checked={checked}
                           onChange={() => toggleSub(sub.key)}
                         />
-                        <span className="text-muted-foreground tabular-nums w-8">{sub.key}</span>
-                        <span>{sub.nome}</span>
+                        <span className="text-muted-foreground tabular-nums w-8">{sub.key === BETAO_KEY ? "★" : sub.key}</span>
+                        <span>{sub.nome}{sub.key === BETAO_KEY ? <span className="ml-2 text-xs text-muted-foreground">(transversal — em todas as obras)</span> : null}</span>
                       </span>
                       <Badge variant={sub.artigoCount > 0 ? "secondary" : "outline"}>{sub.artigoCount} art.</Badge>
                     </label>
