@@ -262,7 +262,7 @@ function PacoteDetailPage() {
             <Button variant="outline" asChild>
               <Link to="/procurement/pacotes"><ArrowLeft className="h-4 w-4 mr-2" /> Voltar</Link>
             </Button>
-            <Button variant="outline" onClick={() => exportarExcel(nome || "pacote", especialidade, artigos)} disabled={artigos.length === 0}>
+            <Button variant="outline" onClick={() => exportarExcel(nome || "pacote", especialidade, artigos, { nome: pacote.orcamento?.obra?.nome, codigo: pacote.orcamento?.obra?.codigo, cliente: (pacote.orcamento?.obra as any)?.cliente ?? null }, { nome: pacote.orcamento?.nome, versao: pacote.orcamento?.versao })} disabled={artigos.length === 0}>
               <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
             </Button>
             <Button variant="outline" onClick={() => exportarPDF(nome || "pacote", especialidade, pacote.orcamento?.nome, artigos)} disabled={artigos.length === 0}>
