@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import {
   Plus, Sparkles, MoreHorizontal, Trash2, Copy, Pencil, Send, FolderOpen, ShoppingCart,
 } from "lucide-react";
-import { ESPECIALIDADES, inferirEspecialidade, type Especialidade } from "@/lib/procurement/especialidades";
+import { ESPECIALIDADES, inferirEspecialidade, classificarArtigo, CONFIANCA_MINIMA, type Especialidade } from "@/lib/procurement/especialidades";
 
 export const Route = createFileRoute("/_app/procurement/pacotes")({
   head: () => ({ meta: [{ title: "Pacotes de Consulta — Procurement — MV OS" }] }),
