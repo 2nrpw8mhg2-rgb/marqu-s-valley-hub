@@ -168,7 +168,63 @@ function DocumentosPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [isDragOver, setIsDragOver] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Limpa selecção ao mudar de pasta
+  useEffect(() => {
+    setSelecionados(new Set());
+  }, [pastaActualId]);
+
+  const toggleSel = (id: string) => {
+    setSelecionados((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+  const toggleSelAll = () => {
+    setSelecionados((prev) =>
+      prev.size === docs.length ? new Set() : new Set(docs.map((d) => d.id)),
+    );
+  };
+
+  const eliminarSelecionados = async () => {
+    if (selecionados.size === 0) return;
+    if (!confirm(`Eliminar ${selecionados.size} ficheiro(s)?`)) return;
+    const ids = Array.from(selecionados);
+    const alvos = docs.filter((d) => ids.includes(d.id));
+    const paths = alvos.map((d) => d.storage_path).filter(Boolean);
+    if (paths.length) await supabase.storage.from("documentos").remove(paths);
+    const { error } = await supabase.from("documentos").delete().in("id", ids);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`${ids.length} ficheiro(s) eliminados`);
+    setSelecionados(new Set());
+    invalidar();
+  };
+
+  const moverSelecionadosPara = async (destinoId: string) => {
+    if (selecionados.size === 0) return;
+    const ids = Array.from(selecionados);
+    const { error } = await supabase
+      .from("documentos")
+      .update({ pasta_id: destinoId })
+      .in("id", ids);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`${ids.length} ficheiro(s) movidos`);
+    setSelecionados(new Set());
+    setBulkMoveOpen(false);
+    invalidar();
+  };
+
 
   const invalidar = () => {
     qc.invalidateQueries({ queryKey: ["pastas-obra", obraId] });
