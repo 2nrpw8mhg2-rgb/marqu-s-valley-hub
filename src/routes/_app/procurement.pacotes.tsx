@@ -471,23 +471,21 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
               <div className="mt-2 rounded-md border max-h-64 overflow-auto divide-y">
                 {ESPECIALIDADES.map(esp => {
                   const n = counts?.[esp] ?? 0;
-                  const disabled = n === 0;
                   const checked = selecionadas.has(esp);
                   return (
                     <label
                       key={esp}
-                      className={`flex items-center justify-between gap-2 px-3 py-2 text-sm cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/50"}`}
+                      className="flex items-center justify-between gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50"
                     >
                       <span className="flex items-center gap-2">
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={disabled}
                           onChange={() => toggleEsp(esp)}
                         />
                         {esp}
                       </span>
-                      <Badge variant="secondary">{n} art.</Badge>
+                      <Badge variant={n > 0 ? "secondary" : "outline"}>{n} art.</Badge>
                     </label>
                   );
                 })}
