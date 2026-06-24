@@ -1094,6 +1094,69 @@ function MoveDialog({
 
 type ArvoreNo = Pasta & { filhos: ArvoreNo[] };
 
+function BulkMoveDialog({
+  count,
+  pastas,
+  onClose,
+  onConfirm,
+}: {
+  count: number;
+  pastas: Pasta[];
+  onClose: () => void;
+  onConfirm: (destinoId: string) => void | Promise<void>;
+}) {
+  const [destinoId, setDestinoId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const arvore = useMemo(() => construirArvore(pastas), [pastas]);
+  const proibidas = useMemo(() => new Set<string>(), []);
+
+  const submit = async () => {
+    if (!destinoId) {
+      toast.error("Selecione uma pasta de destino");
+      return;
+    }
+    setBusy(true);
+    await onConfirm(destinoId);
+    setBusy(false);
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="bg-card border-border">
+        <DialogHeader>
+          <DialogTitle>Mover {count} ficheiro(s) para...</DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="max-h-80 border border-border rounded-md">
+          <div className="p-2">
+            {arvore.map((node) => (
+              <TreeNode
+                key={node.id}
+                node={node}
+                nivel={0}
+                proibidas={proibidas}
+                selecionada={destinoId}
+                onSelect={setDestinoId}
+              />
+            ))}
+          </div>
+        </ScrollArea>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={submit}
+            disabled={busy || !destinoId}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            {busy ? "A mover..." : "Mover"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function TreeNode({
   node,
   nivel,
