@@ -30,6 +30,27 @@ export function ImportMQDialog({ open, onClose, onImport }: Props) {
     setHeaderRow(0); setParsed([]);
   };
 
+  const validateAndHandle = async (f: File | null | undefined) => {
+    if (!f) return;
+    const isXlsxExt = /\.xlsx$/i.test(f.name);
+    const validMimes = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel.sheet.macroEnabled.12",
+      "", // alguns browsers não preenchem o tipo em drag-and-drop
+    ];
+    if (!isXlsxExt || !validMimes.includes(f.type)) {
+      toast.error("Formato não suportado", {
+        description: `"${f.name}" não é um ficheiro .xlsx válido. Converte primeiro para Excel (.xlsx) — formatos como .xls, .csv, .ods ou .numbers não são aceites.`,
+      });
+      return;
+    }
+    if (f.size > 20 * 1024 * 1024) {
+      toast.error("Ficheiro demasiado grande", { description: "Limite: 20 MB." });
+      return;
+    }
+    await handleFile(f);
+  };
+
   const handleFile = async (f: File) => {
     setFile(f);
     try {
@@ -42,7 +63,7 @@ export function ImportMQDialog({ open, onClose, onImport }: Props) {
       if (det) { setHeaderRow(det.headerRowIdx); setMap(det.map); }
       setStep(2);
     } catch (e: any) {
-      toast.error("Erro a ler o ficheiro: " + e.message);
+      toast.error("Erro a ler o ficheiro", { description: e.message });
     }
   };
 
@@ -89,21 +110,18 @@ export function ImportMQDialog({ open, onClose, onImport }: Props) {
             onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); }}
             onDrop={(e) => {
               e.preventDefault(); e.stopPropagation(); setDragOver(false);
-              const f = e.dataTransfer.files?.[0];
-              if (!f) return;
-              if (!/\.(xlsx|xls)$/i.test(f.name)) { toast.error("Apenas .xlsx ou .xls"); return; }
-              handleFile(f);
+              validateAndHandle(e.dataTransfer.files?.[0]);
             }}
             className={`block border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${dragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/60 hover:bg-muted/30"}`}
           >
             <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
             <p className="font-medium">Arrasta o ficheiro Excel ou clica para escolher</p>
-            <p className="text-xs text-muted-foreground mt-1">Suportado: .xlsx, .xls</p>
+            <p className="text-xs text-muted-foreground mt-1">Apenas .xlsx · máx. 20 MB</p>
             <input
               type="file"
-              accept=".xlsx,.xls"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              onChange={(e) => validateAndHandle(e.target.files?.[0])}
             />
           </label>
         )}
