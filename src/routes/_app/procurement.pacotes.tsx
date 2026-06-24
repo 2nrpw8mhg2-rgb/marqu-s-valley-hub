@@ -789,7 +789,7 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
               <div className="mt-2 rounded-md border divide-y max-h-72 overflow-auto">
                 {subs.map(sub => (
                   <div key={sub.key} className="flex justify-between px-3 py-1.5 text-sm">
-                    <span><span className="text-muted-foreground tabular-nums mr-2">{sub.key}</span>{sub.nome}</span>
+                    <span><span className="text-muted-foreground tabular-nums mr-2">{sub.key === BETAO_KEY ? "★" : sub.key}</span>{sub.nome}</span>
                     <Badge variant={sub.artigoCount > 0 ? "secondary" : "outline"}>{sub.artigoCount} art.</Badge>
                   </div>
                 ))}
