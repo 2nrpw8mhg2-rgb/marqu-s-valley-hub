@@ -352,7 +352,13 @@ function DecomposicaoPage() {
                         <td className="px-2 font-mono text-[11px]">{a.codigo}</td>
                         <td className="px-2">{a.descricao}</td>
                         <td className="px-2 text-muted-foreground">{a.unidade}</td>
-                        <td className="px-2 text-right tabular-nums">{fmtNum(a.quantidade)}</td>
+                        <td className="px-1">
+                          <NumberInput
+                            className="h-7 text-xs text-right tabular-nums px-1.5 w-full min-w-0"
+                            value={a.quantidade}
+                            onChange={v => updateArt(idx, { quantidade: v })}
+                          />
+                        </td>
                         <td className="px-1">
                           <NumberInput
                             className="h-7 text-xs text-right tabular-nums px-1.5 w-full min-w-0"
