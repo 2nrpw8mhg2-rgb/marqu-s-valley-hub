@@ -38,9 +38,14 @@ const sections: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
+    title: "Fase 3 — Procurement",
+    items: [
+      { to: "/procurement/pacotes", label: "Pacotes de Consulta", icon: ShoppingCart },
+    ],
+  },
+  {
     title: "Próximas fases",
     items: [
-      { to: "/procurement", label: "Procurement", icon: ShoppingCart, phase: "Fase 3", disabled: true },
       { to: "/ia", label: "Agentes IA", icon: Sparkles, phase: "Fase 4+", disabled: true },
     ],
   },
