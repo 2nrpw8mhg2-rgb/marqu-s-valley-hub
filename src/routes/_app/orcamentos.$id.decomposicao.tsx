@@ -422,7 +422,7 @@ function DecomposicaoPage() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>
