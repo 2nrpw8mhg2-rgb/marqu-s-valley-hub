@@ -262,6 +262,57 @@ function PacoteDetailPage() {
     qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] });
   }
 
+  const { data: outrosPacotes = [] } = useQuery({
+    queryKey: ["procurement-pacotes-do-orcamento", pacote?.orcamento_id],
+    enabled: !!pacote?.orcamento_id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("procurement_pacotes")
+        .select("id, nome, especialidade")
+        .eq("orcamento_id", pacote!.orcamento_id)
+        .neq("id", id)
+        .order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  async function confirmarMover() {
+    const art = moverState.artigo;
+    const destinoId = moverState.destinoId;
+    if (!art || !destinoId) return;
+    const destino = outrosPacotes.find((p: any) => p.id === destinoId);
+    if (!destino) return;
+    setMovendo(true);
+    // 1) update pacote_id + especialidade do artigo
+    const { error } = await supabase
+      .from("procurement_pacote_artigos")
+      .update({
+        pacote_id: destinoId,
+        especialidade: destino.especialidade,
+        sinalizado_revisao: false,
+        motivo: `Movido manualmente de "${especialidade}" para "${destino.especialidade}"`,
+        confianca: 1,
+      })
+      .eq("id", art.id);
+    setMovendo(false);
+    if (error) { toast.error(error.message); return; }
+    // 2) aprendizagem
+    registar({ data: {
+      artigo: { codigo: art.codigo, descricao: art.descricao, capitulo: art.capitulo, subcapitulo: art.subcapitulo },
+      especialidadeAnterior: especialidade,
+      especialidadeFinal: destino.especialidade,
+      confiancaAnterior: art.confianca ?? null,
+      obraId: (pacote?.orcamento as any)?.obra?.id ?? null,
+      acao: "move",
+    }}).catch(() => {});
+    toast.success(`Artigo movido para "${destino.nome}"`);
+    setMoverState({ artigo: null, destinoId: "" });
+    qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", id] });
+    qc.invalidateQueries({ queryKey: ["procurement-pacote-artigos", destinoId] });
+    qc.invalidateQueries({ queryKey: ["procurement-pacotes"] });
+  }
+
   async function correrAuditoria() {
     setReanalising(true);
     try {
