@@ -244,6 +244,7 @@ function PacotesListPage() {
                           <div className="text-xs text-muted-foreground">{p.nome}</div>
                         )}
                       </TableCell>
+                      <TableCell>{p.especialidade}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {p.orcamento?.obra?.codigo ? `${p.orcamento.obra.codigo} · ` : ""}{p.orcamento?.nome}
                       </TableCell>
