@@ -15,6 +15,7 @@ type Props = {
 
 export function ImportMQDialog({ open, onClose, onImport }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [dragOver, setDragOver] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [sheets, setSheets] = useState<string[]>([]);
   const [sheetData, setSheetData] = useState<Record<string, any[][]>>({});
