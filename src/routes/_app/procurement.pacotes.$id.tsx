@@ -609,6 +609,54 @@ function PacoteDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!moverState.artigo} onOpenChange={(v) => !v && setMoverState({ artigo: null, destinoId: "" })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mover artigo para outro pacote</DialogTitle>
+          </DialogHeader>
+          {moverState.artigo && (
+            <div className="space-y-4">
+              <div className="rounded-md border p-3 text-sm bg-muted/30">
+                <div className="font-mono text-xs text-muted-foreground">{moverState.artigo.codigo ?? "—"}</div>
+                <div>{moverState.artigo.descricao}</div>
+                <div className="text-xs text-muted-foreground mt-1">Pacote atual: <span className="font-medium">{especialidade}</span></div>
+              </div>
+              <div>
+                <Label>Pacote de destino</Label>
+                {outrosPacotes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Não existem outros pacotes neste orçamento.
+                  </p>
+                ) : (
+                  <Select
+                    value={moverState.destinoId}
+                    onValueChange={(v) => setMoverState((s) => ({ ...s, destinoId: v }))}
+                  >
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Escolher pacote..." /></SelectTrigger>
+                    <SelectContent>
+                      {outrosPacotes.map((p: any) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nome} <span className="text-muted-foreground">· {p.especialidade}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Esta correção é guardada na base de aprendizagem para melhorar a classificação em obras futuras.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoverState({ artigo: null, destinoId: "" })}>Cancelar</Button>
+            <Button onClick={confirmarMover} disabled={!moverState.destinoId || movendo}>
+              {movendo ? "A mover..." : "Mover artigo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
 
   );
