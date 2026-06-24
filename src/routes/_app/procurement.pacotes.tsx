@@ -28,7 +28,9 @@ import { toast } from "sonner";
 import {
   Plus, Sparkles, MoreHorizontal, Trash2, Copy, Pencil, Send, FolderOpen, ShoppingCart,
 } from "lucide-react";
-import { ESPECIALIDADES, inferirEspecialidade, classificarArtigo, CONFIANCA_MINIMA, validarArtigoParaEspecialidade, type Especialidade } from "@/lib/procurement/especialidades";
+import { ESPECIALIDADES, inferirEspecialidade, classificarArtigo, CONFIANCA_MINIMA, validarArtigoParaEspecialidade, isBetaoArtigo, type Especialidade } from "@/lib/procurement/especialidades";
+
+const BETAO_KEY = "__betao__";
 
 export const Route = createFileRoute("/_app/procurement/pacotes")({
   head: () => ({ meta: [{ title: "Pacotes de Consulta — Procurement — MV OS" }] }),
@@ -348,10 +350,12 @@ function SummaryCard({ label, value, tone = "default" }: { label: string; value:
 // Subempreitada = top-level chapter of the orçamento (códigos como "1", "2", "12"...).
 // Cada subempreitada agrega todos os artigos do capítulo e dos seus sub-capítulos.
 type Subempreitada = {
-  key: string;          // top-level chapter codigo (ex: "12")
+  key: string;          // top-level chapter codigo (ex: "12") or BETAO_KEY
   nome: string;         // chapter descricao (ex: "COBERTURAS")
   capituloIds: Set<string>;
   artigoCount: number;
+  // Para a sub-empreitada sintética "Betão": IDs dos artigos identificados.
+  artigoIds?: Set<string>;
 };
 
 function isTopLevelCode(codigo: string | null | undefined): boolean {
@@ -374,12 +378,13 @@ async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitad
   if (e1) throw e1;
   const { data: artigos, error: e2 } = await supabase
     .from("orcamento_artigos")
-    .select("id, capitulo_id")
+    .select("id, capitulo_id, codigo, descricao")
     .eq("orcamento_id", orcamentoId);
   if (e2) throw e2;
 
   const caps = capitulos ?? [];
   const arts = artigos ?? [];
+  const capById = new Map<string, any>(caps.map((c: any) => [c.id, c]));
 
   // Para cada top-level chapter, encontra todos os capitulo_ids descendentes
   const subs: Subempreitada[] = caps
@@ -399,8 +404,32 @@ async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitad
       };
     });
 
+  // Subempreitada sintética "Betão" — analisa TODOS os artigos da obra e
+  // inclui qualquer trabalho relacionado com betão, mesmo que esteja noutro
+  // capítulo (estruturas, bases de pavimentos, lajes de cobertura, etc.).
+  const betaoIds = new Set<string>();
+  for (const a of arts) {
+    const cap = a.capitulo_id ? capById.get(a.capitulo_id) : null;
+    if (isBetaoArtigo({
+      descricao: a.descricao,
+      codigo: a.codigo,
+      capitulo: cap?.descricao ?? null,
+      capituloCodigo: cap?.codigo ?? null,
+    })) {
+      betaoIds.add(a.id);
+    }
+  }
+  subs.unshift({
+    key: BETAO_KEY,
+    nome: "Betão",
+    capituloIds: new Set(),
+    artigoCount: betaoIds.size,
+    artigoIds: betaoIds,
+  });
+
   return subs;
 }
+
 
 function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
   const [nomeGeral, setNomeGeral] = useState("");
@@ -459,13 +488,19 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
       let totalIncluidos = 0;
       const escolhidas = subs.filter(s => selecionadas.has(s.key));
       for (const sub of escolhidas) {
-        const items = (artigos ?? []).filter((a: any) => a.capitulo_id && sub.capituloIds.has(a.capitulo_id));
+        const isBetao = sub.key === BETAO_KEY;
+        const items = (artigos ?? []).filter((a: any) =>
+          isBetao
+            ? sub.artigoIds?.has(a.id)
+            : a.capitulo_id && sub.capituloIds.has(a.capitulo_id)
+        );
+        const especialidade = isBetao ? "Betão" : sub.nome;
         const { data: novo, error: e1 } = await supabase
           .from("procurement_pacotes")
           .insert({
             orcamento_id: orcamentoId, obra_id: (orc as any)?.obra?.id ?? null,
             nome: sub.nome,
-            especialidade: sub.nome as any, estado: "por_preparar",
+            especialidade: especialidade as any, estado: "por_preparar",
             grupo_consulta: nomeGeral.trim(),
           } as any).select("id").single();
         if (e1) throw e1;
@@ -480,7 +515,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
               unidade: a.unidade, quantidade: a.quantidade,
               capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
               preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
-              categoria_custo: null, especialidade: sub.nome,
+              categoria_custo: null, especialidade,
             };
           });
           const { error: e2 } = await supabase.from("procurement_pacote_artigos").insert(rows);
@@ -489,6 +524,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
         }
         criados++;
       }
+
       toast.success(`${criados} pacote(s) criado(s) · ${totalIncluidos} artigo(s) incluído(s)`);
       onCreated?.();
       onOpenChange(false);
@@ -548,8 +584,8 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
                           checked={checked}
                           onChange={() => toggleSub(sub.key)}
                         />
-                        <span className="text-muted-foreground tabular-nums w-8">{sub.key}</span>
-                        <span>{sub.nome}</span>
+                        <span className="text-muted-foreground tabular-nums w-8">{sub.key === BETAO_KEY ? "★" : sub.key}</span>
+                        <span>{sub.nome}{sub.key === BETAO_KEY ? <span className="ml-2 text-xs text-muted-foreground">(transversal — em todas as obras)</span> : null}</span>
                       </span>
                       <Badge variant={sub.artigoCount > 0 ? "secondary" : "outline"}>{sub.artigoCount} art.</Badge>
                     </label>
@@ -671,16 +707,21 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
 
       let totalCriados = 0;
       for (const sub of subs) {
-        const items = (artigos ?? []).filter((a: any) =>
-          a.capitulo_id && sub.capituloIds.has(a.capitulo_id) && !jaIncluidos.has(a.id)
-        );
+        const isBetao = sub.key === BETAO_KEY;
+        const items = (artigos ?? []).filter((a: any) => {
+          if (jaIncluidos.has(a.id)) return false;
+          return isBetao
+            ? sub.artigoIds?.has(a.id)
+            : a.capitulo_id && sub.capituloIds.has(a.capitulo_id);
+        });
         if (items.length === 0) continue;
+        const especialidade = isBetao ? "Betão" : sub.nome;
         const { data: novo, error: e1 } = await supabase
           .from("procurement_pacotes")
           .insert({
             orcamento_id: orcamentoId, obra_id: (orc as any)?.obra?.id ?? null,
             nome: sub.nome,
-            especialidade: sub.nome as any, estado: "por_preparar",
+            especialidade: especialidade as any, estado: "por_preparar",
           }).select("id").single();
         if (e1) throw e1;
         const rows = items.map((a: any) => {
@@ -693,9 +734,10 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
             unidade: a.unidade, quantidade: a.quantidade,
             capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
             preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
-            categoria_custo: null, especialidade: sub.nome,
+            categoria_custo: null, especialidade,
           };
         });
+
         const { error: e2 } = await supabase.from("procurement_pacote_artigos").insert(rows);
         if (e2) throw e2;
         totalCriados++;
@@ -747,7 +789,7 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
               <div className="mt-2 rounded-md border divide-y max-h-72 overflow-auto">
                 {subs.map(sub => (
                   <div key={sub.key} className="flex justify-between px-3 py-1.5 text-sm">
-                    <span><span className="text-muted-foreground tabular-nums mr-2">{sub.key}</span>{sub.nome}</span>
+                    <span><span className="text-muted-foreground tabular-nums mr-2">{sub.key === BETAO_KEY ? "★" : sub.key}</span>{sub.nome}</span>
                     <Badge variant={sub.artigoCount > 0 ? "secondary" : "outline"}>{sub.artigoCount} art.</Badge>
                   </div>
                 ))}
