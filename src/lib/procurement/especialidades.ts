@@ -304,6 +304,19 @@ export function inferirEspecialidade(a: ArtigoInput): Especialidade {
 export const CONFIANCA_MINIMA = 0.8;
 
 export function validarArtigoParaEspecialidade(a: ArtigoInput, especialidade: string) {
+  // Especialidade especial "Betão" agrega todos os artigos relacionados com
+  // betão / elementos estruturais, independentemente do capítulo de origem.
+  if (especialidade === "Betão") {
+    const valido = isBetaoArtigo(a);
+    return {
+      valido,
+      classificacao: {
+        especialidade: "Betão" as unknown as Especialidade,
+        confianca: valido ? 1 : 0,
+        motivo: valido ? "Artigo identificado como trabalho de betão" : "Sem palavras-chave de betão",
+      },
+    };
+  }
   const { especialidade: _ignorarEspecialidadeGuardada, ...semEspecialidadeGuardada } = a;
   const classificacao = classificarArtigo(semEspecialidadeGuardada);
   return {
@@ -311,3 +324,31 @@ export function validarArtigoParaEspecialidade(a: ArtigoInput, especialidade: st
     classificacao,
   };
 }
+
+// =============================================================
+// Pacote "Betão" — sempre presente em qualquer obra. Identifica
+// artigos relacionados com betão / estruturas em betão mesmo que
+// estejam dispersos noutros capítulos (estruturas, bases de
+// pavimentos, lajes de cobertura, fundações, etc.).
+// =============================================================
+
+const BETAO_DESC_RX = /\b(bet[ãa]o|betonagem|betonilha|sapatas?|ensoleiramento|cofrag\w*|armaduras?\s+(?:em|para|de)|ma[çc]i[çc]os?|micro\s*estacas?|muros?\s+de\s+(?:suporte|conten[çc][ãa]o|tens[ãa]o)|escadas?\s+em\s+bet|enchimentos?\s+(?:em\s+)?bet|regulariza[çc][ãa]o\s+(?:em\s+)?bet|malha\s+electrossoldada|ferro\s+para\s+bet|c\s*\d{2}\s*\/\s*\d{2}\b|\bxc\s*\d|estruturas?\s+mistas?|vigas?\s+(?:de\s+funda[çc][ãa]o|de\s+borda|de\s+lintel|principais?|secund[áa]rias?|em\s+bet|de\s+bet|de\s+contorno|de\s+coroamento|\/p[óo]rticos?|p[óo]rticos?))\b/i;
+
+// Padrões soltos (viga/pilar/laje/sapata) — aceites quando o capítulo é
+// claramente estrutural OU quando o próprio artigo contém betão.
+const BETAO_SOFT_RX = /\b(vigas?|pilares?|lajes?|sapatas?|funda[çc][õo]es?|funda[çc][ãa]o)\b/i;
+const CAP_ESTRUTURAL_RX = /\b(estruturas?|funda[çc][õo]es?|bet[ãa]o|bases?\s+de\s+pavimentos?)\b/i;
+
+// Negativos: "viga/pilar/laje" referem-se claramente a outro material.
+const BETAO_NEG_RX = /\b(em\s+madeira|de\s+madeira|em\s+alum[íi]nio|de\s+alum[íi]nio|em\s+pvc|gesso\s*cartonado|pladur|laje\s+de\s+gesso)\b/i;
+
+export function isBetaoArtigo(a: ArtigoInput): boolean {
+  const desc = (a.descricao ?? "").toString();
+  const chap = `${a.capitulo ?? ""} ${a.subcapitulo ?? ""}`;
+  const hay = `${desc} ${chap}`;
+  if (BETAO_NEG_RX.test(desc) && !/\bbet[ãa]o\b/i.test(desc)) return false;
+  if (BETAO_DESC_RX.test(hay)) return true;
+  if (CAP_ESTRUTURAL_RX.test(chap) && BETAO_SOFT_RX.test(desc)) return true;
+  return false;
+}
+
