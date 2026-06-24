@@ -5,6 +5,7 @@ import {
   FileText,
   Users,
   Calculator,
+  BookMarked,
   ShoppingCart,
   Sparkles,
   LogOut,
@@ -28,9 +29,15 @@ const sections: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
+    title: "Fase 2 — Orçamentação",
+    items: [
+      { to: "/orcamentos", label: "Orçamentos", icon: Calculator },
+      { to: "/biblioteca", label: "Biblioteca de Artigos", icon: BookMarked },
+    ],
+  },
+  {
     title: "Próximas fases",
     items: [
-      { to: "/orcamentacao", label: "Orçamentação", icon: Calculator, phase: "Fase 2", disabled: true },
       { to: "/procurement", label: "Procurement", icon: ShoppingCart, phase: "Fase 3", disabled: true },
       { to: "/ia", label: "Agentes IA", icon: Sparkles, phase: "Fase 4+", disabled: true },
     ],
