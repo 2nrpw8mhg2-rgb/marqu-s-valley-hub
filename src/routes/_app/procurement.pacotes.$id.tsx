@@ -377,14 +377,40 @@ function PacoteDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {artigos.map((a: any) => (
-                  <TableRow key={a.id}>
+                {artigos.map((a: any) => {
+                  const conf = a.confianca != null ? Number(a.confianca) : null;
+                  const confTone =
+                    conf == null ? "bg-muted text-muted-foreground"
+                    : conf >= 0.85 ? "bg-emerald-500/15 text-emerald-700"
+                    : conf >= 0.7 ? "bg-amber-500/15 text-amber-700"
+                    : "bg-red-500/15 text-red-700";
+                  return (
+                  <TableRow key={a.id} className={a.sinalizado_revisao ? "bg-red-500/5" : undefined}>
                     <TableCell className="font-mono text-xs">{a.codigo ?? "—"}</TableCell>
                     <TableCell className="max-w-md">
                       <p className="text-sm">{a.descricao}</p>
-                      {a.especialidade && a.especialidade !== especialidade && (
-                        <Badge variant="outline" className="mt-1 text-[10px]">Sugerida: {a.especialidade}</Badge>
-                      )}
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {a.sinalizado_revisao && (
+                          <Badge variant="outline" className="text-[10px] border-red-500/40 text-red-600">
+                            <AlertTriangle className="h-3 w-3 mr-1" /> Rever
+                          </Badge>
+                        )}
+                        {conf != null && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded ${confTone}`}>
+                                  {Math.round(conf * 100)}%
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs">{a.motivo ?? "Sem motivo registado"}</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        {a.especialidade && a.especialidade !== especialidade && (
+                          <Badge variant="outline" className="text-[10px]">Sugerida: {a.especialidade}</Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{a.capitulo ?? "—"}</TableCell>
                     <TableCell className="text-sm">{a.unidade ?? "—"}</TableCell>
