@@ -238,8 +238,12 @@ function PacotesListPage() {
                   const r = resumo.por(p);
                   return (
                     <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate({ to: "/procurement/pacotes/$id", params: { id: p.id } })}>
-                      <TableCell className="font-medium">{p.nome}</TableCell>
-                      <TableCell>{p.especialidade}</TableCell>
+                      <TableCell className="font-medium">
+                        <div>{(p as any).grupo_consulta ?? p.nome}</div>
+                        {(p as any).grupo_consulta && (
+                          <div className="text-xs text-muted-foreground">{p.nome}</div>
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {p.orcamento?.obra?.codigo ? `${p.orcamento.obra.codigo} · ` : ""}{p.orcamento?.nome}
                       </TableCell>
