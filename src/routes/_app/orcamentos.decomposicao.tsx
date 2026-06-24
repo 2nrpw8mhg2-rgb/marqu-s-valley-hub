@@ -21,7 +21,7 @@ function DecomposicaoListPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orcamentos")
-        .select("id, nome, versao, estado, valor_total, obra:obras(nome, codigo, cliente)")
+        .select("id, nome, versao, estado, obra:obras(nome, codigo, cliente)")
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -86,7 +86,6 @@ function DecomposicaoListPage() {
                   </div>
                   <div className="mt-3 flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">v{o.versao} · {o.estado}</span>
-                    <span className="font-semibold tabular-nums">{fmtEUR(Number(o.valor_total) || 0)}</span>
                   </div>
                   <Button variant="outline" size="sm" className="w-full mt-3">
                     <Layers className="h-3.5 w-3.5 mr-1" /> Abrir decomposição
