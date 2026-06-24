@@ -342,13 +342,17 @@ const BETAO_CONTEXTO_RX = /\b(estruturas?|bet[ãa]o\s+armado|bases?\s+de\s+pavim
 // Trabalhos onde "betão" costuma ser apenas suporte/substrato ou elemento
 // acessório. Só passam se a própria descrição for claramente uma execução de
 // laje/base/elemento em betão.
-const BETAO_EXCLUIR_RX = /\b(demoli[çc][ãa]o|demoli[çc][õo]es|demolir|remo[çc][ãa]o|desmontagem|betonilha|pinturas?|tintas?|prim[áa]rios?|dem[ãa]os?|sikagard|tetos?\s+falsos?|tectos?\s+falsos?|gesso\s*laminado|gesso\s*cartonado|pladur|knauf|placas?\s+de\s+gesso|revestimentos?|tijoleira|ladrilhos?|mosaicos?|cer[âa]mic[ao]s?|colagem|isolamento|impermeabiliza[çc][ãa]o|telas?|caixas?\s+de\s+visita|po[çc]o\s+de\s+infiltra[çc][ãa]o|rede\s+de\s+esgotos?|canaliza[çc][õo]es?|perfis?\s+em\s+a[çc]o|estrutura\s+met[áa]lica|em\s+madeira|de\s+madeira|em\s+alum[íi]nio|de\s+alum[íi]nio|em\s+pvc)\b/i;
+const BETAO_EXCLUIR_RX = /\b(demoli[çc][ãa]o|demoli[çc][õo]es|demolir|remo[çc][ãa]o|desmontagem|betonilha|pinturas?|tintas?|prim[áa]rios?|dem[ãa]os?|sikagard|tetos?\s+falsos?|tectos?\s+falsos?|gesso\s*laminado|gesso\s*cartonado|pladur|knauf|placas?\s+de\s+gesso|revestimentos?|tijoleira|ladrilhos?|mosaicos?|cer[âa]mic[ao]s?|colagem|isolamento|impermeabiliza[çc][ãa]o|telas?|caixas?\s+de\s+visita|po[çc]o\s+de\s+infiltra[çc][ãa]o|rede\s+de\s+esgotos?|canaliza[çc][õo]es?|alvenarias?|blocos?|piscinas?|perfis?\s+em\s+a[çc]o|estrutura\s+met[áa]lica|em\s+madeira|de\s+madeira|em\s+alum[íi]nio|de\s+alum[íi]nio|em\s+pvc)\b/i;
 const BETAO_EXCLUSAO_PERMITIDA_RX = /\b(execu[çc][ãa]o\s+de\s+(?:base\s+de\s+pavimento|laje)|laje\s+(?:mista|aligeirada|de\s+pavimento|em\s+bet[ãa]o)|pavimento\s+t[ée]rreo\s+em\s+bet[ãa]o)\b/i;
+const BETAO_CODIGO_BLOQUEADO_RX = /^(3|4)(\.|$)/;
 
 export function isBetaoArtigo(a: ArtigoInput): boolean {
   const desc = (a.descricao ?? "").toString();
   const chap = `${a.capitulo ?? ""} ${a.subcapitulo ?? ""}`;
   const hay = `${desc} ${chap}`;
+  const codigo = normalizarCodigo(a.codigo);
+  const capituloCodigo = normalizarCodigo(a.capituloCodigo);
+  if (BETAO_CODIGO_BLOQUEADO_RX.test(codigo) || BETAO_CODIGO_BLOQUEADO_RX.test(capituloCodigo)) return false;
   const descTemBetaoForte = BETAO_FORTE_RX.test(desc);
   const contextoTemBetaoForte = BETAO_FORTE_RX.test(chap);
   const temElemento = BETAO_ELEMENTO_RX.test(desc);
