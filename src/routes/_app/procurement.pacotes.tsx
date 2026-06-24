@@ -635,35 +635,28 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
   const [orcamentoId, setOrcamentoId] = useState<string>("");
   const [skipExistentes, setSkipExistentes] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [preview, setPreview] = useState<Record<string, number> | null>(null);
+  const [subs, setSubs] = useState<Subempreitada[] | null>(null);
 
   async function carregarPreview(id: string) {
     setOrcamentoId(id);
-    setPreview(null);
+    setSubs(null);
     if (!id) return;
-    const { data: artigos, error } = await supabase
-      .from("orcamento_artigos")
-      .select("descricao, codigo, capitulo:orcamento_capitulos(codigo, descricao)")
-      .eq("orcamento_id", id);
-    if (error) { toast.error(error.message); return; }
-    const counts: Record<string, number> = {};
-    (artigos ?? []).forEach((a: any) => {
-      const esp = inferirEspecialidade({
-        descricao: a.descricao, codigo: a.codigo, capituloCodigo: a.capitulo?.codigo, capitulo: a.capitulo?.descricao,
-      });
-      counts[esp] = (counts[esp] ?? 0) + 1;
-    });
-    setPreview(counts);
+    try {
+      setSubs(await carregarSubempreitadas(id));
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro a carregar subempreitadas");
+    }
   }
 
   async function gerar() {
     if (!orcamentoId) { toast.error("Seleciona um orçamento"); return; }
+    if (!subs || subs.length === 0) { toast.error("Não há subempreitadas a gerar"); return; }
     setLoading(true);
     try {
       const orc = orcamentos.find((o: any) => o.id === orcamentoId);
       const { data: artigos, error } = await supabase
         .from("orcamento_artigos")
-        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(codigo, descricao)")
+        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, capitulo_id, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(codigo, descricao)")
         .eq("orcamento_id", orcamentoId);
       if (error) throw error;
 
@@ -676,32 +669,18 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
         jaIncluidos = new Set((existentes ?? []).map((x: any) => x.artigo_id).filter(Boolean));
       }
 
-      const grupos = new Map<Especialidade, any[]>();
-      (artigos ?? []).forEach((a: any) => {
-        if (jaIncluidos.has(a.id)) return;
-        const res = classificarArtigo({
-          descricao: a.descricao, codigo: a.codigo, capituloCodigo: a.capitulo?.codigo, capitulo: a.capitulo?.descricao,
-        });
-        if (res.confianca < CONFIANCA_MINIMA) return;
-        const esp = res.especialidade;
-        if (!grupos.has(esp)) grupos.set(esp, []);
-        grupos.get(esp)!.push(a);
-      });
-
-      if (grupos.size === 0) {
-        toast.info("Não há artigos novos para agrupar.");
-        setLoading(false);
-        return;
-      }
-
       let totalCriados = 0;
-      for (const [esp, items] of grupos) {
+      for (const sub of subs) {
+        const items = (artigos ?? []).filter((a: any) =>
+          a.capitulo_id && sub.capituloIds.has(a.capitulo_id) && !jaIncluidos.has(a.id)
+        );
+        if (items.length === 0) continue;
         const { data: novo, error: e1 } = await supabase
           .from("procurement_pacotes")
           .insert({
             orcamento_id: orcamentoId, obra_id: (orc as any)?.obra?.id ?? null,
-            nome: `${esp} — ${orc?.nome ?? "Orçamento"}`,
-            especialidade: esp, estado: "por_preparar",
+            nome: sub.nome,
+            especialidade: sub.nome as any, estado: "por_preparar",
           }).select("id").single();
         if (e1) throw e1;
         const rows = items.map((a: any) => {
@@ -714,23 +693,28 @@ function GerarPacotesDialog({ open, onOpenChange, orcamentos, onCreated }: any) 
             unidade: a.unidade, quantidade: a.quantidade,
             capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
             preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
-            categoria_custo: null, especialidade: esp,
+            categoria_custo: null, especialidade: sub.nome,
           };
         });
         const { error: e2 } = await supabase.from("procurement_pacote_artigos").insert(rows);
         if (e2) throw e2;
         totalCriados++;
       }
-      toast.success(`${totalCriados} pacote(s) criado(s)`);
+      if (totalCriados === 0) {
+        toast.info("Não há artigos novos para agrupar.");
+      } else {
+        toast.success(`${totalCriados} pacote(s) criado(s)`);
+      }
       onCreated?.();
       onOpenChange(false);
-      setOrcamentoId(""); setPreview(null);
+      setOrcamentoId(""); setSubs(null);
     } catch (e: any) {
       toast.error(e.message ?? "Erro a gerar pacotes");
     } finally {
       setLoading(false);
     }
   }
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
