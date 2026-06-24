@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
@@ -65,9 +65,8 @@ function OrcamentoEditor() {
   const [capsState, setCapsState] = useState<Cap[]>([]);
   const [artsState, setArtsState] = useState<Art[]>([]);
   const [meta, setMeta] = useState({ nome: "", estado: "rascunho", margem_global_pct: 0, observacoes: "" });
-  const [loadedKey, setLoadedKey] = useState<string | null>(null);
-
-  if (data && loadedKey !== id) {
+  useEffect(() => {
+    if (!data) return;
     setCapsState(data.capitulos);
     setArtsState(data.artigos);
     setMeta({
@@ -76,8 +75,7 @@ function OrcamentoEditor() {
       margem_global_pct: Number(data.orcamento.margem_global_pct),
       observacoes: data.orcamento.observacoes ?? "",
     });
-    setLoadedKey(id);
-  }
+  }, [data]);
 
   const totals = useMemo(() => {
     const subtotal = artsState.reduce((acc, a) => acc + lineTotal(a), 0);
