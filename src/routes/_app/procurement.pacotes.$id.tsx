@@ -176,6 +176,13 @@ function PacoteDetailPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [adicionarOpen, setAdicionarOpen] = useState(false);
+  const [auditoriaOpen, setAuditoriaOpen] = useState(false);
+  const [auditoria, setAuditoria] = useState<{ sinalizados: any[]; sugeridos: any[] } | null>(null);
+  const [reanalising, setReanalising] = useState(false);
+  const reanalisar = useServerFn(reanalisarPacote);
+  const registar = useServerFn(registarCorrecao);
+
+
 
   const { data: pacote, isLoading } = useQuery({
     queryKey: ["procurement-pacote", id],
