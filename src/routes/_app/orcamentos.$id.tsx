@@ -128,19 +128,28 @@ function OrcamentoEditor() {
         if (error) throw error;
       }
 
-      // upsert biblioteca
+      // alimenta biblioteca de artigos (best-effort, sem unique)
       for (const a of artsState) {
         if (!a.descricao || !a.preco_unitario) continue;
-        await supabase.from("artigos_biblioteca").upsert({
+        const { data: existing } = await supabase
+          .from("artigos_biblioteca")
+          .select("id")
+          .eq("descricao", a.descricao)
+          .maybeSingle();
+        const payload = {
           codigo: a.codigo, descricao: a.descricao, unidade: a.unidade,
           preco_referencia: a.preco_unitario, ultima_obra_id: data?.orcamento.obra_id,
-        }, { onConflict: "codigo" }).select();
+        };
+        if (existing?.id) {
+          await supabase.from("artigos_biblioteca").update(payload).eq("id", existing.id);
+        } else {
+          await supabase.from("artigos_biblioteca").insert(payload);
+        }
       }
 
       toast.success("Orçamento guardado");
       qc.invalidateQueries({ queryKey: ["orcamento", id] });
       qc.invalidateQueries({ queryKey: ["orcamentos-list"] });
-      setLoadedKey(null); // force reload
     } catch (e: any) {
       toast.error(e.message);
     } finally { setSaving(false); }
@@ -178,7 +187,6 @@ function OrcamentoEditor() {
       const { error } = await supabase.from("orcamento_artigos").insert(arts);
       if (error) throw error;
     }
-    setLoadedKey(null);
     qc.invalidateQueries({ queryKey: ["orcamento", id] });
   };
 
