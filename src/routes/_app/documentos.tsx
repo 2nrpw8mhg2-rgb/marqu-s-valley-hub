@@ -40,6 +40,7 @@ import {
   FileArchive,
   FileSpreadsheet,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 
