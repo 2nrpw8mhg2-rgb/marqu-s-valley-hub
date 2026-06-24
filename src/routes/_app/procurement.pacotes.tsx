@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { ESPECIALIDADES, inferirEspecialidade, type Especialidade } from "@/lib/procurement/especialidades";
 
-export const Route = createFileRoute("/_app/procurement/pacotes/")({
+export const Route = createFileRoute("/_app/procurement/pacotes")({
   head: () => ({ meta: [{ title: "Pacotes de Consulta — Procurement — MV OS" }] }),
   component: PacotesListPage,
 });
