@@ -350,10 +350,12 @@ function SummaryCard({ label, value, tone = "default" }: { label: string; value:
 // Subempreitada = top-level chapter of the orçamento (códigos como "1", "2", "12"...).
 // Cada subempreitada agrega todos os artigos do capítulo e dos seus sub-capítulos.
 type Subempreitada = {
-  key: string;          // top-level chapter codigo (ex: "12")
+  key: string;          // top-level chapter codigo (ex: "12") or BETAO_KEY
   nome: string;         // chapter descricao (ex: "COBERTURAS")
   capituloIds: Set<string>;
   artigoCount: number;
+  // Para a sub-empreitada sintética "Betão": IDs dos artigos identificados.
+  artigoIds?: Set<string>;
 };
 
 function isTopLevelCode(codigo: string | null | undefined): boolean {
@@ -376,12 +378,13 @@ async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitad
   if (e1) throw e1;
   const { data: artigos, error: e2 } = await supabase
     .from("orcamento_artigos")
-    .select("id, capitulo_id")
+    .select("id, capitulo_id, codigo, descricao")
     .eq("orcamento_id", orcamentoId);
   if (e2) throw e2;
 
   const caps = capitulos ?? [];
   const arts = artigos ?? [];
+  const capById = new Map<string, any>(caps.map((c: any) => [c.id, c]));
 
   // Para cada top-level chapter, encontra todos os capitulo_ids descendentes
   const subs: Subempreitada[] = caps
@@ -401,8 +404,32 @@ async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitad
       };
     });
 
+  // Subempreitada sintética "Betão" — analisa TODOS os artigos da obra e
+  // inclui qualquer trabalho relacionado com betão, mesmo que esteja noutro
+  // capítulo (estruturas, bases de pavimentos, lajes de cobertura, etc.).
+  const betaoIds = new Set<string>();
+  for (const a of arts) {
+    const cap = a.capitulo_id ? capById.get(a.capitulo_id) : null;
+    if (isBetaoArtigo({
+      descricao: a.descricao,
+      codigo: a.codigo,
+      capitulo: cap?.descricao ?? null,
+      capituloCodigo: cap?.codigo ?? null,
+    })) {
+      betaoIds.add(a.id);
+    }
+  }
+  subs.unshift({
+    key: BETAO_KEY,
+    nome: "Betão",
+    capituloIds: new Set(),
+    artigoCount: betaoIds.size,
+    artigoIds: betaoIds,
+  });
+
   return subs;
 }
+
 
 function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
   const [nomeGeral, setNomeGeral] = useState("");
