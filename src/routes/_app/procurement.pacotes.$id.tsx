@@ -654,28 +654,27 @@ function PacoteDetailPage() {
               </div>
               <div>
                 <Label>Pacote de destino</Label>
-                {outrosPacotes.length === 0 ? (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Não existem outros pacotes neste orçamento.
-                  </p>
-                ) : (
-                  <Select
-                    value={moverState.destinoId}
-                    onValueChange={(v) => setMoverState((s) => ({ ...s, destinoId: v }))}
-                  >
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="Escolher pacote..." /></SelectTrigger>
-                    <SelectContent>
-                      {outrosPacotes.map((p: any) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.nome} <span className="text-muted-foreground">· {p.especialidade}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                <Select
+                  value={moverState.destinoId}
+                  onValueChange={(v) => setMoverState((s) => ({ ...s, destinoId: v }))}
+                >
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Escolher especialidade..." /></SelectTrigger>
+                  <SelectContent>
+                    {opcoesDestino.map((o) => (
+                      <SelectItem key={o.especialidade} value={o.especialidade}>
+                        {o.especialidade}
+                        {o.pacote ? (
+                          <span className="text-muted-foreground"> · pacote existente</span>
+                        ) : (
+                          <span className="text-muted-foreground"> · será criado</span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <p className="text-xs text-muted-foreground">
-                Esta correção é guardada na base de aprendizagem para melhorar a classificação em obras futuras.
+                Se o pacote da especialidade escolhida ainda não existir neste orçamento, será criado automaticamente. A correção é guardada na base de aprendizagem para melhorar a classificação em obras futuras.
               </p>
             </div>
           )}
