@@ -350,7 +350,7 @@ function SummaryCard({ label, value, tone = "default" }: { label: string; value:
 
 // Subempreitada = top-level chapter of the orçamento (códigos como "1", "2", "12"...).
 // Cada subempreitada agrega todos os artigos do capítulo e dos seus sub-capítulos.
-type Subempreitada = {
+export type Subempreitada = {
   key: string;          // unique key: top chapter id, or BETAO_KEY
   codigo: string;       // display code (ex: "12")
   nome: string;         // chapter descricao (ex: "COBERTURAS")
