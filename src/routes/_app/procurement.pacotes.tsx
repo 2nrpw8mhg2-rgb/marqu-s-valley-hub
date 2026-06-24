@@ -371,7 +371,7 @@ function isChildOf(childCode: string | null | undefined, parentCode: string): bo
   return c === parentCode || c.startsWith(parentCode + ".");
 }
 
-async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitada[]> {
+export async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitada[]> {
   const { data: capitulos, error: e1 } = await supabase
     .from("orcamento_capitulos")
     .select("id, codigo, descricao, ordem")
