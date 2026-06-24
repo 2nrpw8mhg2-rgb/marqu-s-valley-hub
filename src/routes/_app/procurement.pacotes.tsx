@@ -488,13 +488,19 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
       let totalIncluidos = 0;
       const escolhidas = subs.filter(s => selecionadas.has(s.key));
       for (const sub of escolhidas) {
-        const items = (artigos ?? []).filter((a: any) => a.capitulo_id && sub.capituloIds.has(a.capitulo_id));
+        const isBetao = sub.key === BETAO_KEY;
+        const items = (artigos ?? []).filter((a: any) =>
+          isBetao
+            ? sub.artigoIds?.has(a.id)
+            : a.capitulo_id && sub.capituloIds.has(a.capitulo_id)
+        );
+        const especialidade = isBetao ? "Betão" : sub.nome;
         const { data: novo, error: e1 } = await supabase
           .from("procurement_pacotes")
           .insert({
             orcamento_id: orcamentoId, obra_id: (orc as any)?.obra?.id ?? null,
             nome: sub.nome,
-            especialidade: sub.nome as any, estado: "por_preparar",
+            especialidade: especialidade as any, estado: "por_preparar",
             grupo_consulta: nomeGeral.trim(),
           } as any).select("id").single();
         if (e1) throw e1;
@@ -509,7 +515,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
               unidade: a.unidade, quantidade: a.quantidade,
               capitulo: a.capitulo?.descricao ?? null, subcapitulo: null,
               preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
-              categoria_custo: null, especialidade: sub.nome,
+              categoria_custo: null, especialidade,
             };
           });
           const { error: e2 } = await supabase.from("procurement_pacote_artigos").insert(rows);
@@ -518,6 +524,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
         }
         criados++;
       }
+
       toast.success(`${criados} pacote(s) criado(s) · ${totalIncluidos} artigo(s) incluído(s)`);
       onCreated?.();
       onOpenChange(false);
