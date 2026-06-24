@@ -162,6 +162,7 @@ function DocumentosPage() {
   }, [pastaActual, pastas]);
 
   const [novaPastaOpen, setNovaPastaOpen] = useState(false);
+  const [novaObraOpen, setNovaObraOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<{ kind: "pasta" | "doc"; id: string; nome: string } | null>(null);
   const [moveTarget, setMoveTarget] = useState<{ kind: "pasta" | "doc"; id: string; nome: string } | null>(null);
   const [uploading, setUploading] = useState(false);
