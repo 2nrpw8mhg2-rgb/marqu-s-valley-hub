@@ -1060,7 +1060,7 @@ async function duplicarPastaRecursivo(
     .eq("pasta_id", pasta.id);
   for (const d of (docs ?? []) as Documento[]) {
     if (!d.storage_path) continue;
-    const novoPath = `${d.storage_path.split("/")[0]}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${d.nome}`;
+    const novoPath = `${d.storage_path.split("/")[0]}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${sanitizarNome(d.nome)}`;
     const { error: copyErr } = await supabase.storage
       .from("documentos")
       .copy(d.storage_path, novoPath);
