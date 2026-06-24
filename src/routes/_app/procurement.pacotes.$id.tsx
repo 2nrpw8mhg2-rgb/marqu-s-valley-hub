@@ -269,25 +269,35 @@ function PacoteDetailPage() {
       const { data, error } = await supabase
         .from("procurement_pacotes")
         .select("id, nome, especialidade")
-        .eq("orcamento_id", pacote!.orcamento_id)
-        .neq("id", id)
-        .order("nome");
+        .eq("orcamento_id", pacote!.orcamento_id);
       if (error) throw error;
       return data ?? [];
     },
   });
 
-  // Lista combinada: todas as especialidades, sinalizando quais já têm pacote no orçamento.
-  // O valor do select é a especialidade; se não existir pacote, cria-se ao confirmar.
+  const { data: subempreitadas = [] } = useQuery({
+    queryKey: ["procurement-subempreitadas", pacote?.orcamento_id],
+    enabled: !!pacote?.orcamento_id,
+    queryFn: async () => {
+      const { carregarSubempreitadas } = await import("./procurement.pacotes");
+      return carregarSubempreitadas(pacote!.orcamento_id);
+    },
+  });
+
+  // Opções: todas as subempreitadas do orçamento, exceto a actual (mesmo nome).
   const opcoesDestino = useMemo(() => {
-    const porEsp = new Map<string, any>();
-    for (const p of outrosPacotes as any[]) {
-      if (!porEsp.has(p.especialidade)) porEsp.set(p.especialidade, p);
-    }
-    return ESPECIALIDADES
-      .filter((e) => e !== especialidade)
-      .map((e) => ({ especialidade: e, pacote: porEsp.get(e) ?? null }));
-  }, [outrosPacotes, especialidade]);
+    const porNome = new Map<string, any>();
+    for (const p of outrosPacotes as any[]) porNome.set(p.nome.toLowerCase(), p);
+    return (subempreitadas as any[])
+      .filter((s) => s.nome.toLowerCase() !== (nome || "").toLowerCase())
+      .map((s) => ({
+        key: s.key,
+        nome: s.nome,
+        codigo: s.codigo,
+        artigoCount: s.artigoCount,
+        pacote: porNome.get(s.nome.toLowerCase()) ?? null,
+      }));
+  }, [subempreitadas, outrosPacotes, nome]);
 
   async function confirmarMover() {
     const art = moverState.artigo;
