@@ -354,7 +354,7 @@ function DecomposicaoPage() {
                         <td className="px-2 text-right tabular-nums">{fmtNum(a.quantidade)}</td>
                         <td className="px-1">
                           <Input
-                            className="h-7 text-xs text-right tabular-nums"
+                            className="h-7 text-xs text-right tabular-nums no-spin px-1.5 w-full min-w-0"
                             type="number" step="0.01" value={a.preco_seco}
                             onChange={e => updateArt(idx, { preco_seco: Number(e.target.value) })}
                           />
@@ -362,7 +362,7 @@ function DecomposicaoPage() {
                         {INLINE_COST_COLS.map(c => (
                           <td key={c.key} className="px-1">
                             <Input
-                              className="h-7 text-xs text-right tabular-nums"
+                              className="h-7 text-xs text-right tabular-nums no-spin px-1.5 w-full min-w-0"
                               type="number" step="0.01"
                               value={a[c.key]}
                               onChange={e => updateArt(idx, { [c.key]: Number(e.target.value) } as Partial<Art>)}
@@ -372,7 +372,7 @@ function DecomposicaoPage() {
                         <td className="px-2 text-right tabular-nums font-medium bg-muted/30">{fmtEUR(cu)}</td>
                         <td className="px-1">
                           <Input
-                            className="h-7 text-xs text-right tabular-nums"
+                            className="h-7 text-xs text-right tabular-nums no-spin px-1.5 w-full min-w-0"
                             type="number" step="0.1" value={a.margem_pct}
                             onChange={e => updateArt(idx, { margem_pct: Number(e.target.value) })}
                           />
@@ -401,7 +401,7 @@ function DecomposicaoPage() {
                                     <div key={c.key} className="space-y-1">
                                       <Label className="text-[10px] text-muted-foreground">{c.label}</Label>
                                       <Input
-                                        className="h-7 text-xs text-right tabular-nums"
+                                        className="h-7 text-xs text-right tabular-nums no-spin px-1.5 w-full min-w-0"
                                         type="number" step="0.01"
                                         value={a[c.key]}
                                         onChange={e => updateArt(idx, { [c.key]: Number(e.target.value) } as Partial<Art>)}
