@@ -683,6 +683,77 @@ function DocumentosPage() {
 
 /* -------- Sub-componentes -------- */
 
+function NovaObraDialog({ onClose }: { onClose: (novoId: string | null) => void }) {
+  const [nome, setNome] = useState("");
+  const [cliente, setCliente] = useState("");
+  const [localizacao, setLocalizacao] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nome.trim()) return;
+    setBusy(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase
+      .from("obras")
+      .insert({
+        nome: nome.trim(),
+        cliente: cliente.trim() || null,
+        localizacao: localizacao.trim() || null,
+        created_by: user?.id,
+      })
+      .select("id")
+      .single();
+    setBusy(false);
+    if (error || !data) {
+      toast.error(error?.message ?? "Falha ao criar obra");
+      return;
+    }
+    toast.success("Obra criada — pastas padrão geradas");
+    onClose(data.id);
+  };
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose(null)}>
+      <DialogContent className="bg-card border-border">
+        <DialogHeader>
+          <DialogTitle>Nova obra</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Nome *</Label>
+            <Input
+              autoFocus
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Ex: Rua São Francisco de Sales"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Cliente</Label>
+            <Input value={cliente} onChange={(e) => setCliente(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Localização</Label>
+            <Input value={localizacao} onChange={(e) => setLocalizacao(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onClose(null)}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={busy || !nome.trim()}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {busy ? "A criar..." : "Criar obra"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
 function NovaPastaDialog({
   obraId,
   parentId,
