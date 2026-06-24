@@ -395,16 +395,24 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
       if (error) throw error;
 
       const grupos = new Map<Especialidade, any[]>();
+      const revisaoManual: Array<{ artigo: any; sugerida: Especialidade; confianca: number; motivo: string; pacote: Especialidade }> = [];
+      let excluidos = 0;
       (artigos ?? []).forEach((a: any) => {
-        const esp = inferirEspecialidade({
+        const res = classificarArtigo({
           descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.descricao,
         });
-        if (!selecionadas.has(esp)) return;
-        if (!grupos.has(esp)) grupos.set(esp, []);
-        grupos.get(esp)!.push(a);
+        // Só inclui no pacote se a especialidade classificada coincide e a confiança é alta
+        if (!selecionadas.has(res.especialidade)) { excluidos++; return; }
+        if (res.confianca < CONFIANCA_MINIMA) {
+          revisaoManual.push({ artigo: a, sugerida: res.especialidade, confianca: res.confianca, motivo: res.motivo, pacote: res.especialidade });
+          return;
+        }
+        if (!grupos.has(res.especialidade)) grupos.set(res.especialidade, []);
+        grupos.get(res.especialidade)!.push(a);
       });
 
       let criados = 0;
+      let totalIncluidos = 0;
       for (const esp of selecionadas) {
         const items = grupos.get(esp) ?? [];
         const { data: novo, error: e1 } = await supabase
@@ -432,10 +440,17 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
           });
           const { error: e2 } = await supabase.from("procurement_pacote_artigos").insert(rows);
           if (e2) throw e2;
+          totalIncluidos += rows.length;
         }
         criados++;
       }
-      toast.success(`${criados} pacote(s) criado(s) em "${nomeGeral.trim()}"`);
+      const partes = [`${criados} pacote(s) criado(s)`, `${totalIncluidos} artigo(s) incluído(s)`];
+      if (revisaoManual.length) partes.push(`${revisaoManual.length} para revisão manual`);
+      if (excluidos) partes.push(`${excluidos} excluído(s) (outras especialidades)`);
+      toast.success(partes.join(" · "));
+      if (revisaoManual.length) {
+        console.warn("[Procurement] Artigos com baixa confiança (revisão manual):", revisaoManual);
+      }
       onCreated?.();
       onOpenChange(false);
       resetState();
