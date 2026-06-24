@@ -411,50 +411,71 @@ export type Database = {
       }
       subempreiteiros: {
         Row: {
+          alvara_valido_ate: string | null
           ativo: boolean
           avaliacao: number | null
+          concelho: string | null
           contacto_nome: string | null
           created_at: string
           created_by: string | null
+          distrito: string | null
           email: string | null
+          emails: string[]
           especialidades: string[]
           id: string
           nif: string | null
           nome: string
           notas: string | null
+          seguro_valido_ate: string | null
           telefone: string | null
+          telefones: string[]
+          tipo: string | null
           updated_at: string
           zonas: string[]
         }
         Insert: {
+          alvara_valido_ate?: string | null
           ativo?: boolean
           avaliacao?: number | null
+          concelho?: string | null
           contacto_nome?: string | null
           created_at?: string
           created_by?: string | null
+          distrito?: string | null
           email?: string | null
+          emails?: string[]
           especialidades?: string[]
           id?: string
           nif?: string | null
           nome: string
           notas?: string | null
+          seguro_valido_ate?: string | null
           telefone?: string | null
+          telefones?: string[]
+          tipo?: string | null
           updated_at?: string
           zonas?: string[]
         }
         Update: {
+          alvara_valido_ate?: string | null
           ativo?: boolean
           avaliacao?: number | null
+          concelho?: string | null
           contacto_nome?: string | null
           created_at?: string
           created_by?: string | null
+          distrito?: string | null
           email?: string | null
+          emails?: string[]
           especialidades?: string[]
           id?: string
           nif?: string | null
           nome?: string
           notas?: string | null
+          seguro_valido_ate?: string | null
           telefone?: string | null
+          telefones?: string[]
+          tipo?: string | null
           updated_at?: string
           zonas?: string[]
         }
