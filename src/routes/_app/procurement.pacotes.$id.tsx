@@ -534,7 +534,6 @@ function PacoteDetailPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
                             onClick={() => setMoverState({ artigo: a, destinoId: "" })}
-                            disabled={outrosPacotes.length === 0}
                           >
                             <ArrowRightLeft className="h-4 w-4 mr-2" />
                             Mover para outro pacote
