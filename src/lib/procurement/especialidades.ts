@@ -2,6 +2,7 @@
 // com palavras-chave positivas e negativas por especialidade.
 
 export const ESPECIALIDADES = [
+  "Betão",
   "Demolições",
   "Terraplanagens",
   "Estruturas",
