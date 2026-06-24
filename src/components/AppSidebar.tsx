@@ -5,6 +5,7 @@ import {
   FileText,
   Users,
   Calculator,
+  Layers,
   BookMarked,
   ShoppingCart,
   Sparkles,
