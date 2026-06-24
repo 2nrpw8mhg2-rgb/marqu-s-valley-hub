@@ -424,6 +424,7 @@ async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitad
   }
   subs.unshift({
     key: BETAO_KEY,
+    codigo: "★",
     nome: "Betão",
     capituloIds: new Set(),
     artigoCount: betaoIds.size,
