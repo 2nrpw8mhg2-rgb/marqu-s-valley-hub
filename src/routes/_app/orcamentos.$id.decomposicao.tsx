@@ -14,6 +14,7 @@ import {
   custoTotal,
   pvUnitario,
   totalVenda,
+  lucroBruto,
   fmtEUR,
   fmtNum,
   fmtPct,
@@ -47,6 +48,7 @@ type Art = {
   quantidade: number;
   margem_pct: number;
   ordem: number;
+  preco_seco: number;
   custo_mao_obra: number;
   custo_tarefeiros: number;
   custo_subempreitadas: number;
@@ -68,6 +70,21 @@ type Fonte = {
   notas: string | null;
 };
 
+// Colunas de custo apresentadas em linha na grelha principal (na ordem pedida)
+const INLINE_COST_COLS: { key: CostKey; label: string; short: string }[] = [
+  { key: "custo_mao_obra", label: "Mão de Obra", short: "MO" },
+  { key: "custo_tarefeiros", label: "Tarefeiros", short: "Tar." },
+  { key: "custo_equipamentos", label: "Equipamentos", short: "Equip." },
+  { key: "custo_materiais", label: "Materiais", short: "Mat." },
+  { key: "custo_subempreitadas", label: "Subempreiteiros", short: "Subs" },
+  { key: "custo_encargos_gerais", label: "Encargos Gerais", short: "Encargos" },
+];
+
+// Restantes categorias só editáveis na linha expandida
+const EXTRA_COST_COLS = COST_CATEGORIES.filter(
+  c => !INLINE_COST_COLS.some(i => i.key === c.key)
+);
+
 function DecomposicaoPage() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
@@ -78,6 +95,8 @@ function DecomposicaoPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["decomposicao", id],
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data: orc, error: e1 } = await supabase
         .from("orcamentos").select("*, obra:obras(id, nome, codigo, cliente)").eq("id", id).single();
@@ -103,6 +122,7 @@ function DecomposicaoPage() {
           ...a,
           quantidade: Number(a.quantidade),
           margem_pct: Number(a.margem_pct),
+          preco_seco: Number(a.preco_seco ?? a.preco_unitario ?? 0),
           custo_mao_obra: Number(a.custo_mao_obra),
           custo_tarefeiros: Number(a.custo_tarefeiros),
           custo_subempreitadas: Number(a.custo_subempreitadas),
@@ -150,19 +170,15 @@ function DecomposicaoPage() {
   }, [fontes]);
 
   const selecionarFonte = async (fonte: Fonte) => {
-    // unselect others in same categoria & artigo
     const sameCat = fontes.filter(f => f.artigo_id === fonte.artigo_id && f.categoria === fonte.categoria);
     await supabase.from("orcamento_artigo_fontes")
       .update({ selecionado: false })
       .in("id", sameCat.map(f => f.id));
     await supabase.from("orcamento_artigo_fontes")
       .update({ selecionado: true }).eq("id", fonte.id);
-
-    // update cost column
     const colKey = `custo_${fonte.categoria}` as CostKey;
     const idx = arts.findIndex(a => a.id === fonte.artigo_id);
     if (idx >= 0) updateArt(idx, { [colKey]: fonte.valor } as Partial<Art>);
-
     setFontes(prev => prev.map(f =>
       f.artigo_id === fonte.artigo_id && f.categoria === fonte.categoria
         ? { ...f, selecionado: f.id === fonte.id }
@@ -194,7 +210,6 @@ function DecomposicaoPage() {
         }).eq("id", a.id);
         if (error) throw error;
       }
-      // persist global margin
       await supabase.from("orcamentos").update({ margem_global_pct: globalMargin }).eq("id", id);
       toast.success("Decomposição guardada · orçamento comercial atualizado");
       qc.invalidateQueries({ queryKey: ["decomposicao", id] });
@@ -216,6 +231,8 @@ function DecomposicaoPage() {
   }
 
   const capById = new Map(data.capitulos.map(c => [c.id, c]));
+  // 4 fixas (código/descrição/un/qtd) + Preço Seco + 6 custos + custo total + margem + pv + total venda + lucro + actions
+  const COL_COUNT = 1 + 4 + 1 + INLINE_COST_COLS.length + 5 + 1;
 
   return (
     <>
@@ -278,27 +295,32 @@ function DecomposicaoPage() {
           </div>
         </Card>
 
-        {/* Grelha */}
+        {/* Grelha completa de decomposição */}
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="bg-muted/40 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <thead className="bg-muted/40 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0">
                 <tr>
                   <th className="w-8"></th>
                   <th className="text-left px-2 py-2 w-20">Código</th>
-                  <th className="text-left px-2 py-2 min-w-[200px]">Descrição</th>
+                  <th className="text-left px-2 py-2 min-w-[220px]">Descrição</th>
                   <th className="text-left px-2 py-2 w-14">Un.</th>
                   <th className="text-right px-2 py-2 w-20">Qtd</th>
-                  <th className="text-right px-2 py-2 w-24">Custo Un.</th>
+                  <th className="text-right px-2 py-2 w-24" title="Preço unitário original importado do Mapa de Quantidades">Preço Seco</th>
+                  {INLINE_COST_COLS.map(c => (
+                    <th key={c.key} className="text-right px-2 py-2 w-24" title={c.label}>{c.short}</th>
+                  ))}
+                  <th className="text-right px-2 py-2 w-24 bg-muted/60">Custo Total</th>
                   <th className="text-right px-2 py-2 w-20">Margem %</th>
                   <th className="text-right px-2 py-2 w-24">PV Unit.</th>
                   <th className="text-right px-2 py-2 w-28">Total Venda</th>
+                  <th className="text-right px-2 py-2 w-24">Lucro Bruto</th>
                   <th className="w-10"></th>
                 </tr>
               </thead>
               <tbody>
                 {arts.length === 0 && (
-                  <tr><td colSpan={10} className="text-center py-12 text-muted-foreground">
+                  <tr><td colSpan={COL_COUNT} className="text-center py-12 text-muted-foreground">
                     Sem artigos. Importa um Mapa de Quantidades na aba anterior.
                   </td></tr>
                 )}
@@ -309,12 +331,13 @@ function DecomposicaoPage() {
                   const cu = custoTotal(a);
                   const pv = pvUnitario(a);
                   const tv = totalVenda(a);
+                  const lucro = lucroBruto(a);
                   const isExp = expanded[a.id];
                   return (
                     <Fragment key={a.id}>
                       {showCapHeader && cap && (
                         <tr key={`cap-${cap.id}`} className="bg-primary/5 border-t border-border">
-                          <td colSpan={10} className="px-3 py-2 font-mono text-xs text-primary font-semibold">
+                          <td colSpan={COL_COUNT} className="px-3 py-2 font-mono text-xs text-primary font-semibold">
                             {cap.codigo} · <span className="font-sans uppercase tracking-wide">{cap.descricao}</span>
                           </td>
                         </tr>
@@ -329,8 +352,25 @@ function DecomposicaoPage() {
                         <td className="px-2">{a.descricao}</td>
                         <td className="px-2 text-muted-foreground">{a.unidade}</td>
                         <td className="px-2 text-right tabular-nums">{fmtNum(a.quantidade)}</td>
-                        <td className="px-2 text-right tabular-nums font-medium">{fmtEUR(cu)}</td>
-                        <td className="px-2">
+                        <td className="px-1">
+                          <Input
+                            className="h-7 text-xs text-right tabular-nums"
+                            type="number" step="0.01" value={a.preco_seco}
+                            onChange={e => updateArt(idx, { preco_seco: Number(e.target.value) })}
+                          />
+                        </td>
+                        {INLINE_COST_COLS.map(c => (
+                          <td key={c.key} className="px-1">
+                            <Input
+                              className="h-7 text-xs text-right tabular-nums"
+                              type="number" step="0.01"
+                              value={a[c.key]}
+                              onChange={e => updateArt(idx, { [c.key]: Number(e.target.value) } as Partial<Art>)}
+                            />
+                          </td>
+                        ))}
+                        <td className="px-2 text-right tabular-nums font-medium bg-muted/30">{fmtEUR(cu)}</td>
+                        <td className="px-1">
                           <Input
                             className="h-7 text-xs text-right tabular-nums"
                             type="number" step="0.1" value={a.margem_pct}
@@ -339,6 +379,7 @@ function DecomposicaoPage() {
                         </td>
                         <td className="px-2 text-right tabular-nums">{fmtEUR(pv)}</td>
                         <td className="px-2 text-right tabular-nums font-semibold text-primary">{fmtEUR(tv)}</td>
+                        <td className={`px-2 text-right tabular-nums font-medium ${lucro >= 0 ? "text-emerald-600" : "text-destructive"}`}>{fmtEUR(lucro)}</td>
                         <td className="text-center">
                           <button
                             title="Associar fonte"
@@ -351,13 +392,12 @@ function DecomposicaoPage() {
                       </tr>
                       {isExp && (
                         <tr className="bg-muted/20">
-                          <td colSpan={10} className="p-4">
+                          <td colSpan={COL_COUNT} className="p-4">
                             <div className="grid md:grid-cols-2 gap-4">
-                              {/* Inputs de custo */}
                               <div>
-                                <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Componentes de custo (€/un.)</h4>
+                                <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Outras componentes de custo (€/un.)</h4>
                                 <div className="grid grid-cols-2 gap-2">
-                                  {COST_CATEGORIES.map(c => (
+                                  {EXTRA_COST_COLS.map(c => (
                                     <div key={c.key} className="space-y-1">
                                       <Label className="text-[10px] text-muted-foreground">{c.label}</Label>
                                       <Input
@@ -374,7 +414,7 @@ function DecomposicaoPage() {
                                   <span className="font-semibold tabular-nums">{fmtEUR(cu)}</span>
                                 </div>
                                 <div className="flex justify-between text-xs">
-                                  <span className="text-muted-foreground">PV (custo × {1 + a.margem_pct / 100}) </span>
+                                  <span className="text-muted-foreground">PV (custo × {(1 + a.margem_pct / 100).toFixed(3)})</span>
                                   <span className="font-semibold tabular-nums text-primary">{fmtEUR(pv)}</span>
                                 </div>
                                 <div className="flex justify-between text-xs">
@@ -383,7 +423,6 @@ function DecomposicaoPage() {
                                 </div>
                               </div>
 
-                              {/* Fontes */}
                               <div>
                                 <div className="flex items-center justify-between mb-2">
                                   <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground">Propostas / cotações associadas</h4>
@@ -428,11 +467,12 @@ function DecomposicaoPage() {
               </tbody>
               <tfoot>
                 <tr className="bg-muted/40 border-t border-border">
-                  <td colSpan={5} className="px-3 py-2 text-right font-medium">Totais</td>
-                  <td className="px-2 py-2 text-right tabular-nums font-semibold">{fmtEUR(totals.totCusto)}</td>
+                  <td colSpan={5 + 1 + INLINE_COST_COLS.length} className="px-3 py-2 text-right font-medium">Totais</td>
+                  <td className="px-2 py-2 text-right tabular-nums font-semibold bg-muted/60">{fmtEUR(totals.totCusto)}</td>
                   <td></td>
                   <td></td>
                   <td className="px-2 py-2 text-right tabular-nums font-semibold text-primary">{fmtEUR(totals.totVenda)}</td>
+                  <td className={`px-2 py-2 text-right tabular-nums font-semibold ${totals.lucro >= 0 ? "text-emerald-600" : "text-destructive"}`}>{fmtEUR(totals.lucro)}</td>
                   <td></td>
                 </tr>
               </tfoot>
