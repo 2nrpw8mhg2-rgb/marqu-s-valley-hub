@@ -21,7 +21,7 @@ function DecomposicaoListPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orcamentos")
-        .select("id, nome, versao, estado, valor_total, obra:obras(nome, codigo, cliente)")
+        .select("id, nome, versao, estado, obra:obras(nome, codigo, cliente)")
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
