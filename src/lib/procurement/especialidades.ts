@@ -163,6 +163,16 @@ export type ClassificacaoResultado = {
 const TERRAPLANAGEM_RX = /\b(terraplenagens?|terraplanagens?|movimentos?\s+de\s+terras?|escava[çc][ãa]o|escava[çc]|aterro|desaterro|enrocamento|tout-?venant|compacta[çc][ãa]o|decapagem|desmatagem)\b/i;
 const BASE_PAVIMENTO_RX = /\bbase(?:s)?\s+de\s+pavimentos?\b|\bpavimentos?\s+(interiores?|exteriores?|flutuantes?)\b/i;
 const COBERTURA_RX = /\b(coberturas?|telhados?|telhas?|subtelha|cumeeira|beirado|caleira|rufos?|algeroz|clarab[oó]ia|platibanda|fibrocimento|onduline|painel\s+sandu(?:í|i)che|barreira\s+para-?vapor)\b/i;
+const DEMOLICAO_RX = /\b(demoli[çc][ãa]o|demoli[çc][õo]es|demolir|levantamento|remo[çc][ãa]o|desmontagem|desmantelamento|picagem|arrombamento)\b/i;
+const ESTRUTURA_RX = /\b(estruturas?|bet[ãa]o\s+armado|funda[çc][õo]es?|sapatas?|vigas?|pilares?|lajes?|cofragem|armaduras?|a[çc]o\s+a?\d+|malha\s+electrossoldada|micro\s*estacas?)\b/i;
+const ALVENARIA_RX = /\b(alvenarias?|tijolos?|blocos?|rebocos?|estuques?|gesso\s*cartonado|pladur|paredes?\s+divis[óo]rias?)\b/i;
+const CAIXILHARIA_RX = /\b(caixilharias?|janelas?|v[ãa]os?\s+exteriores?|portas?\s+de\s+alum[íi]nio|alum[íi]nio|\bpvc\b|vidros?|estores?|persianas?)\b/i;
+const ELETRICIDADE_RX = /\b(eletricidade|electricidade|el[ée]tric[ao]s?|tomadas?|interruptores?|quadro\s+el[ée]ctrico|ilumina[çc][ãa]o|lumin[áa]rias?|\bited\b|cctv|dom[óo]tica|cablagem|fotovoltaic[ao])\b/i;
+const AVAC_RX = /\b(avac|ar\s*condicionado|climatiza[çc][ãa]o|ventila[çc][ãa]o|extra[çc][ãa]o|bomba\s+de\s+calor|piso\s+radiante|\bvrv\b|\bvrf\b|daikin|condutas?|grelhas?\s+de\s+ar)\b/i;
+const CANALIZACOES_RX = /\b(canaliza[çc][õo]es?|hidr[áa]ulic[ao]s?|abastecimento\s+de\s+[áa]guas?|rede\s+de\s+esgotos?|esgotos?|[áa]guas?\s+residuais?|sanit[áa]rios?|lavat[óo]rios?|duches?|banheiras?|ralos?|sif[õo]es?|fossa\s+s[ée]ptica|po[çc]o\s+de\s+infiltra[çc][ãa]o|autoclismos?)\b/i;
+const CARPINTARIA_RX = /\b(carpintarias?|madeiras?|portas?\s+interiores?|roupeiros?|arm[áa]rios?|m[óo]veis?\s+de\s+cozinha|mobili[áa]rio|sobrados?|deck\b|prateleiras?)\b/i;
+const PINTURA_RX = /\b(pinturas?|tintas?|vernizes?|prim[áa]rios?|barramentos?|massa\s+areada)\b/i;
+const ARRANJOS_EXTERIORES_RX = /\b(arranjos?\s+exteriores?|pavimentos?\s+exteriores?|cal[çc]adas?|lancis?|jardins?|relvados?|muros?\s+exteriores?|pavimento\s+pedonal)\b/i;
 
 function normalizarCodigo(codigo?: string | null) {
   return (codigo ?? "").trim();
@@ -170,6 +180,52 @@ function normalizarCodigo(codigo?: string | null) {
 
 function codigoComecaPor(codigo: string, prefixo: string) {
   return codigo === prefixo || codigo.startsWith(`${prefixo}.`);
+}
+
+function classificacaoEstrutural({ codigo, capituloCodigo, hay, chap }: { codigo: string; capituloCodigo: string; hay: string; chap: string }): ClassificacaoResultado | null {
+  if (DEMOLICAO_RX.test(hay) || codigoComecaPor(capituloCodigo, "3") || codigoComecaPor(codigo, "3")) {
+    return { especialidade: "Demolições", confianca: 1, motivo: "Capítulo/código de demolições" };
+  }
+  if (TERRAPLANAGEM_RX.test(hay) || codigoComecaPor(capituloCodigo, "4.2") || codigoComecaPor(codigo, "4.2")) {
+    return { especialidade: "Terraplanagens", confianca: 1, motivo: "Capítulo/código de terraplenagens" };
+  }
+  if ((codigoComecaPor(codigo, "8") || codigoComecaPor(capituloCodigo, "8")) && BASE_PAVIMENTO_RX.test(hay)) {
+    return { especialidade: "Outros", confianca: 0.95, motivo: "Base de pavimentos — rever fora de cobertura/instalações" };
+  }
+  if (ESTRUTURA_RX.test(hay)) {
+    return { especialidade: "Estruturas", confianca: 0.95, motivo: "Capítulo/descrição de estruturas" };
+  }
+  if (COBERTURA_RX.test(hay) || codigoComecaPor(capituloCodigo, "12") || codigoComecaPor(codigo, "12")) {
+    return { especialidade: "Cobertura", confianca: 0.95, motivo: "Capítulo/descrição de cobertura" };
+  }
+  if (ELETRICIDADE_RX.test(hay) || codigoComecaPor(capituloCodigo, "16") || codigoComecaPor(codigo, "16")) {
+    return { especialidade: "Eletricidade/ITED", confianca: 0.95, motivo: "Capítulo/descrição de eletricidade/ITED" };
+  }
+  if (AVAC_RX.test(hay) || codigoComecaPor(capituloCodigo, "17") || codigoComecaPor(codigo, "17")) {
+    return { especialidade: "AVAC", confianca: 0.95, motivo: "Capítulo/descrição de AVAC" };
+  }
+  if (CANALIZACOES_RX.test(hay)) {
+    if (ALVENARIA_RX.test(hay) && !/\b(tubagens?|canaliza[çc][õo]es?|rede\s+de\s+esgotos?|rede\s+de\s+abastecimento|[áa]guas?\s+residuais?|fossa\s+s[ée]ptica|po[çc]o\s+de\s+infiltra[çc][ãa]o)\b/i.test(hay)) {
+      return { especialidade: "Alvenarias", confianca: 0.95, motivo: "Trabalho construtivo em alvenaria" };
+    }
+    return { especialidade: "Canalizações", confianca: 0.95, motivo: "Capítulo/descrição de canalizações" };
+  }
+  if (CAIXILHARIA_RX.test(hay)) {
+    return { especialidade: "Caixilharias", confianca: 0.95, motivo: "Capítulo/descrição de caixilharias" };
+  }
+  if (PINTURA_RX.test(hay)) {
+    return { especialidade: "Pinturas", confianca: 0.95, motivo: "Capítulo/descrição de pinturas" };
+  }
+  if (ALVENARIA_RX.test(hay)) {
+    return { especialidade: "Alvenarias", confianca: 0.95, motivo: "Capítulo/descrição de alvenarias" };
+  }
+  if (ARRANJOS_EXTERIORES_RX.test(hay)) {
+    return { especialidade: "Arranjos Exteriores", confianca: 0.95, motivo: "Capítulo/descrição de arranjos exteriores" };
+  }
+  if (CARPINTARIA_RX.test(hay)) {
+    return { especialidade: "Carpintarias", confianca: 0.9, motivo: "Capítulo/descrição de carpintarias" };
+  }
+  return null;
 }
 
 export function classificarArtigo(a: ArtigoInput): ClassificacaoResultado {
@@ -187,14 +243,8 @@ export function classificarArtigo(a: ArtigoInput): ClassificacaoResultado {
 
   // 2) Guardas estruturais: quando o capítulo/código do mapa identifica claramente
   // a família do trabalho, isto prevalece sobre palavras soltas na descrição.
-  // Ex.: 4.2.1/4.2.2 em TERRAPLENAGENS nunca podem cair em Cobertura.
-  if (TERRAPLANAGEM_RX.test(hay) || codigoComecaPor(capituloCodigo, "4.2") || codigoComecaPor(codigo, "4.2")) {
-    return { especialidade: "Terraplanagens", confianca: 1, motivo: "Capítulo/código de terraplenagens" };
-  }
-
-  if ((codigoComecaPor(codigo, "8") || codigoComecaPor(capituloCodigo, "8")) && BASE_PAVIMENTO_RX.test(hay)) {
-    return { especialidade: "Outros", confianca: 0.95, motivo: "Base de pavimentos — não pertence a Cobertura" };
-  }
+  const estrutural = classificacaoEstrutural({ codigo, capituloCodigo, hay, chap });
+  if (estrutural) return estrutural;
 
   const capituloIndicaCobertura = COBERTURA_RX.test(chap) || codigoComecaPor(capituloCodigo, "12") || codigoComecaPor(codigo, "12");
   const descricaoIndicaCobertura = COBERTURA_RX.test(desc);
@@ -252,3 +302,12 @@ export function inferirEspecialidade(a: ArtigoInput): Especialidade {
 }
 
 export const CONFIANCA_MINIMA = 0.8;
+
+export function validarArtigoParaEspecialidade(a: ArtigoInput, especialidade: string) {
+  const { especialidade: _ignorarEspecialidadeGuardada, ...semEspecialidadeGuardada } = a;
+  const classificacao = classificarArtigo(semEspecialidadeGuardada);
+  return {
+    valido: classificacao.especialidade === especialidade && classificacao.confianca >= CONFIANCA_MINIMA,
+    classificacao,
+  };
+}

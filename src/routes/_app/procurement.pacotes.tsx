@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import {
   Plus, Sparkles, MoreHorizontal, Trash2, Copy, Pencil, Send, FolderOpen, ShoppingCart,
 } from "lucide-react";
-import { ESPECIALIDADES, inferirEspecialidade, classificarArtigo, CONFIANCA_MINIMA, type Especialidade } from "@/lib/procurement/especialidades";
+import { ESPECIALIDADES, inferirEspecialidade, classificarArtigo, CONFIANCA_MINIMA, validarArtigoParaEspecialidade, type Especialidade } from "@/lib/procurement/especialidades";
 
 export const Route = createFileRoute("/_app/procurement/pacotes")({
   head: () => ({ meta: [{ title: "Pacotes de Consulta — Procurement — MV OS" }] }),
@@ -154,14 +154,21 @@ function PacotesListPage() {
       const { data: artigos } = await supabase
         .from("procurement_pacote_artigos").select("*").eq("pacote_id", p.id);
       if (artigos && artigos.length > 0) {
-        const rows = artigos.map((a: any) => ({
+        const rows = artigos.filter((a: any) => validarArtigoParaEspecialidade({
+          descricao: a.descricao,
+          codigo: a.codigo,
+          capitulo: a.capitulo,
+          subcapitulo: a.subcapitulo,
+        }, p.especialidade).valido).map((a: any) => ({
           pacote_id: novo.id, artigo_id: a.artigo_id, codigo: a.codigo, descricao: a.descricao,
           unidade: a.unidade, quantidade: a.quantidade, capitulo: a.capitulo, subcapitulo: a.subcapitulo,
           preco_seco_estimado: a.preco_seco_estimado, categoria_custo: a.categoria_custo,
           especialidade: a.especialidade,
         }));
-        const { error: ie } = await supabase.from("procurement_pacote_artigos").insert(rows);
-        if (ie) throw ie;
+        if (rows.length > 0) {
+          const { error: ie } = await supabase.from("procurement_pacote_artigos").insert(rows);
+          if (ie) throw ie;
+        }
       }
       return novo.id;
     },

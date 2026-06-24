@@ -24,7 +24,7 @@ import { ArrowLeft, Plus, Save, Send, Trash2, Search, FileSpreadsheet, FileText,
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { ESPECIALIDADES, classificarArtigo, CONFIANCA_MINIMA } from "@/lib/procurement/especialidades";
+import { ESPECIALIDADES, validarArtigoParaEspecialidade } from "@/lib/procurement/especialidades";
 
 export const Route = createFileRoute("/_app/procurement/pacotes/$id")({
   head: () => ({ meta: [{ title: "Pacote — Procurement — MV OS" }] }),
@@ -341,16 +341,16 @@ function AdicionarArtigosDialog({
     return artigos
       .filter((a: any) => !artigosJaIncluidos.has(a.id))
       .filter((a: any) => {
-        const res = classificarArtigo({
+        const { valido } = validarArtigoParaEspecialidade({
           descricao: a.descricao,
           codigo: a.codigo,
           capituloCodigo: a.capitulo?.codigo,
           capitulo: a.capitulo?.descricao,
-        });
-        return res.especialidade === especialidade && res.confianca >= CONFIANCA_MINIMA;
+        }, especialidade);
+        return valido;
       })
       .filter((a: any) => !q || a.descricao?.toLowerCase().includes(q) || a.codigo?.toLowerCase().includes(q));
-  }, [artigos, artigosJaIncluidos, search]);
+  }, [artigos, artigosJaIncluidos, especialidade, search]);
 
   function toggle(id: string) {
     setSelecionados(prev => {
