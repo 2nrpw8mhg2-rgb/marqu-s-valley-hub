@@ -130,6 +130,57 @@ export type Database = {
         }
         Relationships: []
       }
+      documento_pastas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_default: boolean
+          is_root: boolean
+          nome: string
+          obra_id: string
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          is_root?: boolean
+          nome: string
+          obra_id: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          is_root?: boolean
+          nome?: string
+          obra_id?: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documento_pastas_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documento_pastas_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "documento_pastas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documentos: {
         Row: {
           created_at: string
@@ -137,6 +188,7 @@ export type Database = {
           mime_type: string | null
           nome: string
           obra_id: string | null
+          pasta_id: string | null
           storage_path: string
           tamanho: number | null
           tipo: Database["public"]["Enums"]["documento_tipo"]
@@ -148,6 +200,7 @@ export type Database = {
           mime_type?: string | null
           nome: string
           obra_id?: string | null
+          pasta_id?: string | null
           storage_path: string
           tamanho?: number | null
           tipo?: Database["public"]["Enums"]["documento_tipo"]
@@ -159,6 +212,7 @@ export type Database = {
           mime_type?: string | null
           nome?: string
           obra_id?: string | null
+          pasta_id?: string | null
           storage_path?: string
           tamanho?: number | null
           tipo?: Database["public"]["Enums"]["documento_tipo"]
@@ -170,6 +224,13 @@ export type Database = {
             columns: ["obra_id"]
             isOneToOne: false
             referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_pasta_id_fkey"
+            columns: ["pasta_id"]
+            isOneToOne: false
+            referencedRelation: "documento_pastas"
             referencedColumns: ["id"]
           },
         ]
@@ -705,6 +766,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      criar_pastas_padrao_obra: {
+        Args: { _obra_id: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
