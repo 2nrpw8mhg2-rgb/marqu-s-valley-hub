@@ -305,16 +305,16 @@ function DecomposicaoPage() {
                   <th className="w-8"></th>
                   <th className="text-left px-2 py-2 w-20">Código</th>
                   <th className="text-left px-2 py-2 min-w-[220px]">Descrição</th>
-                  <th className="text-left px-2 py-2 w-14">Un.</th>
-                  <th className="text-right px-2 py-2 w-20">Qtd</th>
+                  <th className="text-left px-2 py-2 w-16">Unidade</th>
+                  <th className="text-right px-2 py-2 w-24">Quantidade</th>
                   <th className="text-right px-2 py-2 w-32" title="Preço unitário original importado do Mapa de Quantidades">Preço Seco</th>
                   {INLINE_COST_COLS.map(c => (
-                    <th key={c.key} className="text-right px-2 py-2 w-32" title={c.label}>{c.short}</th>
+                    <th key={c.key} className="text-right px-2 py-2 w-32">{c.label}</th>
                   ))}
                   <th className="text-right px-2 py-2 w-28 bg-muted/60">Custo Total</th>
                   <th className="text-right px-2 py-2 w-24">Margem %</th>
-                  <th className="text-right px-2 py-2 w-28">PV Unit.</th>
-                  <th className="text-right px-2 py-2 w-28">Total Venda</th>
+                  <th className="text-right px-2 py-2 w-32">Preço de Venda Unitário</th>
+                  <th className="text-right px-2 py-2 w-32">Total de Venda</th>
                   <th className="text-right px-2 py-2 w-28">Lucro Bruto</th>
                   <th className="w-10"></th>
                 </tr>
