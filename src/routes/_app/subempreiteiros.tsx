@@ -428,6 +428,7 @@ function buildRowsFromSheet(sheet: XLSX.WorkSheet): RawImportRow[] {
   const headerIndex = detected?.index ?? -1;
   const headers = detected?.headers.length ? detected.headers : DEFAULT_IMPORT_HEADERS;
   const dataRows = matrix.slice(headerIndex + 1);
+  const firstDataLine = headerIndex >= 0 ? headerIndex + 2 : 1;
 
   return dataRows
     .map((row, idx) => {
@@ -436,7 +437,7 @@ function buildRowsFromSheet(sheet: XLSX.WorkSheet): RawImportRow[] {
         if (!header) return;
         values[header] = row[colIndex] ?? "";
       });
-      return { linha: (headerIndex >= 0 ? headerIndex : 0) + idx + 2, values };
+      return { linha: firstDataLine + idx, values };
     })
     .filter(({ values }) => Object.values(values).some((v) => String(v ?? "").trim() !== ""));
 }
