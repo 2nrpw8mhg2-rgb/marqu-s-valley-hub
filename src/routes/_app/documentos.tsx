@@ -40,6 +40,7 @@ import {
   FileArchive,
   FileSpreadsheet,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -161,6 +162,7 @@ function DocumentosPage() {
   }, [pastaActual, pastas]);
 
   const [novaPastaOpen, setNovaPastaOpen] = useState(false);
+  const [novaObraOpen, setNovaObraOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<{ kind: "pasta" | "doc"; id: string; nome: string } | null>(null);
   const [moveTarget, setMoveTarget] = useState<{ kind: "pasta" | "doc"; id: string; nome: string } | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -380,10 +382,18 @@ function DocumentosPage() {
       <div className="grid grid-cols-[260px_1fr] gap-0 h-[calc(100vh-5rem)]">
         {/* Sidebar de obras */}
         <aside className="border-r border-border bg-card/30 overflow-hidden flex flex-col">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
             <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
               Obras
             </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs"
+              onClick={() => setNovaObraOpen(true)}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" /> Nova
+            </Button>
           </div>
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
@@ -654,11 +664,95 @@ function DocumentosPage() {
           }}
         />
       )}
+      {novaObraOpen && (
+        <NovaObraDialog
+          onClose={(novoId) => {
+            setNovaObraOpen(false);
+            if (novoId) {
+              qc.invalidateQueries({ queryKey: ["obras-doc"] });
+              qc.invalidateQueries({ queryKey: ["obras-min"] });
+              qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+              navigate({ search: { obraId: novoId, pastaId: undefined } });
+            }
+          }}
+        />
+      )}
     </>
   );
 }
 
 /* -------- Sub-componentes -------- */
+
+function NovaObraDialog({ onClose }: { onClose: (novoId: string | null) => void }) {
+  const [nome, setNome] = useState("");
+  const [cliente, setCliente] = useState("");
+  const [localizacao, setLocalizacao] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nome.trim()) return;
+    setBusy(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase
+      .from("obras")
+      .insert({
+        nome: nome.trim(),
+        cliente: cliente.trim() || null,
+        localizacao: localizacao.trim() || null,
+        created_by: user?.id,
+      })
+      .select("id")
+      .single();
+    setBusy(false);
+    if (error || !data) {
+      toast.error(error?.message ?? "Falha ao criar obra");
+      return;
+    }
+    toast.success("Obra criada — pastas padrão geradas");
+    onClose(data.id);
+  };
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose(null)}>
+      <DialogContent className="bg-card border-border">
+        <DialogHeader>
+          <DialogTitle>Nova obra</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Nome *</Label>
+            <Input
+              autoFocus
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Ex: Rua São Francisco de Sales"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Cliente</Label>
+            <Input value={cliente} onChange={(e) => setCliente(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Localização</Label>
+            <Input value={localizacao} onChange={(e) => setLocalizacao(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onClose(null)}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={busy || !nome.trim()}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {busy ? "A criar..." : "Criar obra"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 function NovaPastaDialog({
   obraId,
