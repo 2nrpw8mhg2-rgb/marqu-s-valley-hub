@@ -21,6 +21,7 @@ import { Route as AppBibliotecaRouteImport } from './routes/_app/biblioteca'
 import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos.index'
 import { Route as AppProcurementPacotesRouteImport } from './routes/_app/procurement.pacotes'
 import { Route as AppOrcamentosDecomposicaoRouteImport } from './routes/_app/orcamentos.decomposicao'
+import { Route as AppProcurementPacotesIndexRouteImport } from './routes/_app/procurement.pacotes.index'
 import { Route as AppOrcamentosIdIndexRouteImport } from './routes/_app/orcamentos.$id.index'
 import { Route as AppProcurementPacotesIdRouteImport } from './routes/_app/procurement.pacotes.$id'
 import { Route as AppOrcamentosIdDecomposicaoRouteImport } from './routes/_app/orcamentos.$id.decomposicao'
@@ -85,6 +86,12 @@ const AppOrcamentosDecomposicaoRoute =
     path: '/orcamentos/decomposicao',
     getParentRoute: () => AppRoute,
   } as any)
+const AppProcurementPacotesIndexRoute =
+  AppProcurementPacotesIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppProcurementPacotesRoute,
+  } as any)
 const AppOrcamentosIdIndexRoute = AppOrcamentosIdIndexRouteImport.update({
   id: '/orcamentos/$id/',
   path: '/orcamentos/$id/',
@@ -117,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
   '/procurement/pacotes/$id': typeof AppProcurementPacotesIdRoute
   '/orcamentos/$id/': typeof AppOrcamentosIdIndexRoute
+  '/procurement/pacotes/': typeof AppProcurementPacotesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -128,11 +136,11 @@ export interface FileRoutesByTo {
   '/obras': typeof AppObrasRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
-  '/procurement/pacotes': typeof AppProcurementPacotesRouteWithChildren
   '/orcamentos': typeof AppOrcamentosIndexRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
   '/procurement/pacotes/$id': typeof AppProcurementPacotesIdRoute
   '/orcamentos/$id': typeof AppOrcamentosIdIndexRoute
+  '/procurement/pacotes': typeof AppProcurementPacotesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/_app/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
   '/_app/procurement/pacotes/$id': typeof AppProcurementPacotesIdRoute
   '/_app/orcamentos/$id/': typeof AppOrcamentosIdIndexRoute
+  '/_app/procurement/pacotes/': typeof AppProcurementPacotesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/orcamentos/$id/decomposicao'
     | '/procurement/pacotes/$id'
     | '/orcamentos/$id/'
+    | '/procurement/pacotes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -180,11 +190,11 @@ export interface FileRouteTypes {
     | '/obras'
     | '/subempreiteiros'
     | '/orcamentos/decomposicao'
-    | '/procurement/pacotes'
     | '/orcamentos'
     | '/orcamentos/$id/decomposicao'
     | '/procurement/pacotes/$id'
     | '/orcamentos/$id'
+    | '/procurement/pacotes'
   id:
     | '__root__'
     | '/'
@@ -202,6 +212,7 @@ export interface FileRouteTypes {
     | '/_app/orcamentos/$id/decomposicao'
     | '/_app/procurement/pacotes/$id'
     | '/_app/orcamentos/$id/'
+    | '/_app/procurement/pacotes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -296,6 +307,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrcamentosDecomposicaoRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/procurement/pacotes/': {
+      id: '/_app/procurement/pacotes/'
+      path: '/'
+      fullPath: '/procurement/pacotes/'
+      preLoaderRoute: typeof AppProcurementPacotesIndexRouteImport
+      parentRoute: typeof AppProcurementPacotesRoute
+    }
     '/_app/orcamentos/$id/': {
       id: '/_app/orcamentos/$id/'
       path: '/orcamentos/$id'
@@ -322,10 +340,12 @@ declare module '@tanstack/react-router' {
 
 interface AppProcurementPacotesRouteChildren {
   AppProcurementPacotesIdRoute: typeof AppProcurementPacotesIdRoute
+  AppProcurementPacotesIndexRoute: typeof AppProcurementPacotesIndexRoute
 }
 
 const AppProcurementPacotesRouteChildren: AppProcurementPacotesRouteChildren = {
   AppProcurementPacotesIdRoute: AppProcurementPacotesIdRoute,
+  AppProcurementPacotesIndexRoute: AppProcurementPacotesIndexRoute,
 }
 
 const AppProcurementPacotesRouteWithChildren =
