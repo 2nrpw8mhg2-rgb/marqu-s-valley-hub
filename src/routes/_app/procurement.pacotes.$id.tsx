@@ -20,11 +20,14 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Save, Send, Trash2, Search, FileSpreadsheet, FileText, Users } from "lucide-react";
+import { ArrowLeft, Plus, Save, Send, Trash2, Search, FileSpreadsheet, FileText, Users, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useServerFn } from "@tanstack/react-start";
 import { ESPECIALIDADES, validarArtigoParaEspecialidade } from "@/lib/procurement/especialidades";
+import { reanalisarPacote, registarCorrecao } from "@/lib/procurement/classifier.functions";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/_app/procurement/pacotes/$id")({
   head: () => ({ meta: [{ title: "Pacote — Procurement — MV OS" }] }),
