@@ -20,7 +20,10 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Save, Send, Trash2, Search } from "lucide-react";
+import { ArrowLeft, Plus, Save, Send, Trash2, Search, FileSpreadsheet, FileText, Users } from "lucide-react";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { ESPECIALIDADES } from "@/lib/procurement/especialidades";
 
 export const Route = createFileRoute("/_app/procurement/pacotes/$id")({
