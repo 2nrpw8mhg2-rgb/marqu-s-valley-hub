@@ -354,28 +354,27 @@ function DecomposicaoPage() {
                         <td className="px-2 text-muted-foreground">{a.unidade}</td>
                         <td className="px-2 text-right tabular-nums">{fmtNum(a.quantidade)}</td>
                         <td className="px-1">
-                          <Input
-                            className="h-7 text-xs text-right tabular-nums no-spin px-1.5 w-full min-w-0"
-                            type="number" step="0.01" value={a.preco_seco}
-                            onChange={e => updateArt(idx, { preco_seco: Number(e.target.value) })}
+                          <NumberInput
+                            className="h-7 text-xs text-right tabular-nums px-1.5 w-full min-w-0"
+                            value={a.preco_seco}
+                            onChange={v => updateArt(idx, { preco_seco: v })}
                           />
                         </td>
                         {INLINE_COST_COLS.map(c => (
                           <td key={c.key} className="px-1">
-                            <Input
-                              className="h-7 text-xs text-right tabular-nums no-spin px-1.5 w-full min-w-0"
-                              type="number" step="0.01"
+                            <NumberInput
+                              className="h-7 text-xs text-right tabular-nums px-1.5 w-full min-w-0"
                               value={a[c.key]}
-                              onChange={e => updateArt(idx, { [c.key]: Number(e.target.value) } as Partial<Art>)}
+                              onChange={v => updateArt(idx, { [c.key]: v } as Partial<Art>)}
                             />
                           </td>
                         ))}
                         <td className="px-2 text-right tabular-nums font-medium bg-muted/30">{fmtEUR(cu)}</td>
                         <td className="px-1">
-                          <Input
-                            className="h-7 text-xs text-right tabular-nums no-spin px-1.5 w-full min-w-0"
-                            type="number" step="0.1" value={a.margem_pct}
-                            onChange={e => updateArt(idx, { margem_pct: Number(e.target.value) })}
+                          <NumberInput
+                            className="h-7 text-xs text-right tabular-nums px-1.5 w-full min-w-0"
+                            value={a.margem_pct}
+                            onChange={v => updateArt(idx, { margem_pct: v })}
                           />
                         </td>
                         <td className="px-2 text-right tabular-nums">{fmtEUR(pv)}</td>
