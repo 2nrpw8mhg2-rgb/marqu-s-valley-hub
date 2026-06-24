@@ -2,7 +2,7 @@
 // Análise contextual baseada em: descrição + capítulo + vizinhos + aprendizagem.
 // Devolve scores por especialidade (multi-pacote) com justificação.
 
-import { ESPECIALIDADES, type Especialidade, isBetaoArtigo } from "./especialidades";
+import { ESPECIALIDADES, canonizarEspecialidade, type Especialidade, isBetaoArtigo } from "./especialidades";
 
 export type ArtigoCtx = {
   id?: string;
@@ -66,6 +66,34 @@ const REGRAS: Record<Especialidade, Regras> = {
     fracas: [/\bteto\s+falso/i, /\btecto\s+falso/i],
     exclusoes: [/\bcobertura/i],
   },
+  "Impermeabilizações": {
+    fortes: [
+      /\bimpermeabiliza[çc][ãa]o/i,
+      /\btelas?\s+(asf[áa]ltica|betuminosa|bicamada|liquida|l[íi]quida)/i,
+      /\bmembrana\s+(betuminosa|impermeabilizante|liquida|l[íi]quida)/i,
+      /\bdrenagem\s+perif[ée]rica/i,
+      /\bbarreira\s+(de|para)-?vapor/i,
+      /\bemuls[ãa]o\s+betuminosa/i,
+      /\bbetuminos[ao]\b/i,
+      /\bmuros?\s+enterrados?\b/i,
+    ],
+    fracas: [/\bhumidades?\b/i, /\bterra[çc]os?\b/i, /\bcobertura\s+plana/i, /\bzonas?\s+h[úu]midas?\b/i, /\bcasas?\s+de\s+banho\b/i],
+    exclusoes: [
+      /\bsapatas?\b/i,
+      /\bfunda[çc][õo]es?\s+estruturais?\b/i,
+      /\bpilares?\b/i,
+      /\bvigas?\b/i,
+      /\blajes?\s+estruturais?\b/i,
+      /\balpendres?\b/i,
+      /\bparedes?\s+divis[óo]rias?\b/i,
+      /\balvenarias?\b/i,
+      /\brebocos?\b/i,
+      /\bbet[ãa]o\s+armado\b/i,
+      /\barmaduras?\b/i,
+      /\bcofragens?\b/i,
+      /\bestrutura\s+met[áa]lica\b/i,
+    ],
+  },
   "Cobertura": {
     fortes: [/\bcobertura/i, /\btelhad/i, /\btelhas?\b/i, /\bsubtelha/i, /\bcumeeira/i, /\bbeirado/i, /\bcaleira/i, /\brufos?\b/i, /\balgeroz/i, /\bclarab[oó]ia/i, /\bplatibanda/i, /\bfibrocimento/i, /\bonduline/i, /\bpainel\s+sandu/i, /\bbarreira\s+para-?vapor/i],
     fracas: [/\bremate\s+(de\s+)?cobertura/i, /\bchapa\s+sandu/i, /\btubo\s+de\s+queda\s+(da\s+)?cobertura/i],
@@ -110,6 +138,10 @@ const REGRAS: Record<Especialidade, Regras> = {
     fortes: [],
     fracas: [],
   },
+  "Por Classificar": {
+    fortes: [],
+    fracas: [],
+  },
   "Outros": {
     fortes: [],
     fracas: [],
@@ -133,6 +165,12 @@ function especialidadeDeCodigoCapitulo(codigo: string): Especialidade | null {
     case "20": case "21": return "Arranjos Exteriores";
     default: return null;
   }
+}
+
+function nivelConfianca(confianca: number): "Alta" | "Média" | "Baixa" {
+  if (confianca >= 0.85) return "Alta";
+  if (confianca >= 0.7) return "Média";
+  return "Baixa";
 }
 
 // Calcula a especialidade dominante de um conjunto de artigos do mesmo capítulo
@@ -229,7 +267,7 @@ function pontuar(a: ArtigoCtx, vizinhos: ArtigoCtx[]): ResultadoClassificacao {
 
   if (ordenados.length === 0) {
     return {
-      especialidade: "Outros",
+      especialidade: "Por Classificar",
       confianca: 0.15,
       motivo: "Exclusões anularam todos os pacotes",
       scores: Object.fromEntries(scores) as ScoreMap,
@@ -252,10 +290,20 @@ function pontuar(a: ArtigoCtx, vizinhos: ArtigoCtx[]): ResultadoClassificacao {
     confianca: Math.min(0.99, 0.4 + v / 120),
   }));
 
+  if (!ehBetao && (confianca < 0.7 || topScore < 30 || margem < 12)) {
+    return {
+      especialidade: "Por Classificar",
+      confianca,
+      motivo: `${nivelConfianca(confianca)} confiança: ${topEsp} com score ${topScore} e margem +${margem}`,
+      scores: scoresObj,
+      alternativas,
+    };
+  }
+
   return {
     especialidade: topEsp,
     confianca,
-    motivo: `Score ${topScore} · margem +${margem}${reforcoVizinhos ? ` · vizinhos +${reforcoVizinhos}` : ""}`,
+    motivo: `${nivelConfianca(confianca)} confiança · score ${topScore} · margem +${margem}${reforcoVizinhos ? ` · vizinhos +${reforcoVizinhos}` : ""}`,
     scores: scoresObj,
     alternativas,
   };
@@ -292,7 +340,8 @@ export function pertenceAoPacote(
   artigo: ArtigoComVizinhos,
   especialidadePacote: string,
 ): { pertence: boolean; confianca: number; motivo: string; sugestao: Especialidade | null } {
-  if (especialidadePacote === "Betão") {
+  const alvo = canonizarEspecialidade(especialidadePacote) ?? (ESPECIALIDADES.includes(especialidadePacote as Especialidade) ? especialidadePacote as Especialidade : null);
+  if (alvo === "Betão") {
     const ok = isBetaoArtigo(artigo);
     return {
       pertence: ok,
@@ -303,14 +352,12 @@ export function pertenceAoPacote(
   }
 
   const r = classificarComContexto(artigo);
-  if (r.especialidade === especialidadePacote && r.confianca >= 0.7) {
-    return { pertence: true, confianca: r.confianca, motivo: r.motivo, sugestao: null };
+  if (alvo === "Por Classificar") {
+    const ok = r.especialidade === "Por Classificar" || r.confianca < 0.7;
+    return { pertence: ok, confianca: r.confianca, motivo: ok ? r.motivo : `Classificação sugerida: ${r.especialidade}`, sugestao: ok ? null : r.especialidade };
   }
-  // Aceita se o pacote da especialidade está pelo menos como alternativa forte (>= 70% da top)
-  const scoreAlvo = r.scores[especialidadePacote as Especialidade] ?? 0;
-  const scoreTop = r.scores[r.especialidade] ?? 0;
-  if (scoreAlvo > 0 && scoreTop > 0 && scoreAlvo / scoreTop >= 0.75) {
-    return { pertence: true, confianca: 0.7, motivo: `Sinais fortes mas ambíguo com ${r.especialidade}`, sugestao: r.especialidade };
+  if (alvo && r.especialidade === alvo && r.confianca >= 0.7) {
+    return { pertence: true, confianca: r.confianca, motivo: r.motivo, sugestao: null };
   }
   return {
     pertence: false,
