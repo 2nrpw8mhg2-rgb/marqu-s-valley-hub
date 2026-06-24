@@ -542,12 +542,13 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
         }
         const keyNif = parsed.nif ? `nif:${parsed.nif}` : null;
         const keyEmail = parsed.email ? `email:${parsed.email.toLowerCase()}` : null;
-        const dedupKey = keyNif ?? keyEmail ?? `nome:${parsed.nome.toLowerCase()}`;
-        if (seenKeys.has(dedupKey)) {
+        const dedupKey = keyNif ?? keyEmail;
+        if (dedupKey && seenKeys.has(dedupKey)) {
           rep.duplicados++;
           continue;
         }
-        seenKeys.add(dedupKey);
+        if (dedupKey) seenKeys.add(dedupKey);
+
 
         const existingId =
           (parsed.nif && byNif.get(parsed.nif)) ||
