@@ -18,6 +18,7 @@ import { Route as AppDocumentosRouteImport } from './routes/_app/documentos'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppBibliotecaRouteImport } from './routes/_app/biblioteca'
 import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos.index'
+import { Route as AppOrcamentosDecomposicaoRouteImport } from './routes/_app/orcamentos.decomposicao'
 import { Route as AppOrcamentosIdRouteImport } from './routes/_app/orcamentos.$id'
 import { Route as AppOrcamentosIdDecomposicaoRouteImport } from './routes/_app/orcamentos.$id.decomposicao'
 
@@ -65,6 +66,12 @@ const AppOrcamentosIndexRoute = AppOrcamentosIndexRouteImport.update({
   path: '/orcamentos/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOrcamentosDecomposicaoRoute =
+  AppOrcamentosDecomposicaoRouteImport.update({
+    id: '/orcamentos/decomposicao',
+    path: '/orcamentos/decomposicao',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppOrcamentosIdRoute = AppOrcamentosIdRouteImport.update({
   id: '/orcamentos/$id',
   path: '/orcamentos/$id',
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/obras': typeof AppObrasRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/orcamentos/$id': typeof AppOrcamentosIdRouteWithChildren
+  '/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/orcamentos/': typeof AppOrcamentosIndexRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
 }
@@ -98,6 +106,7 @@ export interface FileRoutesByTo {
   '/obras': typeof AppObrasRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/orcamentos/$id': typeof AppOrcamentosIdRouteWithChildren
+  '/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/orcamentos': typeof AppOrcamentosIndexRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
 }
@@ -112,6 +121,7 @@ export interface FileRoutesById {
   '/_app/obras': typeof AppObrasRoute
   '/_app/subempreiteiros': typeof AppSubempreiteirosRoute
   '/_app/orcamentos/$id': typeof AppOrcamentosIdRouteWithChildren
+  '/_app/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/_app/orcamentos/': typeof AppOrcamentosIndexRoute
   '/_app/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
 }
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/obras'
     | '/subempreiteiros'
     | '/orcamentos/$id'
+    | '/orcamentos/decomposicao'
     | '/orcamentos/'
     | '/orcamentos/$id/decomposicao'
   fileRoutesByTo: FileRoutesByTo
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/obras'
     | '/subempreiteiros'
     | '/orcamentos/$id'
+    | '/orcamentos/decomposicao'
     | '/orcamentos'
     | '/orcamentos/$id/decomposicao'
   id:
@@ -151,6 +163,7 @@ export interface FileRouteTypes {
     | '/_app/obras'
     | '/_app/subempreiteiros'
     | '/_app/orcamentos/$id'
+    | '/_app/orcamentos/decomposicao'
     | '/_app/orcamentos/'
     | '/_app/orcamentos/$id/decomposicao'
   fileRoutesById: FileRoutesById
@@ -226,6 +239,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrcamentosIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/orcamentos/decomposicao': {
+      id: '/_app/orcamentos/decomposicao'
+      path: '/orcamentos/decomposicao'
+      fullPath: '/orcamentos/decomposicao'
+      preLoaderRoute: typeof AppOrcamentosDecomposicaoRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/orcamentos/$id': {
       id: '/_app/orcamentos/$id'
       path: '/orcamentos/$id'
@@ -262,6 +282,7 @@ interface AppRouteChildren {
   AppObrasRoute: typeof AppObrasRoute
   AppSubempreiteirosRoute: typeof AppSubempreiteirosRoute
   AppOrcamentosIdRoute: typeof AppOrcamentosIdRouteWithChildren
+  AppOrcamentosDecomposicaoRoute: typeof AppOrcamentosDecomposicaoRoute
   AppOrcamentosIndexRoute: typeof AppOrcamentosIndexRoute
 }
 
@@ -272,6 +293,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppObrasRoute: AppObrasRoute,
   AppSubempreiteirosRoute: AppSubempreiteirosRoute,
   AppOrcamentosIdRoute: AppOrcamentosIdRouteWithChildren,
+  AppOrcamentosDecomposicaoRoute: AppOrcamentosDecomposicaoRoute,
   AppOrcamentosIndexRoute: AppOrcamentosIndexRoute,
 }
 
