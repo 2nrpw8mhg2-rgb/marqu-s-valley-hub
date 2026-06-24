@@ -40,6 +40,56 @@ function fmtEUR(n: number) {
   return new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n || 0);
 }
 
+function sanitizeFilename(s: string) {
+  return s.replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function exportarExcel(nome: string, especialidade: string, artigos: any[]) {
+  const rows = artigos.map((a) => ({
+    Código: a.codigo ?? "",
+    Descrição: a.descricao ?? "",
+    Unidade: a.unidade ?? "",
+    Quantidade: Number(a.quantidade ?? 0),
+    "Preço unitário (€)": "",
+    "Total (€)": "",
+    Observações: "",
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows, {
+    header: ["Código", "Descrição", "Unidade", "Quantidade", "Preço unitário (€)", "Total (€)", "Observações"],
+  });
+  ws["!cols"] = [{ wch: 12 }, { wch: 60 }, { wch: 8 }, { wch: 12 }, { wch: 18 }, { wch: 14 }, { wch: 30 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, especialidade.slice(0, 31) || "Pacote");
+  XLSX.writeFile(wb, `${sanitizeFilename(nome)}.xlsx`);
+}
+
+function exportarPDF(nome: string, especialidade: string, orcamentoNome: string | undefined, artigos: any[]) {
+  const doc = new jsPDF({ orientation: "landscape" });
+  doc.setFontSize(14);
+  doc.text(nome, 14, 14);
+  doc.setFontSize(10);
+  doc.setTextColor(110);
+  doc.text(`Especialidade: ${especialidade}${orcamentoNome ? "  ·  Orçamento: " + orcamentoNome : ""}`, 14, 21);
+  autoTable(doc, {
+    startY: 26,
+    head: [["Código", "Descrição", "Unidade", "Quantidade", "Preço unitário", "Total", "Observações"]],
+    body: artigos.map((a) => [
+      a.codigo ?? "",
+      a.descricao ?? "",
+      a.unidade ?? "",
+      Number(a.quantidade ?? 0).toLocaleString("pt-PT"),
+      "", "", "",
+    ]),
+    styles: { fontSize: 9, cellPadding: 2 },
+    headStyles: { fillColor: [40, 40, 40] },
+    columnStyles: {
+      0: { cellWidth: 22 }, 1: { cellWidth: 110 }, 2: { cellWidth: 18 },
+      3: { cellWidth: 22, halign: "right" }, 4: { cellWidth: 28 }, 5: { cellWidth: 24 }, 6: { cellWidth: 40 },
+    },
+  });
+  doc.save(`${sanitizeFilename(nome)}.pdf`);
+}
+
 function PacoteDetailPage() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
