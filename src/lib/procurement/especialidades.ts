@@ -205,6 +205,9 @@ function classificacaoEstrutural({ codigo, capituloCodigo, hay, chap }: { codigo
     return { especialidade: "AVAC", confianca: 0.95, motivo: "Capítulo/descrição de AVAC" };
   }
   if (CANALIZACOES_RX.test(hay)) {
+    if (ALVENARIA_RX.test(hay) && !/\b(tubagens?|canaliza[çc][õo]es?|rede\s+de\s+esgotos?|rede\s+de\s+abastecimento|[áa]guas?\s+residuais?|fossa\s+s[ée]ptica|po[çc]o\s+de\s+infiltra[çc][ãa]o)\b/i.test(hay)) {
+      return { especialidade: "Alvenarias", confianca: 0.95, motivo: "Trabalho construtivo em alvenaria" };
+    }
     return { especialidade: "Canalizações", confianca: 0.95, motivo: "Capítulo/descrição de canalizações" };
   }
   if (CAIXILHARIA_RX.test(hay)) {
