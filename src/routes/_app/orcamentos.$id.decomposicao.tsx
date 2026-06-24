@@ -311,7 +311,7 @@ function DecomposicaoPage() {
                   const tv = totalVenda(a);
                   const isExp = expanded[a.id];
                   return (
-                    <>
+                    <Fragment key={a.id}>
                       {showCapHeader && cap && (
                         <tr key={`cap-${cap.id}`} className="bg-primary/5 border-t border-border">
                           <td colSpan={10} className="px-3 py-2 font-mono text-xs text-primary font-semibold">
