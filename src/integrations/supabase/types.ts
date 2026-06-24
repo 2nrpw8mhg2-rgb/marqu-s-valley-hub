@@ -385,6 +385,123 @@ export type Database = {
           },
         ]
       }
+      procurement_pacote_artigos: {
+        Row: {
+          artigo_id: string | null
+          capitulo: string | null
+          categoria_custo: string | null
+          codigo: string | null
+          created_at: string
+          descricao: string
+          especialidade: string | null
+          id: string
+          pacote_id: string
+          preco_seco_estimado: number
+          quantidade: number
+          subcapitulo: string | null
+          unidade: string | null
+        }
+        Insert: {
+          artigo_id?: string | null
+          capitulo?: string | null
+          categoria_custo?: string | null
+          codigo?: string | null
+          created_at?: string
+          descricao: string
+          especialidade?: string | null
+          id?: string
+          pacote_id: string
+          preco_seco_estimado?: number
+          quantidade?: number
+          subcapitulo?: string | null
+          unidade?: string | null
+        }
+        Update: {
+          artigo_id?: string | null
+          capitulo?: string | null
+          categoria_custo?: string | null
+          codigo?: string | null
+          created_at?: string
+          descricao?: string
+          especialidade?: string | null
+          id?: string
+          pacote_id?: string
+          preco_seco_estimado?: number
+          quantidade?: number
+          subcapitulo?: string | null
+          unidade?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procurement_pacote_artigos_artigo_id_fkey"
+            columns: ["artigo_id"]
+            isOneToOne: false
+            referencedRelation: "orcamento_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procurement_pacote_artigos_pacote_id_fkey"
+            columns: ["pacote_id"]
+            isOneToOne: false
+            referencedRelation: "procurement_pacotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      procurement_pacotes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          especialidade: string
+          estado: Database["public"]["Enums"]["procurement_pacote_estado"]
+          id: string
+          nome: string
+          obra_id: string | null
+          observacoes: string | null
+          orcamento_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          especialidade: string
+          estado?: Database["public"]["Enums"]["procurement_pacote_estado"]
+          id?: string
+          nome: string
+          obra_id?: string | null
+          observacoes?: string | null
+          orcamento_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          especialidade?: string
+          estado?: Database["public"]["Enums"]["procurement_pacote_estado"]
+          id?: string
+          nome?: string
+          obra_id?: string | null
+          observacoes?: string | null
+          orcamento_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procurement_pacotes_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procurement_pacotes_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -530,6 +647,13 @@ export type Database = {
         | "adjudicado"
         | "perdido"
         | "cancelado"
+      procurement_pacote_estado:
+        | "por_preparar"
+        | "preparado"
+        | "enviado"
+        | "em_analise"
+        | "adjudicado"
+        | "cancelado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -671,6 +795,14 @@ export const Constants = {
         "enviado",
         "adjudicado",
         "perdido",
+        "cancelado",
+      ],
+      procurement_pacote_estado: [
+        "por_preparar",
+        "preparado",
+        "enviado",
+        "em_analise",
+        "adjudicado",
         "cancelado",
       ],
     },
