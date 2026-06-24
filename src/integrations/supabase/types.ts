@@ -454,6 +454,7 @@ export type Database = {
           created_by: string | null
           especialidade: string
           estado: Database["public"]["Enums"]["procurement_pacote_estado"]
+          grupo_consulta: string | null
           id: string
           nome: string
           obra_id: string | null
@@ -466,6 +467,7 @@ export type Database = {
           created_by?: string | null
           especialidade: string
           estado?: Database["public"]["Enums"]["procurement_pacote_estado"]
+          grupo_consulta?: string | null
           id?: string
           nome: string
           obra_id?: string | null
@@ -478,6 +480,7 @@ export type Database = {
           created_by?: string | null
           especialidade?: string
           estado?: Database["public"]["Enums"]["procurement_pacote_estado"]
+          grupo_consulta?: string | null
           id?: string
           nome?: string
           obra_id?: string | null

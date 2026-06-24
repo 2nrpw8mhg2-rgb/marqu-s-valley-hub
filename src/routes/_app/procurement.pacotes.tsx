@@ -222,7 +222,7 @@ function PacotesListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
+                  <TableHead>Pacote geral</TableHead>
                   <TableHead>Especialidade</TableHead>
                   <TableHead>Orçamento</TableHead>
                   <TableHead className="text-right">Artigos</TableHead>
@@ -238,7 +238,12 @@ function PacotesListPage() {
                   const r = resumo.por(p);
                   return (
                     <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate({ to: "/procurement/pacotes/$id", params: { id: p.id } })}>
-                      <TableCell className="font-medium">{p.nome}</TableCell>
+                      <TableCell className="font-medium">
+                        <div>{(p as any).grupo_consulta ?? p.nome}</div>
+                        {(p as any).grupo_consulta && (
+                          <div className="text-xs text-muted-foreground">{p.nome}</div>
+                        )}
+                      </TableCell>
                       <TableCell>{p.especialidade}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {p.orcamento?.obra?.codigo ? `${p.orcamento.obra.codigo} · ` : ""}{p.orcamento?.nome}
@@ -326,41 +331,126 @@ function SummaryCard({ label, value, tone = "default" }: { label: string; value:
 }
 
 function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
-  const [nome, setNome] = useState("");
-  const [especialidade, setEspecialidade] = useState<string>("Outros");
+  const [nomeGeral, setNomeGeral] = useState("");
   const [orcamentoId, setOrcamentoId] = useState<string>("");
+  const [selecionadas, setSelecionadas] = useState<Set<Especialidade>>(new Set());
+  const [counts, setCounts] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function submit() {
-    if (!orcamentoId || !nome.trim()) {
-      toast.error("Preenche orçamento e nome");
-      return;
+  function resetState() {
+    setNomeGeral(""); setOrcamentoId(""); setSelecionadas(new Set()); setCounts(null);
+  }
+
+  async function onOrcamentoChange(id: string) {
+    setOrcamentoId(id);
+    setCounts(null);
+    setSelecionadas(new Set());
+    if (!id) return;
+    const orc = orcamentos.find((o: any) => o.id === id);
+    if (orc && !nomeGeral.trim()) {
+      setNomeGeral(`Consulta ao Mercado — ${orc.obra?.nome ?? orc.nome} — V1`);
     }
-    setLoading(true);
-    const orc = orcamentos.find((o: any) => o.id === orcamentoId);
-    const { error } = await supabase.from("procurement_pacotes").insert({
-      orcamento_id: orcamentoId, obra_id: (orc as any)?.obra?.id ?? null,
-      nome: nome.trim(), especialidade,
-    });
-    setLoading(false);
+    const { data: artigos, error } = await supabase
+      .from("orcamento_artigos")
+      .select("descricao, codigo, capitulo:orcamento_capitulos(nome)")
+      .eq("orcamento_id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Pacote criado");
-    setNome(""); setEspecialidade("Outros"); setOrcamentoId("");
-    onCreated?.();
-    onOpenChange(false);
+    const c: Record<string, number> = {};
+    (artigos ?? []).forEach((a: any) => {
+      const esp = inferirEspecialidade({
+        descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.nome,
+      });
+      c[esp] = (c[esp] ?? 0) + 1;
+    });
+    setCounts(c);
+  }
+
+  function toggleEsp(esp: Especialidade) {
+    setSelecionadas(prev => {
+      const next = new Set(prev);
+      if (next.has(esp)) next.delete(esp); else next.add(esp);
+      return next;
+    });
+  }
+
+  async function submit() {
+    if (!orcamentoId) { toast.error("Seleciona um orçamento"); return; }
+    if (!nomeGeral.trim()) { toast.error("Define o nome do pacote geral"); return; }
+    if (selecionadas.size === 0) { toast.error("Seleciona pelo menos uma especialidade"); return; }
+    setLoading(true);
+    try {
+      const orc = orcamentos.find((o: any) => o.id === orcamentoId);
+      const { data: artigos, error } = await supabase
+        .from("orcamento_artigos")
+        .select("id, codigo, descricao, unidade, quantidade, preco_unitario, custo_mao_obra, custo_tarefeiros, custo_subempreitadas, custo_materiais, custo_equipamentos, custo_transportes, custo_encargos_gerais, custo_outros, capitulo:orcamento_capitulos(nome)")
+        .eq("orcamento_id", orcamentoId);
+      if (error) throw error;
+
+      const grupos = new Map<Especialidade, any[]>();
+      (artigos ?? []).forEach((a: any) => {
+        const esp = inferirEspecialidade({
+          descricao: a.descricao, codigo: a.codigo, capitulo: a.capitulo?.nome,
+        });
+        if (!selecionadas.has(esp)) return;
+        if (!grupos.has(esp)) grupos.set(esp, []);
+        grupos.get(esp)!.push(a);
+      });
+
+      let criados = 0;
+      for (const esp of selecionadas) {
+        const items = grupos.get(esp) ?? [];
+        const { data: novo, error: e1 } = await supabase
+          .from("procurement_pacotes")
+          .insert({
+            orcamento_id: orcamentoId, obra_id: (orc as any)?.obra?.id ?? null,
+            nome: `${nomeGeral.trim()} — ${esp}`,
+            especialidade: esp, estado: "por_preparar",
+            grupo_consulta: nomeGeral.trim(),
+          } as any).select("id").single();
+        if (e1) throw e1;
+        if (items.length > 0) {
+          const rows = items.map((a: any) => {
+            const custoTotal = Number(a.custo_mao_obra ?? 0) + Number(a.custo_tarefeiros ?? 0)
+              + Number(a.custo_subempreitadas ?? 0) + Number(a.custo_materiais ?? 0)
+              + Number(a.custo_equipamentos ?? 0) + Number(a.custo_transportes ?? 0)
+              + Number(a.custo_encargos_gerais ?? 0) + Number(a.custo_outros ?? 0);
+            return {
+              pacote_id: novo.id, artigo_id: a.id, codigo: a.codigo, descricao: a.descricao,
+              unidade: a.unidade, quantidade: a.quantidade,
+              capitulo: a.capitulo?.nome ?? null, subcapitulo: null,
+              preco_seco_estimado: custoTotal > 0 ? custoTotal : Number(a.preco_unitario ?? 0),
+              categoria_custo: null, especialidade: esp,
+            };
+          });
+          const { error: e2 } = await supabase.from("procurement_pacote_artigos").insert(rows);
+          if (e2) throw e2;
+        }
+        criados++;
+      }
+      toast.success(`${criados} pacote(s) criado(s) em "${nomeGeral.trim()}"`);
+      onCreated?.();
+      onOpenChange(false);
+      resetState();
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro a criar pacotes");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetState(); }}>
+      <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Novo pacote de consulta</DialogTitle>
-          <DialogDescription>Cria um pacote vazio. Depois podes adicionar artigos do orçamento.</DialogDescription>
+          <DialogDescription>
+            Escolhe o orçamento, dá um nome ao pacote geral e seleciona as especialidades. O sistema cria um pacote independente por especialidade, com os artigos do mapa de quantidades correspondentes.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div>
             <Label>Orçamento</Label>
-            <Select value={orcamentoId} onValueChange={setOrcamentoId}>
+            <Select value={orcamentoId} onValueChange={onOrcamentoChange}>
               <SelectTrigger><SelectValue placeholder="Seleciona um orçamento..." /></SelectTrigger>
               <SelectContent>
                 {orcamentos.map((o: any) => (
@@ -370,22 +460,56 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
             </Select>
           </div>
           <div>
-            <Label>Nome do pacote</Label>
-            <Input value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex.: Eletricidade — Moradia Sonega" />
+            <Label>Nome do pacote geral de consulta</Label>
+            <Input value={nomeGeral} onChange={e => setNomeGeral(e.target.value)} placeholder='Ex.: "Consulta ao Mercado — Moradia Sonega — V1"' />
           </div>
           <div>
-            <Label>Especialidade</Label>
-            <Select value={especialidade} onValueChange={setEspecialidade}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ESPECIALIDADES.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Label>Especialidades a consultar</Label>
+            {!orcamentoId ? (
+              <p className="text-xs text-muted-foreground mt-2">Seleciona primeiro um orçamento para ver as especialidades disponíveis.</p>
+            ) : (
+              <div className="mt-2 rounded-md border max-h-64 overflow-auto divide-y">
+                {ESPECIALIDADES.map(esp => {
+                  const n = counts?.[esp] ?? 0;
+                  const disabled = n === 0;
+                  const checked = selecionadas.has(esp);
+                  return (
+                    <label
+                      key={esp}
+                      className={`flex items-center justify-between gap-2 px-3 py-2 text-sm cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/50"}`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={disabled}
+                          onChange={() => toggleEsp(esp)}
+                        />
+                        {esp}
+                      </span>
+                      <Badge variant="secondary">{n} art.</Badge>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {orcamentoId && counts && (
+              <div className="flex gap-2 mt-2">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setSelecionadas(new Set(ESPECIALIDADES.filter(e => (counts[e] ?? 0) > 0)))}>
+                  Selecionar todas
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setSelecionadas(new Set())}>
+                  Limpar
+                </Button>
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={submit} disabled={loading}>Criar</Button>
+          <Button onClick={submit} disabled={loading}>
+            {loading ? "A criar..." : `Criar ${selecionadas.size || ""} pacote(s)`}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
