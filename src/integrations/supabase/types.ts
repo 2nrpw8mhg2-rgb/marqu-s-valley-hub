@@ -229,6 +229,7 @@ export type Database = {
           notas: string | null
           orcamento_id: string
           ordem: number
+          preco_seco: number
           preco_unitario: number
           quantidade: number
           unidade: string | null
@@ -251,6 +252,7 @@ export type Database = {
           notas?: string | null
           orcamento_id: string
           ordem?: number
+          preco_seco?: number
           preco_unitario?: number
           quantidade?: number
           unidade?: string | null
@@ -273,6 +275,7 @@ export type Database = {
           notas?: string | null
           orcamento_id?: string
           ordem?: number
+          preco_seco?: number
           preco_unitario?: number
           quantidade?: number
           unidade?: string | null
