@@ -542,12 +542,13 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
         }
         const keyNif = parsed.nif ? `nif:${parsed.nif}` : null;
         const keyEmail = parsed.email ? `email:${parsed.email.toLowerCase()}` : null;
-        const dedupKey = keyNif ?? keyEmail ?? `nome:${parsed.nome.toLowerCase()}`;
-        if (seenKeys.has(dedupKey)) {
+        const dedupKey = keyNif ?? keyEmail;
+        if (dedupKey && seenKeys.has(dedupKey)) {
           rep.duplicados++;
           continue;
         }
-        seenKeys.add(dedupKey);
+        if (dedupKey) seenKeys.add(dedupKey);
+
 
         const existingId =
           (parsed.nif && byNif.get(parsed.nif)) ||
@@ -593,15 +594,24 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
       }
 
       for (const batch of chunkArray(inserts, 100)) {
-        const linhas = batch.map((item) => item._linha);
         const payload = batch.map(({ _linha, ...item }) => item);
         const { error } = await supabase.from("subempreiteiros").insert(payload);
-        if (error) rep.erros.push({ linha: linhas[0], motivo: `Erro ao criar ${batch.length} registos: ${error.message}` });
-        else rep.criados += batch.length;
+        if (error) {
+          // Fallback: insert one-by-one so a single bad row doesn't block the rest
+          for (const item of batch) {
+            const { _linha, ...row } = item;
+            const { error: rowErr } = await supabase.from("subempreiteiros").insert(row);
+            if (rowErr) rep.erros.push({ linha: _linha, motivo: rowErr.message });
+            else rep.criados++;
+          }
+        } else {
+          rep.criados += batch.length;
+        }
         doneWrites += batch.length;
         setProgress({ phase: "A gravar registos", done: doneWrites, total: totalWrites });
         await waitForUi();
       }
+
 
       setReport(rep);
       toast.success(`Importação concluída: ${rep.criados} criados, ${rep.atualizados} atualizados`);
