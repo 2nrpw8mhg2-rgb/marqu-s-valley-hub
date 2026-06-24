@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      artigos_biblioteca: {
+        Row: {
+          codigo: string | null
+          created_at: string
+          descricao: string
+          especialidade: string | null
+          id: string
+          preco_referencia: number | null
+          ultima_obra_id: string | null
+          unidade: string | null
+          updated_at: string
+          utilizacoes: number
+        }
+        Insert: {
+          codigo?: string | null
+          created_at?: string
+          descricao: string
+          especialidade?: string | null
+          id?: string
+          preco_referencia?: number | null
+          ultima_obra_id?: string | null
+          unidade?: string | null
+          updated_at?: string
+          utilizacoes?: number
+        }
+        Update: {
+          codigo?: string | null
+          created_at?: string
+          descricao?: string
+          especialidade?: string | null
+          id?: string
+          preco_referencia?: number | null
+          ultima_obra_id?: string | null
+          unidade?: string | null
+          updated_at?: string
+          utilizacoes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artigos_biblioteca_ultima_obra_id_fkey"
+            columns: ["ultima_obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documentos: {
         Row: {
           created_at: string
@@ -108,6 +155,154 @@ export type Database = {
           valor_estimado?: number | null
         }
         Relationships: []
+      }
+      orcamento_artigos: {
+        Row: {
+          capitulo_id: string | null
+          codigo: string | null
+          created_at: string
+          descricao: string
+          id: string
+          margem_pct: number
+          notas: string | null
+          orcamento_id: string
+          ordem: number
+          preco_unitario: number
+          quantidade: number
+          unidade: string | null
+        }
+        Insert: {
+          capitulo_id?: string | null
+          codigo?: string | null
+          created_at?: string
+          descricao: string
+          id?: string
+          margem_pct?: number
+          notas?: string | null
+          orcamento_id: string
+          ordem?: number
+          preco_unitario?: number
+          quantidade?: number
+          unidade?: string | null
+        }
+        Update: {
+          capitulo_id?: string | null
+          codigo?: string | null
+          created_at?: string
+          descricao?: string
+          id?: string
+          margem_pct?: number
+          notas?: string | null
+          orcamento_id?: string
+          ordem?: number
+          preco_unitario?: number
+          quantidade?: number
+          unidade?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamento_artigos_capitulo_id_fkey"
+            columns: ["capitulo_id"]
+            isOneToOne: false
+            referencedRelation: "orcamento_capitulos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamento_artigos_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orcamento_capitulos: {
+        Row: {
+          codigo: string | null
+          created_at: string
+          descricao: string
+          id: string
+          orcamento_id: string
+          ordem: number
+        }
+        Insert: {
+          codigo?: string | null
+          created_at?: string
+          descricao: string
+          id?: string
+          orcamento_id: string
+          ordem?: number
+        }
+        Update: {
+          codigo?: string | null
+          created_at?: string
+          descricao?: string
+          id?: string
+          orcamento_id?: string
+          ordem?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamento_capitulos_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orcamentos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_decisao: string | null
+          data_envio: string | null
+          estado: Database["public"]["Enums"]["orcamento_estado"]
+          id: string
+          margem_global_pct: number
+          nome: string
+          obra_id: string
+          observacoes: string | null
+          updated_at: string
+          versao: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_decisao?: string | null
+          data_envio?: string | null
+          estado?: Database["public"]["Enums"]["orcamento_estado"]
+          id?: string
+          margem_global_pct?: number
+          nome: string
+          obra_id: string
+          observacoes?: string | null
+          updated_at?: string
+          versao?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_decisao?: string | null
+          data_envio?: string | null
+          estado?: Database["public"]["Enums"]["orcamento_estado"]
+          id?: string
+          margem_global_pct?: number
+          nome?: string
+          obra_id?: string
+          observacoes?: string | null
+          updated_at?: string
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamentos_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -227,6 +422,12 @@ export type Database = {
         | "proposta"
         | "outro"
       obra_estado: "oportunidade" | "em_curso" | "concluida" | "cancelada"
+      orcamento_estado:
+        | "rascunho"
+        | "enviado"
+        | "adjudicado"
+        | "perdido"
+        | "cancelado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -363,6 +564,13 @@ export const Constants = {
         "outro",
       ],
       obra_estado: ["oportunidade", "em_curso", "concluida", "cancelada"],
+      orcamento_estado: [
+        "rascunho",
+        "enviado",
+        "adjudicado",
+        "perdido",
+        "cancelado",
+      ],
     },
   },
 } as const
