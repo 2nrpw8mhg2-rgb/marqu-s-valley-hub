@@ -351,7 +351,8 @@ function SummaryCard({ label, value, tone = "default" }: { label: string; value:
 // Subempreitada = top-level chapter of the orçamento (códigos como "1", "2", "12"...).
 // Cada subempreitada agrega todos os artigos do capítulo e dos seus sub-capítulos.
 type Subempreitada = {
-  key: string;          // top-level chapter codigo (ex: "12") or BETAO_KEY
+  key: string;          // unique key: top chapter id, or BETAO_KEY
+  codigo: string;       // display code (ex: "12")
   nome: string;         // chapter descricao (ex: "COBERTURAS")
   capituloIds: Set<string>;
   artigoCount: number;
@@ -398,7 +399,8 @@ async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitad
       ids.add(top.id);
       const artigoCount = arts.filter((a: any) => a.capitulo_id && ids.has(a.capitulo_id)).length;
       return {
-        key: top.codigo.trim(),
+        key: top.id,
+        codigo: top.codigo.trim(),
         nome: (top.descricao ?? "").trim() || `Capítulo ${top.codigo}`,
         capituloIds: ids,
         artigoCount,
@@ -422,6 +424,7 @@ async function carregarSubempreitadas(orcamentoId: string): Promise<Subempreitad
   }
   subs.unshift({
     key: BETAO_KEY,
+    codigo: "★",
     nome: "Betão",
     capituloIds: new Set(),
     artigoCount: betaoIds.size,
@@ -590,7 +593,7 @@ function NovoPacoteDialog({ open, onOpenChange, orcamentos, onCreated }: any) {
                           checked={checked}
                           onChange={() => toggleSub(sub.key)}
                         />
-                        <span className="text-muted-foreground tabular-nums w-8">{sub.key === BETAO_KEY ? "★" : sub.key}</span>
+                        <span className="text-muted-foreground tabular-nums w-8">{sub.key === BETAO_KEY ? "★" : sub.codigo}</span>
                         <span>{sub.nome}{sub.key === BETAO_KEY ? <span className="ml-2 text-xs text-muted-foreground">(transversal — em todas as obras)</span> : null}</span>
                       </span>
                       <Badge variant={sub.artigoCount > 0 ? "secondary" : "outline"}>{sub.artigoCount} art.</Badge>
