@@ -20,7 +20,10 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Save, Send, Trash2, Search } from "lucide-react";
+import { ArrowLeft, Plus, Save, Send, Trash2, Search, FileSpreadsheet, FileText, Users } from "lucide-react";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { ESPECIALIDADES } from "@/lib/procurement/especialidades";
 
 export const Route = createFileRoute("/_app/procurement/pacotes/$id")({
@@ -35,6 +38,56 @@ const ESTADO_LABEL: Record<string, string> = {
 
 function fmtEUR(n: number) {
   return new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n || 0);
+}
+
+function sanitizeFilename(s: string) {
+  return s.replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function exportarExcel(nome: string, especialidade: string, artigos: any[]) {
+  const rows = artigos.map((a) => ({
+    Código: a.codigo ?? "",
+    Descrição: a.descricao ?? "",
+    Unidade: a.unidade ?? "",
+    Quantidade: Number(a.quantidade ?? 0),
+    "Preço unitário (€)": "",
+    "Total (€)": "",
+    Observações: "",
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows, {
+    header: ["Código", "Descrição", "Unidade", "Quantidade", "Preço unitário (€)", "Total (€)", "Observações"],
+  });
+  ws["!cols"] = [{ wch: 12 }, { wch: 60 }, { wch: 8 }, { wch: 12 }, { wch: 18 }, { wch: 14 }, { wch: 30 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, especialidade.slice(0, 31) || "Pacote");
+  XLSX.writeFile(wb, `${sanitizeFilename(nome)}.xlsx`);
+}
+
+function exportarPDF(nome: string, especialidade: string, orcamentoNome: string | undefined, artigos: any[]) {
+  const doc = new jsPDF({ orientation: "landscape" });
+  doc.setFontSize(14);
+  doc.text(nome, 14, 14);
+  doc.setFontSize(10);
+  doc.setTextColor(110);
+  doc.text(`Especialidade: ${especialidade}${orcamentoNome ? "  ·  Orçamento: " + orcamentoNome : ""}`, 14, 21);
+  autoTable(doc, {
+    startY: 26,
+    head: [["Código", "Descrição", "Unidade", "Quantidade", "Preço unitário", "Total", "Observações"]],
+    body: artigos.map((a) => [
+      a.codigo ?? "",
+      a.descricao ?? "",
+      a.unidade ?? "",
+      Number(a.quantidade ?? 0).toLocaleString("pt-PT"),
+      "", "", "",
+    ]),
+    styles: { fontSize: 9, cellPadding: 2 },
+    headStyles: { fillColor: [40, 40, 40] },
+    columnStyles: {
+      0: { cellWidth: 22 }, 1: { cellWidth: 110 }, 2: { cellWidth: 18 },
+      3: { cellWidth: 22, halign: "right" }, 4: { cellWidth: 28 }, 5: { cellWidth: 24 }, 6: { cellWidth: 40 },
+    },
+  });
+  doc.save(`${sanitizeFilename(nome)}.pdf`);
 }
 
 function PacoteDetailPage() {
@@ -130,6 +183,12 @@ function PacoteDetailPage() {
           <>
             <Button variant="outline" asChild>
               <Link to="/procurement/pacotes"><ArrowLeft className="h-4 w-4 mr-2" /> Voltar</Link>
+            </Button>
+            <Button variant="outline" onClick={() => exportarExcel(nome || "pacote", especialidade, artigos)} disabled={artigos.length === 0}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+            </Button>
+            <Button variant="outline" onClick={() => exportarPDF(nome || "pacote", especialidade, pacote.orcamento?.nome, artigos)} disabled={artigos.length === 0}>
+              <FileText className="h-4 w-4 mr-2" /> PDF
             </Button>
             <Button onClick={salvarHeader}><Save className="h-4 w-4 mr-2" /> Guardar</Button>
             <Button variant="default" onClick={prepararEnvio} disabled={artigos.length === 0}>
