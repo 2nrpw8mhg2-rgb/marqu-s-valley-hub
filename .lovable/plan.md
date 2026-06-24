@@ -1,63 +1,92 @@
-## Decomposição de Preços — Nova área de orçamentação
+## FASE 3 — Procurement · Módulo 1: Pacotes de Consulta
 
-Vou criar um sub-menu "Decomposição de Preços" dentro do editor de orçamento, onde cada artigo importado do Mapa de Quantidades pode ser aberto e ter o custo decomposto pelas várias categorias, gerando automaticamente o preço de venda final.
+Criar a área **Procurement** integrada com Orçamentação e Decomposição de Preços, começando pelo Módulo 1 (Pacotes de Consulta). Os módulos seguintes (envio a subempreiteiros, receção e comparação de propostas, adjudicação, histórico) ficam para entregas posteriores desta mesma fase.
 
-### 1. Base de dados (nova migração)
+### 1. Base de dados (migração)
 
-Adicionar 7 colunas de custo a `orcamento_artigos` (default 0):
-- `custo_mao_obra`, `custo_tarefeiros`, `custo_subempreitadas`, `custo_materiais`, `custo_equipamentos`, `custo_transportes`, `custo_encargos_gerais`, `custo_outros`
+Novas tabelas em `public`:
 
-Nova tabela `orcamento_artigo_fontes` para guardar associações a subempreiteiros/fornecedores:
-- `artigo_id`, `categoria` (subempreitada | material | equipamento | mao_obra), `subempreiteiro_id` (nullable), `descricao`, `valor`, `selecionado` (boolean — só o selecionado alimenta o custo)
+- `procurement_pacotes`
+  - `id`, `orcamento_id` (FK → orcamentos), `obra_id` (FK → obras, nullable derivado), `nome`, `especialidade`, `estado` (enum: `por_preparar | preparado | enviado | em_analise | adjudicado | cancelado`, default `por_preparar`), `observacoes`, `user_id`, `created_at`, `updated_at`.
+- `procurement_pacote_artigos`
+  - `id`, `pacote_id` (FK → procurement_pacotes ON DELETE CASCADE), `artigo_id` (FK → orcamento_artigos), `codigo`, `descricao`, `unidade`, `quantidade`, `capitulo`, `subcapitulo`, `preco_seco_estimado` (= custo unit. da decomposição), `categoria_custo`, `especialidade`, `created_at`.
 
-Manter `preco_unitario` e `margem_pct` existentes (passam a ser calculados/sobrescritos pela decomposição quando esta tem valores > 0).
+Enum `procurement_pacote_estado`. Grants `authenticated` + `service_role`. RLS por `user_id` (mesmo padrão das outras tabelas). Trigger `set_updated_at` no pacote.
 
-### 2. Nova rota: `/orcamentos/$id/decomposicao`
+Não toca em `orcamento_artigos` nem na Decomposição — apenas cria uma camada nova de organização. Os dados são copiados para o pacote no momento da geração (snapshot) para permitir editar especialidade/preço estimado sem alterar o orçamento original.
 
-Sub-menu visível no editor do orçamento (tabs: **Mapa de Quantidades** | **Decomposição de Preços**).
+### 2. Sidebar
 
-**Grelha principal** com colunas: Código · Descrição · Un. · Qtd · Mão de Obra · Tarefeiros · Equipamentos · Materiais · Subempreitadas · Encargos · **Custo Total** (auto) · **Margem %** · **PV Unit** (auto) · **Total Venda** (auto) · ações.
+Remover `disabled` de **Procurement** e expandir para sub-itens:
+- Procurement
+  - Pacotes de Consulta → `/procurement/pacotes`
 
-Cada linha expansível mostra:
-- Inputs dos 7 componentes de custo
-- Lista de **fontes associadas** (orçamentos de subempreiteiros / cotações) com radio button "selecionada" — o valor da fonte selecionada preenche automaticamente o campo de custo correspondente
-- Botão "Associar subempreiteiro" → dialog que lista subempreiteiros ativos e permite adicionar uma proposta (categoria, descrição, valor)
+### 3. Rotas novas
 
-### 3. Cálculos automáticos (client-side, reativos)
+- `src/routes/_app/procurement.pacotes.tsx` — lista de pacotes
+- `src/routes/_app/procurement.pacotes.$id.tsx` — detalhe do pacote
 
-```
-custoTotal     = soma dos 7 componentes
-pvUnitario     = custoTotal * (1 + margem%/100)
-totalVenda     = pvUnitario * quantidade
-lucroBruto     = totalVenda - (custoTotal * quantidade)
-```
+### 4. Página Lista (`/procurement/pacotes`)
 
-Aplicar margem: individual por artigo OU global (botão "Aplicar margem global a tudo" já existente é reutilizado).
+Topo:
+- Filtro **Obra/Orçamento** (select dos orçamentos do utilizador).
+- Botões: **Novo pacote** · **Gerar pacotes automaticamente** (dialog que pede orçamento e cria 1 pacote por especialidade detectada).
 
-### 4. Resumo global (sticky no topo)
+Cards de resumo:
+- Total de pacotes · Por preparar · Enviados · Adjudicados · Valor total estimado em consulta.
 
-Cards com: **Total Custos** · **Total Venda** · **Lucro Bruto** · **Margem Média %** · barra com **% de custos por categoria** (MO, Subs, Materiais, Equip., Encargos, Outros).
+Tabela:
+| Nome | Especialidade | Nº artigos | Valor estimado | Estado | Criado | Atualizado | Ações |
 
-### 5. Ligação ao orçamento comercial
+Ações por linha: Abrir · Editar nome/especialidade · Duplicar · Eliminar · Preparar envio (muda estado para `preparado`).
 
-Ao guardar a decomposição, o `preco_unitario` de cada artigo é actualizado para o `pvUnitario` calculado. A vista actual `/orcamentos/$id` (Mapa de Quantidades) continua a mostrar os preços, mas com aviso visual de que vêm da Decomposição — edição manual do PV ali fica bloqueada quando o artigo tem decomposição preenchida (`custoTotal > 0`).
+### 5. Página Detalhe (`/procurement/pacotes/$id`)
 
-Export PDF/Excel continua a usar `preco_unitario` (agora alimentado pela decomposição), garantindo que o orçamento comercial reflecte sempre os custos reais + margem.
+Header: nome editável, obra/orçamento associado, especialidade (select), badge de estado, dropdown para mudar estado.
 
-### 6. Sidebar
+Bloco de observações internas (textarea).
 
-Adicionar atalho "Decomposição de Preços" como sub-item visual em Orçamentação (na prática leva à lista de orçamentos e dentro escolhe-se um para abrir a aba).
+Tabela de artigos do pacote (código, descrição, capítulo/subcapítulo, un., qtd, preço seco estimado, total, ações).
 
-### Ficheiros novos / alterados
+Ações:
+- **Adicionar artigos**: dialog com a lista de artigos do orçamento de origem que ainda não estão no pacote (com pesquisa, checkboxes para multi-add).
+- **Remover artigo**.
+- **Editar quantidade / preço seco** inline.
+- Botão **Preparar pedido de orçamento para subempreiteiros** (apenas marca `preparado` por agora — o envio real entra no próximo módulo).
 
-- **migration**: colunas de custo + tabela `orcamento_artigo_fontes` + grants/RLS
-- `src/routes/_app/orcamentos.$id.decomposicao.tsx` (nova rota — sub-página)
-- `src/routes/_app/orcamentos.$id.tsx` (adicionar tabs MQ / Decomposição, bloquear edição de PV quando há decomposição)
-- `src/components/orcamentos/AssociarFonteDialog.tsx` (novo)
-- `src/lib/orcamento-utils.ts` (helpers de cálculo da decomposição)
-- `src/components/AppSidebar.tsx` (atalho opcional)
+Totais no rodapé: nº artigos, valor total estimado.
 
-### Fora do âmbito desta entrega
+### 6. Geração automática por especialidade
 
-- Biblioteca de Recursos reutilizável (€/h por categoria) — fica para fase seguinte; agora os valores são introduzidos por artigo ou vindos de propostas
-- Composições detalhadas por receita — adiamento; modelo escolhido é **preço directo + margem** com decomposição por categoria de custo, que cobre o pedido actual
+Função client-side `inferirEspecialidade(artigo)` que devolve uma das especialidades-alvo (Demolições, Estruturas, Alvenarias, Cobertura, Caixilharias, Eletricidade/ITED, AVAC, Canalizações, Carpintarias, Pinturas, Outros) com base em:
+
+1. `especialidade` ou `categoria_custo` já presentes na Decomposição (prioridade máxima);
+2. `capitulo` / `subcapitulo` (regras por prefixo/contém);
+3. Palavras-chave na `descricao` (mapa keyword → especialidade, ex.: `tomada|cabo|quadro elétrico|ITED → Eletricidade/ITED`, `tubo|esgoto|sanita|lavatório → Canalizações`, etc.).
+
+O **preço seco estimado** = `custo_total_decomposicao` do artigo (soma dos 7 componentes). Se a decomposição não estiver preenchida, usa `preco_unitario` como fallback e marca o artigo no pacote com aviso.
+
+A geração automática:
+- agrupa artigos por especialidade detectada;
+- cria um pacote por grupo com `nome = "{Especialidade} – {nome do orçamento}"`, `estado = por_preparar`;
+- ignora artigos que já pertencem a outro pacote do mesmo orçamento (evita duplicação) — confirmação no dialog.
+
+### 7. Ficheiros
+
+Novos:
+- `supabase/migrations/<timestamp>_procurement_pacotes.sql`
+- `src/routes/_app/procurement.pacotes.tsx`
+- `src/routes/_app/procurement.pacotes.$id.tsx`
+- `src/lib/procurement/especialidades.ts` (lista canónica + `inferirEspecialidade`)
+- `src/components/procurement/GerarPacotesDialog.tsx`
+- `src/components/procurement/AdicionarArtigosDialog.tsx`
+
+Alterados:
+- `src/components/AppSidebar.tsx` (ativar Procurement + sub-item)
+
+### Fora do âmbito desta entrega (próximos módulos da Fase 3)
+
+- Pedidos de orçamento a subempreiteiros (envio por email, links públicos de resposta)
+- Grelha de comparação de propostas e adjudicação
+- Histórico de preços por artigo/especialidade/subempreiteiro
+- Relatórios de poupança e margem real vs orçamentada
