@@ -321,7 +321,6 @@ const HEADER_MAP: Record<string, keyof ImportRow | "skip"> = {
   especialidades: "especialidades",
   area: "especialidades",
   areas: "especialidades",
-  atividadade: "especialidades",
   atividade: "especialidades",
   atividades: "especialidades",
   empresa: "nome",
@@ -371,7 +370,7 @@ const HEADER_MAP: Record<string, keyof ImportRow | "skip"> = {
   telefones: "telefones",
   tlm: "telefones",
   tel: "telefones",
-  contactoTelefonico: "telefones",
+  contactotelefonico: "telefones",
   distrito: "distrito",
   concelho: "concelho",
   municipio: "concelho",
@@ -483,13 +482,13 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+      const rows = buildRowsFromSheet(sheet);
       if (rows.length === 0) {
         toast.error("Ficheiro vazio");
         setBusy(false);
         return;
       }
-      const headers = Object.keys(rows[0]);
+      const headers = Object.keys(rows[0].values);
 
       const { data: existing } = await supabase
         .from("subempreiteiros")
@@ -506,9 +505,9 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
       const rep: ImportReport = { criados: 0, atualizados: 0, duplicados: 0, erros: [] };
 
       for (let i = 0; i < rows.length; i++) {
-        const parsed = parseRow(rows[i], headers);
+        const parsed = parseRow(rows[i].values, headers);
         if (!parsed) {
-          rep.erros.push({ linha: i + 2, motivo: "Sem nome/empresa" });
+          rep.erros.push({ linha: rows[i].linha, motivo: "Sem nome/empresa" });
           continue;
         }
         const keyNif = parsed.nif ? `nif:${parsed.nif}` : null;
@@ -542,7 +541,7 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
 
         if (existingId) {
           const { error } = await supabase.from("subempreiteiros").update(payload).eq("id", existingId);
-          if (error) rep.erros.push({ linha: i + 2, motivo: error.message });
+          if (error) rep.erros.push({ linha: rows[i].linha, motivo: error.message });
           else rep.atualizados++;
         } else {
           payload.created_by = user?.id ?? null;
@@ -552,7 +551,7 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
             .select("id")
             .single();
           if (error) {
-            rep.erros.push({ linha: i + 2, motivo: error.message });
+            rep.erros.push({ linha: rows[i].linha, motivo: error.message });
           } else {
             rep.criados++;
             if (parsed.nif && data?.id) byNif.set(parsed.nif, data.id);
