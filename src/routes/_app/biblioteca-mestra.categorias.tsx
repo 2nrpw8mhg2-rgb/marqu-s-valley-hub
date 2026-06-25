@@ -512,7 +512,7 @@ function CategoriasPage() {
           </Card>
 
           {/* Categorias */}
-          <Card className="bg-card border-border">
+          <Card className="bg-card border-border flex-1 min-w-0">
             <div className="flex items-center justify-between p-4 border-b border-border">
               <div>
                 <h2 className="text-base font-semibold">
