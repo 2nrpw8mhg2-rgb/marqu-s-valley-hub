@@ -100,10 +100,13 @@ export type Database = {
           codigo: string | null
           created_at: string
           descricao: string
+          estado_ia: Database["public"]["Enums"]["biblioteca_artigo_estado_ia"]
           id: string
           observacoes: string | null
           subespecialidade_id: string
+          tipo: Database["public"]["Enums"]["biblioteca_artigo_tipo"]
           unidade: string | null
+          unidade_id: string
           updated_at: string
         }
         Insert: {
@@ -112,10 +115,13 @@ export type Database = {
           codigo?: string | null
           created_at?: string
           descricao: string
+          estado_ia?: Database["public"]["Enums"]["biblioteca_artigo_estado_ia"]
           id?: string
           observacoes?: string | null
           subespecialidade_id: string
+          tipo?: Database["public"]["Enums"]["biblioteca_artigo_tipo"]
           unidade?: string | null
+          unidade_id: string
           updated_at?: string
         }
         Update: {
@@ -124,10 +130,13 @@ export type Database = {
           codigo?: string | null
           created_at?: string
           descricao?: string
+          estado_ia?: Database["public"]["Enums"]["biblioteca_artigo_estado_ia"]
           id?: string
           observacoes?: string | null
           subespecialidade_id?: string
+          tipo?: Database["public"]["Enums"]["biblioteca_artigo_tipo"]
           unidade?: string | null
+          unidade_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -143,6 +152,13 @@ export type Database = {
             columns: ["subespecialidade_id"]
             isOneToOne: false
             referencedRelation: "biblioteca_subespecialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "biblioteca_artigos_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_unidades"
             referencedColumns: ["id"]
           },
         ]
@@ -311,6 +327,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      biblioteca_unidades: {
+        Row: {
+          ativa: boolean
+          categoria: string | null
+          codigo: string
+          created_at: string
+          id: string
+          nome: string
+          ordem: number
+          simbolo: string
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          categoria?: string | null
+          codigo: string
+          created_at?: string
+          id?: string
+          nome: string
+          ordem?: number
+          simbolo: string
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          categoria?: string | null
+          codigo?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          ordem?: number
+          simbolo?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       classificacao_aprendizagem: {
         Row: {
@@ -1097,6 +1149,20 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "orcamentista" | "diretor_obra" | "comprador"
+      biblioteca_artigo_estado_ia:
+        | "validado"
+        | "revisto"
+        | "criado_auto"
+        | "pendente"
+      biblioteca_artigo_tipo:
+        | "servico"
+        | "material"
+        | "equipamento"
+        | "sistema"
+        | "mao_obra"
+        | "transporte"
+        | "taxa_licenca"
+        | "outros"
       biblioteca_keyword_origem: "manual" | "ia"
       biblioteca_keyword_tipo: "positiva" | "negativa"
       documento_tipo:
@@ -1247,6 +1313,22 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "orcamentista", "diretor_obra", "comprador"],
+      biblioteca_artigo_estado_ia: [
+        "validado",
+        "revisto",
+        "criado_auto",
+        "pendente",
+      ],
+      biblioteca_artigo_tipo: [
+        "servico",
+        "material",
+        "equipamento",
+        "sistema",
+        "mao_obra",
+        "transporte",
+        "taxa_licenca",
+        "outros",
+      ],
       biblioteca_keyword_origem: ["manual", "ia"],
       biblioteca_keyword_tipo: ["positiva", "negativa"],
       documento_tipo: [

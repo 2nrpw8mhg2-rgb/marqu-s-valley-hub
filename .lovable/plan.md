@@ -1,70 +1,74 @@
-## Especialidade 010 — Preparação da Obra
 
-Popular a Especialidade 010 com a nova estrutura completa (10 Subespecialidades, 20 Categorias, ~160 Artigos Mestre) e introduzir a infraestrutura de **palavras-chave hierárquicas** da Biblioteca Mestra.
+# Melhorias aos Artigos Mestre
 
-### 1. Nova tabela `biblioteca_especialidade_keywords`
+Três melhorias estruturais à tabela `biblioteca_artigos` e respetiva UI em `/biblioteca-mestra/artigos`.
 
-Coexiste com `biblioteca_artigo_keywords` e abre caminho para tabelas equivalentes em Subespecialidades, Categorias e Artigos.
+## 1. Campo "Tipo" do artigo
 
-Colunas:
-- `id uuid PK`
-- `especialidade_id uuid NOT NULL` → FK `biblioteca_especialidades(id) ON DELETE CASCADE`
-- `termo text NOT NULL`
-- `tipo` — enum partilhado `biblioteca_keyword_tipo` (`'positiva' | 'negativa'`), com migração do `tipo` da tabela existente caso necessário (valores atuais já são `positiva`/`negativa`).
-- `peso numeric(5,2) NOT NULL DEFAULT 1.00` — futura ponderação na classificação por IA
-- `origem` — novo enum `biblioteca_keyword_origem` (`'manual' | 'ia'`), default `'manual'`
-- `ativo boolean NOT NULL DEFAULT true`
-- `created_at`, `updated_at` (trigger `set_updated_at`)
-- Índices: `(especialidade_id)`, `lower(termo)`
-- Único: `(especialidade_id, lower(termo), tipo)`
+Novo enum `biblioteca_artigo_tipo` com os valores:
+`servico`, `material`, `equipamento`, `sistema`, `mao_obra`, `transporte`, `taxa_licenca`, `outros`.
 
-GRANT + RLS (mesmo padrão das outras tabelas da biblioteca: `authenticated` com USING/CHECK true; `service_role` ALL).
+- Coluna `tipo biblioteca_artigo_tipo NOT NULL DEFAULT 'outros'` em `biblioteca_artigos`.
+- Backfill: todos os artigos existentes ficam `'outros'` (utilizador refina depois).
+- Índice `btree(tipo)` para filtros rápidos.
 
-> Nota: as tabelas equivalentes para Subespecialidades, Categorias e Artigos (este último já existe) **não** são criadas agora — entram em planos futuros, seguindo este mesmo esquema. O `peso` e `origem` também serão acrescentados a `biblioteca_artigo_keywords` numa fase posterior, para manter este plano focado.
+## 2. Campo "Estado IA"
 
-### 2. Estrutura da Especialidade 010
+Novo enum `biblioteca_artigo_estado_ia` com os valores:
+`validado`, `revisto`, `criado_auto`, `pendente`.
 
-**Mantém** as 4 Subespecialidades antigas (vazias). **Acrescenta** 10 novas:
+- Coluna `estado_ia biblioteca_artigo_estado_ia NOT NULL DEFAULT 'pendente'` em `biblioteca_artigos`.
+- Backfill: artigos atuais (criados manualmente via SQL pelo utilizador) → `'validado'`.
+- Índice `btree(estado_ia)`.
 
-| Código | Subespecialidade |
-|---|---|
-| 010.01 | Planeamento e Organização Inicial |
-| 010.02 | Levantamentos e Vistorias |
-| 010.03 | Implantação e Marcação |
-| 010.04 | Licenças, Autorizações e Comunicação Prévia |
-| 010.05 | Segurança e Saúde Inicial |
-| 010.06 | Proteções e Salvaguarda |
-| 010.07 | Acessos e Logística Inicial |
-| 010.08 | Limpeza e Preparação Inicial |
-| 010.09 | Ensaios e Diagnósticos Iniciais |
-| 010.10-NOVA | Preparação para Procurement *(ver nota)* |
+## 3. Unidades normalizadas
 
-> **Conflito de código 010.10**: já existe `010.10 — Implantação Topográfica`. Para evitar colisão visual, a nova subespecialidade "Preparação para Procurement" será criada com o código **`010.99`** (e a respetiva categoria como `010.99.01`). Assim mantemos a numeração `010.01–010.09` exatamente como o utilizador definiu e isolamos a antiga `010.10`. Pode ser renumerada quando as 4 antigas forem removidas.
+Nova tabela `public.biblioteca_unidades`:
 
-Cada nova Subespecialidade recebe automaticamente a Categoria **"Por Classificar"** (`.00`) via trigger. Adicionalmente, cada uma recebe as 2 Categorias do brief (códigos `010.XX.01` e `010.XX.02`, ordem 10 e 20).
+| coluna | tipo | notas |
+|---|---|---|
+| `id` | uuid PK | |
+| `codigo` | text UNIQUE NOT NULL | ex: `m2`, `m3`, `un`, `vg` (sigla canónica usada em código) |
+| `simbolo` | text NOT NULL | ex: `m²`, `m³`, `un` (apresentado na UI) |
+| `nome` | text NOT NULL | ex: "Metro quadrado" |
+| `categoria` | text | "comprimento", "área", "volume", "massa", "tempo", "global"… (opcional, ajuda agrupar no dropdown) |
+| `ordem` | int default 100 | |
+| `ativa` | boolean default true | |
+| `created_at`/`updated_at` | timestamptz | + trigger `set_updated_at` |
 
-Cada Categoria recebe os Artigos Mestre listados (ordem incremental de 10 em 10), com:
-- `codigo` = `<codigo_categoria>.<NN>` (ex.: `010.01.01.01`)
-- `unidade` = `vg` (valor global) por defeito — apropriado para a maioria destes artigos de planeamento/preparação; pode ser ajustado depois na UI
-- `ativo = true`
+Seed inicial: `un`, `m`, `m2`, `m3`, `ml`, `kg`, `t`, `vg`, `h`, `dia`, `mes`, `lote`, `cj`, `par`, `km`, `l`.
 
-### 3. Palavras-chave da Especialidade 010
+RLS + GRANTs: leitura para `authenticated`, escrita reservada a `admin` (via `has_role(auth.uid(),'admin')`).
 
-Inserir na nova tabela todas as palavras-chave positivas (23) e negativas (17) listadas pelo utilizador, com `peso = 1.00`, `origem = 'manual'`, `ativo = true`.
+### Migração de `biblioteca_artigos.unidade`
 
-### 4. UI
+- Adicionar `unidade_id uuid REFERENCES biblioteca_unidades(id) ON DELETE RESTRICT`.
+- Backfill: mapear texto livre atual → `unidade_id` via lookup case-insensitive contra `codigo`/`simbolo` (apenas `vg` existe hoje, fica trivial).
+- Manter a coluna `unidade` (texto) por agora como cache de leitura, alimentada por trigger a partir de `unidade_id`, para não partir consultas/orçamentos existentes. Pode ser removida em migração futura quando todo o código consumir `unidade_id`.
+- Após backfill: `ALTER COLUMN unidade_id SET NOT NULL`.
 
-Nenhuma alteração nesta fase. As páginas existentes (`biblioteca-mestra.subespecialidades`, `.categorias`, `.artigos`, `.index`) já refletem o novo conteúdo via leitura da BD. A gestão visual das palavras-chave de Especialidade fica para um plano dedicado.
+## UI — `biblioteca-mestra.artigos.tsx`
 
-### Fora de âmbito
+- **Listagem**: novas colunas `Tipo` (badge) e `Estado IA` (badge colorido com bolinha 🟢🟡🔵🔴). Coluna `Un.` passa a mostrar `simbolo` da unidade ligada.
+- **Filtros**: dropdowns adicionais `Tipo` e `Estado IA`.
+- **Ficha de edição**: novos campos obrigatórios `Tipo` (Select) e `Estado IA` (Select); `Unidade` passa de `Input` para `Select` (autocomplete via Command/Popover) alimentado por `biblioteca_unidades` ativas, ordenadas por categoria/ordem.
+- Validação no `save`: `tipo` e `unidade_id` obrigatórios; `estado_ia` default `'validado'` em novos artigos criados manualmente.
+- Atualizar `src/lib/biblioteca-mestra/types.ts` (`ArtigoMestre` ganha `tipo`, `estado_ia`, `unidade_id`; novo tipo `Unidade`).
 
-- Páginas de gestão de palavras-chave (Especialidade/Subespecialidade/Categoria).
-- Tabelas equivalentes para Subespecialidades e Categorias.
-- Acrescentar `peso`/`origem` a `biblioteca_artigo_keywords`.
-- Eliminação ou renumeração das 4 Subespecialidades antigas (010.10, 010.20, 010.30, 010.40).
-- Motor de classificação automática por IA.
+## Nova página: Gestão de Unidades
 
-### Ficheiros afetados
+- Rota `src/routes/_app/biblioteca-mestra.unidades.tsx` (CRUD simples idêntico ao das categorias): listar, criar, editar, ativar/desativar.
+- Entrada no menu/cards de `biblioteca-mestra.index.tsx`.
 
-- 1 migration SQL: cria `biblioteca_especialidade_keywords` (+ enum `biblioteca_keyword_origem`, GRANTs, RLS, trigger `set_updated_at`).
-- 1 insert SQL (via tool de dados): cria as 10 Subespecialidades, 20 Categorias manuais, ~160 Artigos Mestre e ~40 palavras-chave da Especialidade 010.
+## Fora de âmbito
+
+- Cor/ícone do badge "Estado IA" em outras páginas (orçamentos, procurement) — só Biblioteca Mestra.
+- Conversões automáticas entre unidades.
+- Remoção definitiva da coluna `unidade` texto (deferida).
+- Lógica de IA que muda `estado_ia` automaticamente (fica para a fase do motor de classificação).
+
+## Resumo técnico
+
+1 migração SQL: 2 enums + 3 colunas em `biblioteca_artigos` + tabela `biblioteca_unidades` (com GRANTs, RLS, trigger) + backfill + índices.
+1 insert SQL: seed das 16 unidades + backfill de `unidade_id`.
+Edições: `types.ts`, `biblioteca-mestra.artigos.tsx`, `biblioteca-mestra.index.tsx`, nova rota `biblioteca-mestra.unidades.tsx`.

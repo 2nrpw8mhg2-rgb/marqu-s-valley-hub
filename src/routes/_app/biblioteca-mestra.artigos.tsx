@@ -19,7 +19,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Search, X, Sparkles, FolderInput, Power } from "lucide-react";
-import type { Especialidade, Subespecialidade, Categoria, ArtigoMestre, ArtigoKeyword } from "@/lib/biblioteca-mestra/types";
+import type { Especialidade, Subespecialidade, Categoria, ArtigoMestre, ArtigoKeyword, Unidade, ArtigoTipo, ArtigoEstadoIA } from "@/lib/biblioteca-mestra/types";
+import { ARTIGO_TIPOS, ARTIGO_ESTADOS_IA } from "@/lib/biblioteca-mestra/types";
 
 export const Route = createFileRoute("/_app/biblioteca-mestra/artigos")({
   head: () => ({ meta: [{ title: "Artigos Mestre — Biblioteca Mestra — MV OS" }] }),
@@ -35,6 +36,8 @@ function ArtigosPage() {
   const [espFilter, setEspFilter] = useState<string>("all");
   const [subFilter, setSubFilter] = useState<string>("all");
   const [catFilter, setCatFilter] = useState<string>("all");
+  const [tipoFilter, setTipoFilter] = useState<string>("all");
+  const [estadoFilter, setEstadoFilter] = useState<string>("all");
   const [onlyPorClassificar, setOnlyPorClassificar] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<EditState | null>(null);
@@ -69,6 +72,10 @@ function ArtigosPage() {
     queryKey: ["bm-kw"],
     queryFn: async () => (await supabase.from("biblioteca_artigo_keywords").select("*")).data as ArtigoKeyword[],
   });
+  const { data: unidades = [] } = useQuery({
+    queryKey: ["bm-unidades"],
+    queryFn: async () => (await supabase.from("biblioteca_unidades").select("*").eq("ativa", true).order("ordem")).data as Unidade[],
+  });
 
   const subMap = useMemo(() => new Map(subs.map((s) => [s.id, s])), [subs]);
   const espMap = useMemo(() => new Map(esps.map((e) => [e.id, e])), [esps]);
@@ -101,6 +108,8 @@ function ArtigosPage() {
     if (espFilter !== "all" && sub?.especialidade_id !== espFilter) return false;
     if (subFilter !== "all" && r.subespecialidade_id !== subFilter) return false;
     if (catFilter !== "all" && r.categoria_id !== catFilter) return false;
+    if (tipoFilter !== "all" && r.tipo !== tipoFilter) return false;
+    if (estadoFilter !== "all" && r.estado_ia !== estadoFilter) return false;
     if (onlyPorClassificar && !(cat?.nome === "Por Classificar" && cat.ordem === 0)) return false;
     if (search.trim()) {
       const t = search.toLowerCase();
@@ -115,6 +124,8 @@ function ArtigosPage() {
     return true;
   });
 
+  const defaultUnidadeId = useMemo(() => unidades.find((u) => u.codigo === "vg")?.id ?? unidades[0]?.id, [unidades]);
+
   const openEdit = (a?: ArtigoMestre) => {
     if (a) {
       const list = kwsByArt.get(a.id) ?? [];
@@ -126,7 +137,16 @@ function ArtigosPage() {
     } else {
       const defSub = subFilter !== "all" ? subFilter : undefined;
       const defCat = catFilter !== "all" ? catFilter : (defSub ? cats.find((c) => c.subespecialidade_id === defSub && c.ordem === 0)?.id : undefined);
-      setEditing({ ativo: true, positivas: [], negativas: [], subespecialidade_id: defSub, categoria_id: defCat });
+      setEditing({
+        ativo: true,
+        positivas: [],
+        negativas: [],
+        subespecialidade_id: defSub,
+        categoria_id: defCat,
+        tipo: "outros",
+        estado_ia: "validado",
+        unidade_id: defaultUnidadeId,
+      });
     }
     setKwInputPos("");
     setKwInputNeg("");
@@ -137,6 +157,8 @@ function ArtigosPage() {
     mutationFn: async (e: EditState) => {
       if (!e.descricao?.trim()) throw new Error("Descrição obrigatória");
       if (!e.categoria_id) throw new Error("Categoria obrigatória");
+      if (!e.tipo) throw new Error("Tipo obrigatório");
+      if (!e.unidade_id) throw new Error("Unidade obrigatória");
       const cat = catMap.get(e.categoria_id);
       if (!cat) throw new Error("Categoria inválida");
       const payload = {
@@ -144,7 +166,9 @@ function ArtigosPage() {
         categoria_id: e.categoria_id,
         codigo: e.codigo ?? null,
         descricao: e.descricao.trim(),
-        unidade: e.unidade ?? null,
+        unidade_id: e.unidade_id,
+        tipo: e.tipo,
+        estado_ia: e.estado_ia ?? "validado",
         observacoes: e.observacoes ?? null,
         ativo: e.ativo ?? true,
       };
@@ -286,6 +310,20 @@ function ArtigosPage() {
               {catsBySub.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Select value={tipoFilter} onValueChange={setTipoFilter}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              {ARTIGO_TIPOS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os estados IA</SelectItem>
+              {ARTIGO_ESTADOS_IA.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Button
             variant={onlyPorClassificar ? "default" : "outline"}
             size="sm"
@@ -327,20 +365,25 @@ function ArtigosPage() {
                 <TableHead className="w-24">Código</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead>Categoria</TableHead>
+                <TableHead className="w-28">Tipo</TableHead>
                 <TableHead className="w-16">Un.</TableHead>
+                <TableHead className="w-36">Estado IA</TableHead>
                 <TableHead>Palavras-chave</TableHead>
                 <TableHead className="w-40 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">A carregar...</TableCell></TableRow>}
-              {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">Sem artigos</TableCell></TableRow>}
+              {isLoading && <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground">A carregar...</TableCell></TableRow>}
+              {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground">Sem artigos</TableCell></TableRow>}
               {filtered.map((r) => {
                 const sub = subMap.get(r.subespecialidade_id);
                 const esp = sub ? espMap.get(sub.especialidade_id) : null;
                 const cat = catMap.get(r.categoria_id);
                 const isPorClassificar = cat?.nome === "Por Classificar" && cat.ordem === 0;
                 const arrKw = kwsByArt.get(r.id) ?? [];
+                const tipoLabel = ARTIGO_TIPOS.find((t) => t.value === r.tipo)?.label ?? r.tipo;
+                const estado = ARTIGO_ESTADOS_IA.find((s) => s.value === r.estado_ia);
+                const unidade = unidades.find((u) => u.id === r.unidade_id);
                 return (
                   <TableRow key={r.id} className={isPorClassificar ? "bg-amber-50/40 dark:bg-amber-900/10" : ""}>
                     <TableCell><Checkbox checked={selected.has(r.id)} onCheckedChange={() => toggleOne(r.id)} /></TableCell>
@@ -350,7 +393,16 @@ function ArtigosPage() {
                       <div className="text-muted-foreground text-xs">{esp?.nome} / {sub?.nome ?? "—"}</div>
                       <div className={isPorClassificar ? "text-amber-700 dark:text-amber-400 font-medium" : ""}>{cat?.nome ?? "—"}</div>
                     </TableCell>
-                    <TableCell>{r.unidade ?? "—"}</TableCell>
+                    <TableCell><Badge variant="outline" className="text-xs">{tipoLabel}</Badge></TableCell>
+                    <TableCell>{unidade?.simbolo ?? r.unidade ?? "—"}</TableCell>
+                    <TableCell>
+                      {estado && (
+                        <Badge variant="outline" className={`gap-1.5 ${estado.className}`}>
+                          <span className={`inline-block h-2 w-2 rounded-full ${estado.dot}`} />
+                          {estado.label}
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {arrKw.slice(0, 5).map((k) => (
@@ -421,7 +473,39 @@ function ArtigosPage() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div><Label>Código</Label><Input value={editing?.codigo ?? ""} onChange={(e) => setEditing({ ...editing, codigo: e.target.value })} /></div>
-              <div className="col-span-2"><Label>Unidade</Label><Input value={editing?.unidade ?? ""} onChange={(e) => setEditing({ ...editing, unidade: e.target.value })} placeholder="m², m³, vg, ..." /></div>
+              <div>
+                <Label>Unidade *</Label>
+                <Select value={editing?.unidade_id} onValueChange={(v) => setEditing({ ...editing, unidade_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                  <SelectContent>
+                    {unidades.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.simbolo} — {u.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Tipo *</Label>
+                <Select value={editing?.tipo} onValueChange={(v) => setEditing({ ...editing, tipo: v as ArtigoTipo })}>
+                  <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                  <SelectContent>
+                    {ARTIGO_TIPOS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Estado IA *</Label>
+              <Select value={editing?.estado_ia} onValueChange={(v) => setEditing({ ...editing, estado_ia: v as ArtigoEstadoIA })}>
+                <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                <SelectContent>
+                  {ARTIGO_ESTADOS_IA.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      <span className="inline-flex items-center gap-2"><span className={`inline-block h-2 w-2 rounded-full ${s.dot}`} />{s.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div><Label>Descrição *</Label><Textarea value={editing?.descricao ?? ""} onChange={(e) => setEditing({ ...editing, descricao: e.target.value })} /></div>
             <div><Label>Observações</Label><Textarea value={editing?.observacoes ?? ""} onChange={(e) => setEditing({ ...editing, observacoes: e.target.value })} /></div>

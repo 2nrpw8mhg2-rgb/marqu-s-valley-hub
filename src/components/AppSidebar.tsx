@@ -40,6 +40,7 @@ const sections: { title: string; items: NavItem[] }[] = [
       { to: "/biblioteca-mestra/categorias", label: "Categorias", icon: Layers },
       { to: "/biblioteca-mestra/artigos", label: "Artigos Mestre", icon: FileText },
       { to: "/biblioteca-mestra/keywords", label: "Palavras-chave", icon: Sparkles },
+      { to: "/biblioteca-mestra/unidades", label: "Unidades", icon: Layers },
       { to: "/biblioteca-mestra/templates", label: "Templates de Obra", icon: HardHat },
     ],
   },
