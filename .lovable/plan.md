@@ -1,47 +1,45 @@
-## Especialidade 060 — Redes Hidráulicas e Enterradas
+## Simplificar estados dos Artigos Mestre
 
-Seguir o mesmo padrão usado nas Especialidades 040 (Movimento de Terras) e 050 (Contenções): uma única migração SQL idempotente que popula toda a hierarquia, sem alterações de frontend (o Explorador já mostra automaticamente novas especialidades).
+Reduzir o enum `biblioteca_artigo_estado_ia` aos três estados oficiais e ajustar a UI da Biblioteca Mestra.
 
-### O que vai ser criado
+### 1. Migração de base de dados
 
-**1 Especialidade**
-- `060` — Redes Hidráulicas e Enterradas (ordem 60, ativo)
+Recriar o tipo `biblioteca_artigo_estado_ia` apenas com:
+- `validado`
+- `criado_auto`
+- `obsoleto`
 
-**10 Subespecialidades** (`060.01` a `060.10`)
-- Rede de Abastecimento de Água
-- Rede de Saneamento Doméstico
-- Rede de Águas Pluviais
-- Drenagens
-- Reservatórios e Depósitos
-- Estações Elevatórias
-- ETAR e Tratamento de Águas
-- Ensaios e Colocação em Serviço
-- Trabalhos Complementares
-- Monitorização e Controlo
+Passos da migração (num único bloco):
+1. Criar novo tipo `biblioteca_artigo_estado_ia_new` com os três valores.
+2. Em `biblioteca_artigos`: remover o `DEFAULT` antigo, mapear valores existentes (`pendente` → `validado`, `revisto` → `validado`, `criado_auto` → `criado_auto`, `validado` → `validado`), converter a coluna para o novo tipo e voltar a aplicar `DEFAULT 'validado'`.
+3. `DROP TYPE` antigo e renomear o novo para `biblioteca_artigo_estado_ia`.
 
-**~25 Categorias** com códigos sequenciais `060.XX.YY`
-- 060.01: Tubagens, Acessórios, Órgãos Hidráulicos, Ligações
-- 060.02: Coletores, Caixas, Ligações
-- 060.03: Coletores, Captação, Descarga
-- 060.04: Drenagem Periférica, Drenagem de Pavimentos
-- 060.05: Reservatórios, Equipamentos
-- 060.06: Obras Civis, Equipamentos
-- 060.07: Tratamento, Equipamentos
-- 060.08: Ensaios, Comissionamento
-- 060.09: Proteção, Identificação
-- 060.10: Controlo
+Resultado: o default passa a ser `validado`, eliminando o "Pendente de validação" para tudo o que é criado manualmente.
 
-**~95 Artigos Mestre** (todos os listados no briefing)
-- `unidade_id` = unidade `vg` (vazia/genérica), `tipo='outros'`, `estado_ia='pendente'`, `ativo=true`
+### 2. Frontend
 
-**Keywords da especialidade** (`biblioteca_especialidade_keywords`)
-- 27 positivas (abastecimento de água, saneamento, PEAD, PVC, coletor, válvula, ETAR, etc.)
-- 13 negativas (cofragem, armaduras, betão estrutural, AVAC, ITED, etc.)
+- `src/lib/biblioteca-mestra/types.ts`
+  - `ArtigoEstadoIA = "validado" | "criado_auto" | "obsoleto"`
+  - `ARTIGO_ESTADOS_IA`:
+    - `validado` — label "Validado", ponto verde
+    - `criado_auto` — label "IA", ponto azul
+    - `obsoleto` — label "Obsoleto", ponto amarelo
+  - Sem entradas vermelhas / sem `pendente` / sem `revisto`.
 
-### Detalhes técnicos
+- `src/components/biblioteca-mestra/ArtigoMestreFormDialog.tsx` e `src/routes/_app/biblioteca-mestra.artigos.tsx`
+  - O seletor de estado no formulário passa a mostrar apenas os três valores acima (já lê de `ARTIGO_ESTADOS_IA`, basta a lista nova).
+  - Default ao criar manualmente continua `validado` (já está).
+  - O badge da coluna "Estado" nas listagens (artigos e categorias) usa automaticamente os novos labels/cores.
 
-- Ficheiro: `src/migrations/060_populate_redes_hidraulicas.sql`
-- Bloco `DO $$ ... $$` com estruturas `jsonb` para definir hierarquia
-- `ON CONFLICT DO NOTHING` em todas as inserções (idempotente / re-executável)
-- Sem alterações em código TS/React — a nova especialidade aparece automaticamente no Explorador da Biblioteca Mestra (Especialidade → Subespecialidade → Categoria → Artigo Mestre)
-- Verificação final por contagens (subespecialidades, categorias, artigos, keywords)
+- `src/routes/_app/biblioteca-mestra.artigos.tsx`
+  - Filtro de estado: as opções do `Select` passam a ser as três novas (sem "Pendente"/"Revisto").
+
+### 3. Validação
+
+- Após a migração: confirmar contagens por estado em `biblioteca_artigos`.
+- Verificar no Explorador que nenhum artigo aparece com badge vermelho de "Pendente de validação".
+
+### Notas
+
+- Não se acrescenta agora um botão "Validar Artigo" — só fará sentido quando existirem agentes de IA a criar artigos com `criado_auto`. A infraestrutura (estado + badge azul) fica preparada.
+- Eliminar artigos continua possível; "Obsoleto" é uma escolha do utilizador via edição (sem fluxo dedicado neste passo).
