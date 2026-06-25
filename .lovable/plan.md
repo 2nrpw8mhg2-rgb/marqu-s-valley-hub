@@ -1,50 +1,59 @@
+## Especialidade 030 — Demolições e Gestão de Resíduos
 
-# Especialidade 020 — Instalações Provisórias
+Popular a Biblioteca Mestra com a estrutura completa da Especialidade 030, seguindo o mesmo padrão usado para a Especialidade 020.
 
-Mesma estrutura usada na 010: criar Subespecialidades, Categorias e Artigos Mestre da especialidade já existente `020 — Instalações Provisórias` e popular as palavras-chave em `biblioteca_especialidade_keywords`.
+### 1. Subespecialidades (10 novas)
 
-## Subespecialidades (10)
+Inserir em `biblioteca_subespecialidades` (especialidade 030):
 
-| Código | Nome |
-|---|---|
-| 020.01 | Estaleiro |
-| 020.02 | Tapumes e Vedação |
-| 020.03 | Contentores e Instalações de Apoio |
-| 020.04 | Água Provisória |
-| 020.05 | Eletricidade Provisória |
-| 020.06 | Comunicações |
-| 020.07 | Segurança do Estaleiro |
-| 020.08 | Sinalização de Obra |
-| 020.09 | Equipamentos Temporários |
-| 020.10 | Desmobilização |
+- 030.01 — Demolições Gerais
+- 030.02 — Demolições Estruturais
+- 030.03 — Demolições Não Estruturais
+- 030.04 — Desmontagens Técnicas
+- 030.05 — Desmontagem de Instalações Técnicas
+- 030.06 — Separação e Triagem de Resíduos
+- 030.07 — Transporte e Gestão de RCD
+- 030.08 — Resíduos Especiais
+- 030.09 — Limpeza Pós-Demolição
+- 030.10 — Monitorização e Controlo
 
-Cada subespecialidade gera automaticamente a categoria `Por Classificar` via trigger.
+Se já existirem subespecialidades vazias na 030 com nomes conflituantes, renomear com sufixo "(antigo)" antes da inserção (mesma estratégia da 020).
 
-## Categorias manuais
+O trigger `tg_subesp_por_classificar` cria automaticamente a categoria "Por Classificar" em cada nova subespecialidade.
 
-Exatamente as listadas pelo utilizador (22 no total): Implantação do Estaleiro, Infraestruturas do Estaleiro, Tapumes, Portões, Escritórios, Apoio aos Trabalhadores, Armazéns, Rede Provisória, Equipamentos (em 020.04), Alimentação, Distribuição, Telecomunicações, Controlo, Segurança Física, Equipamentos (em 020.07), Sinalização, Informação, Equipamentos (em 020.09), Apoio, Encerramento.
+### 2. Categorias manuais (20 no total)
 
-## Artigos Mestre
+Inserir em `biblioteca_categorias`, distribuídas pelas subespecialidades acima:
 
-Todos os listados pelo utilizador (≈90), criados como atualmente:
-- `tipo = 'outros'` (default; utilizador refina depois)
-- `unidade_id` = `vg` (default global, igual à 010)
-- `estado_ia = 'validado'` (artigos criados manualmente)
+- 030.01: Demolições Totais, Demolições Parciais
+- 030.02: Betão, Estruturas Metálicas
+- 030.03: Alvenarias, Acabamentos
+- 030.04: Carpintarias, Caixilharias
+- 030.05: Instalações
+- 030.06: Separação, Triagem
+- 030.07: Transporte, Gestão
+- 030.08: Resíduos Perigosos, Resíduos Especiais
+- 030.09: Limpeza, Preparação
+- 030.10: Controlo
+
+### 3. Artigos Mestre (~85 artigos)
+
+Inserir em `biblioteca_artigos` todos os artigos listados no pedido, com:
+
+- `unidade_id` correspondente a `vg` (mesma convenção da 020)
+- `tipo = 'outros'`
+- `estado_ia = 'validado'`
 - `ativo = true`
-- Sem código (à imagem dos da 010); o utilizador pode preencher mais tarde.
 
-## Palavras-chave da especialidade
+### 4. Palavras-chave da Especialidade
 
-Inserir em `biblioteca_especialidade_keywords` para `especialidade_id = 0642a69d-…` (já existe):
-- 21 positivas, 14 negativas
-- `peso = 1.00`, `origem = 'manual'`, `ativo = true`
+Inserir em `biblioteca_especialidade_keywords` para a especialidade 030:
 
-## Execução
+- 16 positivas (demolição, desmontagem, remoção, picagem, corte, desmantelamento, entulho, resíduos, RCD, triagem, separação, operador licenciado, guia de resíduos, amianto, fibrocimento, limpeza pós-demolição)
+- 10 negativas (fundação, cofragem, armadura, betão novo, reboco novo, pintura nova, instalação nova, pavimento novo, cobertura nova, fornecimento) — nota: "execução" é demasiado genérica, será omitida ou marcada com peso reduzido para evitar falsos negativos
 
-Tudo numa única operação `INSERT` (ferramenta de dados, não migração de schema), idêntica ao padrão usado na 010. Não há alterações de schema, código frontend nem types.
+### Notas técnicas
 
-## Fora de âmbito
-
-- Códigos numéricos por artigo
-- Classificação fina de `tipo` por artigo
-- Templates de obra, equivalências com 110 (MEP) ou 030 (Demolições)
+- Operação puramente de dados (INSERT/UPDATE), sem migrações de schema nem alterações de frontend.
+- Verificação final por SQL: contagem de subespecialidades, categorias, artigos e keywords inseridas.
+- Caso encontre conflitos de código/nome na 030, aplica-se o mesmo padrão de "(antigo)" usado na 020.
