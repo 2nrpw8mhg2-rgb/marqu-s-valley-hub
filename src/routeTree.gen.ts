@@ -27,6 +27,7 @@ import { Route as AppBibliotecaMestraTemplatesRouteImport } from './routes/_app/
 import { Route as AppBibliotecaMestraSubespecialidadesRouteImport } from './routes/_app/biblioteca-mestra.subespecialidades'
 import { Route as AppBibliotecaMestraKeywordsRouteImport } from './routes/_app/biblioteca-mestra.keywords'
 import { Route as AppBibliotecaMestraEspecialidadesRouteImport } from './routes/_app/biblioteca-mestra.especialidades'
+import { Route as AppBibliotecaMestraCategoriasRouteImport } from './routes/_app/biblioteca-mestra.categorias'
 import { Route as AppBibliotecaMestraArtigosRouteImport } from './routes/_app/biblioteca-mestra.artigos'
 import { Route as AppOrcamentosIdIndexRouteImport } from './routes/_app/orcamentos.$id.index'
 import { Route as AppProcurementPacotesIdRouteImport } from './routes/_app/procurement.pacotes.$id'
@@ -127,6 +128,12 @@ const AppBibliotecaMestraEspecialidadesRoute =
     path: '/especialidades',
     getParentRoute: () => AppBibliotecaMestraRoute,
   } as any)
+const AppBibliotecaMestraCategoriasRoute =
+  AppBibliotecaMestraCategoriasRouteImport.update({
+    id: '/categorias',
+    path: '/categorias',
+    getParentRoute: () => AppBibliotecaMestraRoute,
+  } as any)
 const AppBibliotecaMestraArtigosRoute =
   AppBibliotecaMestraArtigosRouteImport.update({
     id: '/artigos',
@@ -161,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/obras': typeof AppObrasRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
+  '/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
   '/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
   '/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
   '/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
@@ -183,6 +191,7 @@ export interface FileRoutesByTo {
   '/obras': typeof AppObrasRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
+  '/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
   '/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
   '/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
   '/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
@@ -208,6 +217,7 @@ export interface FileRoutesById {
   '/_app/obras': typeof AppObrasRoute
   '/_app/subempreiteiros': typeof AppSubempreiteirosRoute
   '/_app/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
+  '/_app/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
   '/_app/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
   '/_app/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
   '/_app/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
@@ -233,6 +243,7 @@ export interface FileRouteTypes {
     | '/obras'
     | '/subempreiteiros'
     | '/biblioteca-mestra/artigos'
+    | '/biblioteca-mestra/categorias'
     | '/biblioteca-mestra/especialidades'
     | '/biblioteca-mestra/keywords'
     | '/biblioteca-mestra/subespecialidades'
@@ -255,6 +266,7 @@ export interface FileRouteTypes {
     | '/obras'
     | '/subempreiteiros'
     | '/biblioteca-mestra/artigos'
+    | '/biblioteca-mestra/categorias'
     | '/biblioteca-mestra/especialidades'
     | '/biblioteca-mestra/keywords'
     | '/biblioteca-mestra/subespecialidades'
@@ -279,6 +291,7 @@ export interface FileRouteTypes {
     | '/_app/obras'
     | '/_app/subempreiteiros'
     | '/_app/biblioteca-mestra/artigos'
+    | '/_app/biblioteca-mestra/categorias'
     | '/_app/biblioteca-mestra/especialidades'
     | '/_app/biblioteca-mestra/keywords'
     | '/_app/biblioteca-mestra/subespecialidades'
@@ -426,6 +439,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBibliotecaMestraEspecialidadesRouteImport
       parentRoute: typeof AppBibliotecaMestraRoute
     }
+    '/_app/biblioteca-mestra/categorias': {
+      id: '/_app/biblioteca-mestra/categorias'
+      path: '/categorias'
+      fullPath: '/biblioteca-mestra/categorias'
+      preLoaderRoute: typeof AppBibliotecaMestraCategoriasRouteImport
+      parentRoute: typeof AppBibliotecaMestraRoute
+    }
     '/_app/biblioteca-mestra/artigos': {
       id: '/_app/biblioteca-mestra/artigos'
       path: '/artigos'
@@ -459,6 +479,7 @@ declare module '@tanstack/react-router' {
 
 interface AppBibliotecaMestraRouteChildren {
   AppBibliotecaMestraArtigosRoute: typeof AppBibliotecaMestraArtigosRoute
+  AppBibliotecaMestraCategoriasRoute: typeof AppBibliotecaMestraCategoriasRoute
   AppBibliotecaMestraEspecialidadesRoute: typeof AppBibliotecaMestraEspecialidadesRoute
   AppBibliotecaMestraKeywordsRoute: typeof AppBibliotecaMestraKeywordsRoute
   AppBibliotecaMestraSubespecialidadesRoute: typeof AppBibliotecaMestraSubespecialidadesRoute
@@ -468,6 +489,7 @@ interface AppBibliotecaMestraRouteChildren {
 
 const AppBibliotecaMestraRouteChildren: AppBibliotecaMestraRouteChildren = {
   AppBibliotecaMestraArtigosRoute: AppBibliotecaMestraArtigosRoute,
+  AppBibliotecaMestraCategoriasRoute: AppBibliotecaMestraCategoriasRoute,
   AppBibliotecaMestraEspecialidadesRoute:
     AppBibliotecaMestraEspecialidadesRoute,
   AppBibliotecaMestraKeywordsRoute: AppBibliotecaMestraKeywordsRoute,
