@@ -17,6 +17,7 @@ import { Route as AppObrasRouteImport } from './routes/_app/obras'
 import { Route as AppDocumentosRouteImport } from './routes/_app/documentos'
 import { Route as AppDecomposicaoPrecosRouteImport } from './routes/_app/decomposicao-precos'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppBibliotecaMestraRouteImport } from './routes/_app/biblioteca-mestra'
 import { Route as AppBibliotecaRouteImport } from './routes/_app/biblioteca'
 import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos.index'
 import { Route as AppProcurementPacotesRouteImport } from './routes/_app/procurement.pacotes'
@@ -64,6 +65,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBibliotecaMestraRoute = AppBibliotecaMestraRouteImport.update({
+  id: '/biblioteca-mestra',
+  path: '/biblioteca-mestra',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBibliotecaRoute = AppBibliotecaRouteImport.update({
   id: '/biblioteca',
   path: '/biblioteca',
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/biblioteca': typeof AppBibliotecaRoute
+  '/biblioteca-mestra': typeof AppBibliotecaMestraRoute
   '/dashboard': typeof AppDashboardRoute
   '/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/documentos': typeof AppDocumentosRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/biblioteca': typeof AppBibliotecaRoute
+  '/biblioteca-mestra': typeof AppBibliotecaMestraRoute
   '/dashboard': typeof AppDashboardRoute
   '/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/documentos': typeof AppDocumentosRoute
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/_app/biblioteca': typeof AppBibliotecaRoute
+  '/_app/biblioteca-mestra': typeof AppBibliotecaMestraRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/_app/documentos': typeof AppDocumentosRoute
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/biblioteca'
+    | '/biblioteca-mestra'
     | '/dashboard'
     | '/decomposicao-precos'
     | '/documentos'
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/biblioteca'
+    | '/biblioteca-mestra'
     | '/dashboard'
     | '/decomposicao-precos'
     | '/documentos'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/auth'
     | '/_app/biblioteca'
+    | '/_app/biblioteca-mestra'
     | '/_app/dashboard'
     | '/_app/decomposicao-precos'
     | '/_app/documentos'
@@ -268,6 +280,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/biblioteca-mestra': {
+      id: '/_app/biblioteca-mestra'
+      path: '/biblioteca-mestra'
+      fullPath: '/biblioteca-mestra'
+      preLoaderRoute: typeof AppBibliotecaMestraRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/biblioteca': {
       id: '/_app/biblioteca'
       path: '/biblioteca'
@@ -335,6 +354,7 @@ const AppProcurementPacotesRouteWithChildren =
 
 interface AppRouteChildren {
   AppBibliotecaRoute: typeof AppBibliotecaRoute
+  AppBibliotecaMestraRoute: typeof AppBibliotecaMestraRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDecomposicaoPrecosRoute: typeof AppDecomposicaoPrecosRoute
   AppDocumentosRoute: typeof AppDocumentosRoute
@@ -349,6 +369,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppBibliotecaRoute: AppBibliotecaRoute,
+  AppBibliotecaMestraRoute: AppBibliotecaMestraRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDecomposicaoPrecosRoute: AppDecomposicaoPrecosRoute,
   AppDocumentosRoute: AppDocumentosRoute,
