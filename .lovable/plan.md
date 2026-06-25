@@ -1,90 +1,130 @@
-# Classificador Inteligente de Pacotes de Consulta
+# Fase 1 — Biblioteca Mestra do MV OS
 
-Refatoração completa do sistema de classificação para suportar análise contextual, scoring multi-pacote, aprendizagem global e auditoria automática.
+## Objetivo
+Construir o núcleo de conhecimento da aplicação. Toda a informação técnica passa a viver aqui e alimenta os restantes módulos (Orçamentação, Procurement, Financeira, IA).
 
-## 1. Base de dados (1 migration)
+Nesta fase **não** existe IA. Apenas a base sólida, editável e escalável.
 
-**Tabela nova `classificacao_aprendizagem`** (global, partilhada entre obras):
-- descricao_original (texto)
-- descricao_normalizada (texto, indexado — minúsculas, sem acentos, sem números soltos)
-- codigo_artigo
-- capitulo, subcapitulo
-- especialidade_sugerida (o que o motor sugeriu)
-- especialidade_final (o que o utilizador escolheu)
-- confianca_sugerida (0–1)
-- obra_id, user_id, acao (move/add/remove/change)
-- created_at
-- RLS: leitura por qualquer autenticado (aprendizagem é global); escrita só do próprio user_id
+---
 
-**Tabela nova `classificacao_cache`**:
-- hash (sha256 da descrição+capítulo+vizinhos) — PK
-- resultado_json (scores por pacote + justificação)
-- modelo (regras / ia) + created_at
-- Evita pagar IA várias vezes pelo mesmo artigo
+## Nova arquitetura
 
-**Coluna nova em `procurement_pacote_artigos`**:
-- confianca (numeric)
-- motivo (texto)
-- sinalizado_revisao (bool) — para auditoria
+```text
+Especialidade
+   └── Subespecialidade
+          └── Artigo Mestre
+                 ├── Palavras-chave (positivas / negativas)
+                 ├── Observações
+                 └── Unidade / Código / Estado
+```
 
-## 2. Motor de classificação (`src/lib/procurement/classifier.ts`)
+Os **Pacotes de Consulta** deixam de pertencer à Biblioteca. Continuam a existir no módulo **Procurement** como agrupamentos livres de artigos (cross-subespecialidade).
 
-Novo módulo orquestrador (mantém `especialidades.ts` como camada de regras):
+Os **Templates de Obra** definem que Pacotes de Consulta tipicamente se usam por tipo de obra (Reabilitação, Moradia, Edifício, Construção Nova) — **não** contêm artigos.
 
-**Pipeline para cada artigo**:
-1. **Aprendizagem** — procura na `classificacao_aprendizagem` por descrição normalizada igual ou muito semelhante (similaridade Jaccard sobre tokens). Se houver ≥3 ocorrências consistentes da mesma especialidade → confiança 0.98, motivo "aprendido com X correções".
-2. **Contexto estrutural** — usa código do capítulo + nome (ex.: cap. 12 → cobertura; cap. 3 → demolições; cap. 4.2 → terraplanagens). Bloqueia automaticamente pacotes incompatíveis.
-3. **Scoring multi-pacote** — corre regex existentes mas devolve `Map<Especialidade, score 0–100>` em vez de só um vencedor. Aplica pesos:
-   - palavra-chave forte no início da descrição: +30
-   - palavra-chave no capítulo: +25
-   - vizinhos imediatos (mesmo subcapítulo) com a mesma classificação: +15
-   - exclusões duras (ex.: "tela em fundações" para Cobertura): -100
-4. **Confiança híbrida** — se top1 < 0.85 OU top1−top2 < 0.10 (ambíguo): chama IA.
-5. **IA (Gemini via Lovable AI Gateway)** — server function que recebe descrição + capítulo + 2 vizinhos anteriores + 2 seguintes + lista de pacotes disponíveis. Devolve JSON estruturado com score por pacote + justificação curta. Cache por hash.
-6. **Resultado final**: especialidade, confiança, motivo, scores_alternativos[].
+---
 
-## 3. Auditoria pós-geração
+## Base de dados (novas tabelas)
 
-Quando se cria um pacote, depois de inserir os artigos, corre uma segunda passagem:
+Migração única, com GRANTs e RLS (acesso a utilizadores autenticados):
 
-**Para cada artigo no pacote**: re-pergunta "este artigo pertence a esta especialidade?" Se confiança < 0.7 → marca `sinalizado_revisao=true`.
+- `biblioteca_especialidades` — `nome`, `codigo`, `descricao`, `ordem`, `ativa`
+- `biblioteca_subespecialidades` — `especialidade_id`, `nome`, `codigo`, `descricao`, `ordem`, `ativa`
+- `biblioteca_artigos` — `subespecialidade_id`, `codigo`, `descricao`, `unidade`, `observacoes`, `ativo`
+- `biblioteca_artigo_keywords` — `artigo_id`, `termo`, `tipo` ('positiva' | 'negativa')
+- `templates_obra` — `nome`, `descricao`, `ativa`
+- `template_obra_pacotes` — `template_id`, `pacote_id` (FK para `procurement_pacotes`)
 
-**Para cada artigo NÃO no pacote (no orçamento)**: corre classificador; se top1 == especialidade do pacote E confiança ≥ 0.85 → adiciona à lista de "artigos sugeridos em falta" mostrada na UI.
+Índices em FKs e em `lower(nome)` / `lower(termo)` para pesquisa global.
 
-## 4. UI
+A tabela existente `artigos_biblioteca` (histórico de preços alimentado pelos orçamentos) **mantém-se intacta** — é outro conceito (preços de referência). Será apenas renomeada visualmente no menu para evitar confusão.
 
-**Em `procurement.pacotes.$id.tsx`**:
-- Badge de confiança ao lado de cada artigo (verde ≥85%, amarelo 70–85%, vermelho <70%)
-- Tooltip mostra o motivo + scores alternativos
-- Botão **"Reanalisar pacote"** no topo — corre auditoria, mostra:
-  - artigos sinalizados para revisão (com sugestão de pacote alternativo)
-  - artigos em falta sugeridos (com botão "adicionar")
-- Quando utilizador move/remove/adiciona artigo → grava em `classificacao_aprendizagem`
+---
 
-**Em `procurement.pacotes.tsx`** (criação):
-- Usa novo motor em vez do filtro simples por capítulo
-- Mostra contagem prevista por especialidade com confiança média
+## Estrutura de navegação
 
-## 5. Servidor
+Novo grupo no sidebar **"Biblioteca Mestra"**, substituindo o atual item "Biblioteca de Artigos":
 
-Server functions novas (`src/lib/procurement/classifier.functions.ts`):
-- `reanalisarPacote({ pacoteId })` → corre auditoria, devolve sinalizados + sugestões
-- `classificarLote({ artigos, obraId })` → corre pipeline com IA quando preciso, usa cache
-- `registarCorrecao({ artigo, especialidadeAnterior, especialidadeFinal, acao })` → grava em `classificacao_aprendizagem`
+```text
+Biblioteca Mestra
+ ├── Especialidades
+ ├── Subespecialidades
+ ├── Artigos Mestre
+ ├── Palavras-chave
+ └── Templates de Obra
+```
 
-## Detalhes técnicos
+Rotas TanStack (todas sob `_app/`):
 
-- IA: `google/gemini-2.5-flash` via `https://ai.gateway.lovable.dev/v1/chat/completions`, JSON mode, prompt em PT-PT
-- Normalização: `descricao.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'').replace(/\d+/g,' ').replace(/\s+/g,' ').trim()`
-- Cache: `crypto.createHash('sha256').update(desc+chap+vizinhos).digest('hex')`
-- Similaridade: Jaccard sobre tokens com stopwords PT removidas
+- `biblioteca-mestra.tsx` — layout com `<Outlet />` + browser tipo Explorador
+- `biblioteca-mestra.index.tsx` — vista raiz (explorador)
+- `biblioteca-mestra.especialidades.tsx`
+- `biblioteca-mestra.subespecialidades.tsx`
+- `biblioteca-mestra.artigos.tsx`
+- `biblioteca-mestra.keywords.tsx`
+- `biblioteca-mestra.templates.tsx`
 
-## Ordem de execução
+O item antigo "Biblioteca de Artigos" é renomeado para **"Histórico de Preços"** (mesma página, mesma tabela) — para não perder a informação já existente nem confundir conceitos.
 
-1. Migration (tabelas + colunas)
-2. Server functions + cliente IA
-3. Refactor `classifier.ts` orquestrador
-4. UI: badges, botão reanalisar, painel auditoria
-5. Hooks de aprendizagem em todas as ações (move/add/remove)
+Os Pacotes de Consulta permanecem em **Procurement → Pacotes de Consulta** (sem mudança nesta fase).
 
-Sem alterações à formatação do Excel nem aos pacotes especiais já existentes (Betão continua com `isBetaoArtigo`, mas agora também passa pela auditoria).
+---
+
+## Interface — Explorador de Conhecimento
+
+Vista principal em duas colunas, semelhante ao Explorador do Windows:
+
+```text
+┌─────────────────────┬─────────────────────────────────┐
+│ ▸ Estruturas        │  Subespecialidades de Estruturas│
+│   ▾ Envolvente      │  ─────────────────────────────  │
+│      • Fachadas     │  Nome      Código   Nº Artigos │
+│      • ETICS        │  Fachadas  ENV-FAC      12     │
+│   ▸ Acabamentos     │  ETICS     ENV-ETI       8     │
+│   ▸ Especialidades  │  ...                            │
+│   ▸ Arranjos Ext.   │                                 │
+│   ▸ Finalização     │                                 │
+└─────────────────────┴─────────────────────────────────┘
+```
+
+- Clique numa especialidade → painel direito lista subespecialidades
+- Clique numa subespecialidade → lista artigos
+- Clique num artigo → painel de detalhe (descrição, palavras-chave +/−, observações, estado)
+- Toolbar superior com **pesquisa global** (nome, código, descrição, especialidade, subespecialidade, palavras-chave) e botões **+ Novo** contextuais
+- Drag-and-drop / botões ↑↓ para reordenar especialidades
+- Ações CRUD inline (editar, eliminar, ativar/desativar)
+
+Componentes a criar em `src/components/biblioteca-mestra/`:
+- `KnowledgeExplorer.tsx` (árvore + painel direito)
+- `EspecialidadeForm.tsx`, `SubespecialidadeForm.tsx`, `ArtigoMestreForm.tsx`
+- `KeywordEditor.tsx` (tags +/− por artigo)
+- `TemplateObraForm.tsx`
+- `GlobalSearch.tsx`
+
+---
+
+## Seed inicial (via migração)
+
+**Especialidades:** Estruturas, Envolvente, Acabamentos, Especialidades Técnicas, Arranjos Exteriores, Finalização.
+
+**Templates de Obra (vazios de pacotes):** Reabilitação, Moradia, Edifício, Construção Nova.
+
+Subespecialidades e artigos serão criados pelo utilizador (ou importados posteriormente). Não migro automaticamente o catálogo hard-coded em `src/lib/procurement/especialidades.ts` — esse continua a alimentar o classificador legacy do Procurement até a Biblioteca Mestra estar populada.
+
+---
+
+## Fora do âmbito desta fase
+
+- Qualquer funcionalidade de IA (sugestão de template, auto-classificação)
+- Refactor do Procurement / Orçamentação para consumir a Biblioteca Mestra (será fase seguinte)
+- Importação massiva de artigos a partir de mapas existentes
+
+---
+
+## Resumo da entrega
+
+1. Migração SQL (6 tabelas + GRANTs + RLS + seed de especialidades e templates)
+2. Novo grupo "Biblioteca Mestra" no sidebar; renomear "Biblioteca de Artigos" → "Histórico de Preços"
+3. 6 rotas novas em `src/routes/_app/biblioteca-mestra.*`
+4. Componentes do Explorador + formulários CRUD + pesquisa global
+5. Sem alterações ao Procurement nem ao Orçamento nesta fase
