@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
@@ -77,6 +77,42 @@ function CategoriasPage() {
   const [moveArtEsp, setMoveArtEsp] = useState<string>("");
   const [moveArtSub, setMoveArtSub] = useState<string>("");
   const [moveArtCat, setMoveArtCat] = useState<string>("");
+
+  const [espW, setEspW] = useState<number>(() => {
+    if (typeof window === "undefined") return 280;
+    const v = Number(window.localStorage.getItem("bm-cat-espW"));
+    return v >= 160 && v <= 600 ? v : 280;
+  });
+  const [subW, setSubW] = useState<number>(() => {
+    if (typeof window === "undefined") return 280;
+    const v = Number(window.localStorage.getItem("bm-cat-subW"));
+    return v >= 160 && v <= 600 ? v : 280;
+  });
+  useEffect(() => { window.localStorage.setItem("bm-cat-espW", String(espW)); }, [espW]);
+  useEffect(() => { window.localStorage.setItem("bm-cat-subW", String(subW)); }, [subW]);
+
+  const startResize = (which: "esp" | "sub") => (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = which === "esp" ? espW : subW;
+    const setter = which === "esp" ? setEspW : setSubW;
+    const prevCursor = document.body.style.cursor;
+    const prevSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.min(600, Math.max(180, startW + (ev.clientX - startX)));
+      setter(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevSelect;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   const { data: esps = [] } = useQuery({
     queryKey: ["bm-esp"],
@@ -407,9 +443,16 @@ function CategoriasPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_280px_1fr] gap-4">
+        <div
+          className="flex flex-col lg:flex-row gap-4 items-stretch"
+        >
           {/* Especialidades */}
-          <Card className="bg-card border-border p-2 h-fit">
+          <Card style={{ width: espW }} className="bg-card border-border p-2 h-fit shrink-0 relative w-full lg:w-auto">
+            <div
+              onMouseDown={startResize("esp")}
+              title="Arrastar para redimensionar"
+              className="hidden lg:block absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors"
+            />
             <div className="px-2 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Especialidades</div>
             <ul className="space-y-0.5">
               {esps.filter((e) => !searching || matchedEspIds.has(e.id)).map((e) => {
@@ -434,7 +477,12 @@ function CategoriasPage() {
           </Card>
 
           {/* Subespecialidades */}
-          <Card className="bg-card border-border p-2 h-fit">
+          <Card style={{ width: subW }} className="bg-card border-border p-2 h-fit shrink-0 relative w-full lg:w-auto">
+            <div
+              onMouseDown={startResize("sub")}
+              title="Arrastar para redimensionar"
+              className="hidden lg:block absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors"
+            />
             <div className="px-2 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Subespecialidades</div>
             <ul className="space-y-0.5">
               {visibleSubs.map((s) => {
@@ -464,7 +512,7 @@ function CategoriasPage() {
           </Card>
 
           {/* Categorias */}
-          <Card className="bg-card border-border">
+          <Card className="bg-card border-border flex-1 min-w-0">
             <div className="flex items-center justify-between p-4 border-b border-border">
               <div>
                 <h2 className="text-base font-semibold">
