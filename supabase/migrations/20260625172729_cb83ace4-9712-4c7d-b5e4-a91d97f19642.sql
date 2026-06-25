@@ -1,0 +1,2 @@
+ALTER TABLE public.biblioteca_categorias DROP CONSTRAINT biblioteca_categorias_subespecialidade_id_fkey, ADD CONSTRAINT biblioteca_categorias_subespecialidade_id_fkey FOREIGN KEY (subespecialidade_id) REFERENCES public.biblioteca_subespecialidades(id) ON DELETE CASCADE;
+ALTER TABLE public.biblioteca_artigos DROP CONSTRAINT biblioteca_artigos_categoria_id_fkey, ADD CONSTRAINT biblioteca_artigos_categoria_id_fkey FOREIGN KEY (categoria_id) REFERENCES public.biblioteca_categorias(id) ON DELETE CASCADE;
