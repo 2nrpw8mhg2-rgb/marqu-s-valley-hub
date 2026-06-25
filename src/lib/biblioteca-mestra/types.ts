@@ -90,7 +90,6 @@ export const ARTIGO_TIPOS: { value: ArtigoTipo; label: string }[] = [
 
 export const ARTIGO_ESTADOS_IA: { value: ArtigoEstadoIA; label: string; dot: string; className: string }[] = [
   { value: "validado", label: "Validado", dot: "bg-green-500", className: "text-green-700 dark:text-green-400 border-green-500/40" },
-  { value: "revisto", label: "Revisto", dot: "bg-yellow-500", className: "text-yellow-700 dark:text-yellow-400 border-yellow-500/40" },
-  { value: "criado_auto", label: "Criado automaticamente", dot: "bg-blue-500", className: "text-blue-700 dark:text-blue-400 border-blue-500/40" },
-  { value: "pendente", label: "Pendente de validação", dot: "bg-red-500", className: "text-red-700 dark:text-red-400 border-red-500/40" },
+  { value: "criado_auto", label: "IA", dot: "bg-blue-500", className: "text-blue-700 dark:text-blue-400 border-blue-500/40" },
+  { value: "obsoleto", label: "Obsoleto", dot: "bg-yellow-500", className: "text-yellow-700 dark:text-yellow-400 border-yellow-500/40" },
 ];
