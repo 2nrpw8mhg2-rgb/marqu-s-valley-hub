@@ -10,6 +10,8 @@ import {
   ShoppingCart,
   Sparkles,
   LogOut,
+  Library,
+  History,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -30,11 +32,22 @@ const sections: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
+    title: "Biblioteca Mestra",
+    items: [
+      { to: "/biblioteca-mestra", label: "Explorador", icon: Library },
+      { to: "/biblioteca-mestra/especialidades", label: "Especialidades", icon: BookMarked },
+      { to: "/biblioteca-mestra/subespecialidades", label: "Subespecialidades", icon: Layers },
+      { to: "/biblioteca-mestra/artigos", label: "Artigos Mestre", icon: FileText },
+      { to: "/biblioteca-mestra/keywords", label: "Palavras-chave", icon: Sparkles },
+      { to: "/biblioteca-mestra/templates", label: "Templates de Obra", icon: HardHat },
+    ],
+  },
+  {
     title: "Fase 2 — Orçamentação",
     items: [
       { to: "/orcamentos", label: "Orçamentos", icon: Calculator },
       { to: "/decomposicao-precos", label: "Decomposição de Preços", icon: Layers },
-      { to: "/biblioteca", label: "Biblioteca de Artigos", icon: BookMarked },
+      { to: "/biblioteca", label: "Histórico de Preços", icon: History },
     ],
   },
   {

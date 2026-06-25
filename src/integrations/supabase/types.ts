@@ -61,6 +61,159 @@ export type Database = {
           },
         ]
       }
+      biblioteca_artigo_keywords: {
+        Row: {
+          artigo_id: string
+          created_at: string
+          id: string
+          termo: string
+          tipo: Database["public"]["Enums"]["biblioteca_keyword_tipo"]
+        }
+        Insert: {
+          artigo_id: string
+          created_at?: string
+          id?: string
+          termo: string
+          tipo?: Database["public"]["Enums"]["biblioteca_keyword_tipo"]
+        }
+        Update: {
+          artigo_id?: string
+          created_at?: string
+          id?: string
+          termo?: string
+          tipo?: Database["public"]["Enums"]["biblioteca_keyword_tipo"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_artigo_keywords_artigo_id_fkey"
+            columns: ["artigo_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      biblioteca_artigos: {
+        Row: {
+          ativo: boolean
+          codigo: string | null
+          created_at: string
+          descricao: string
+          id: string
+          observacoes: string | null
+          subespecialidade_id: string
+          unidade: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo?: string | null
+          created_at?: string
+          descricao: string
+          id?: string
+          observacoes?: string | null
+          subespecialidade_id: string
+          unidade?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string | null
+          created_at?: string
+          descricao?: string
+          id?: string
+          observacoes?: string | null
+          subespecialidade_id?: string
+          unidade?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_artigos_subespecialidade_id_fkey"
+            columns: ["subespecialidade_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_subespecialidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      biblioteca_especialidades: {
+        Row: {
+          ativa: boolean
+          codigo: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          codigo?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          codigo?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      biblioteca_subespecialidades: {
+        Row: {
+          ativa: boolean
+          codigo: string | null
+          created_at: string
+          descricao: string | null
+          especialidade_id: string
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          codigo?: string | null
+          created_at?: string
+          descricao?: string | null
+          especialidade_id: string
+          id?: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          codigo?: string | null
+          created_at?: string
+          descricao?: string | null
+          especialidade_id?: string
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_subespecialidades_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_especialidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classificacao_aprendizagem: {
         Row: {
           acao: string
@@ -740,6 +893,72 @@ export type Database = {
         }
         Relationships: []
       }
+      template_obra_pacotes: {
+        Row: {
+          created_at: string
+          id: string
+          ordem: number
+          pacote_id: string
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ordem?: number
+          pacote_id: string
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ordem?: number
+          pacote_id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_obra_pacotes_pacote_id_fkey"
+            columns: ["pacote_id"]
+            isOneToOne: false
+            referencedRelation: "procurement_pacotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_obra_pacotes_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates_obra"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      templates_obra: {
+        Row: {
+          ativa: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -780,6 +999,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "orcamentista" | "diretor_obra" | "comprador"
+      biblioteca_keyword_tipo: "positiva" | "negativa"
       documento_tipo:
         | "projeto"
         | "mq"
@@ -928,6 +1148,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "orcamentista", "diretor_obra", "comprador"],
+      biblioteca_keyword_tipo: ["positiva", "negativa"],
       documento_tipo: [
         "projeto",
         "mq",
