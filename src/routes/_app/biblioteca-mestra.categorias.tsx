@@ -529,7 +529,16 @@ function CategoriasPage() {
           </Card>
 
           {/* Categorias */}
-          <Card className="bg-card border-border flex-1 min-w-0">
+          <Card
+            style={catW != null ? { width: catW, flex: "0 0 auto" } : undefined}
+            className="bg-card border-border flex-1 min-w-0 relative"
+          >
+            <div
+              onMouseDown={startResize("cat")}
+              onDoubleClick={() => setCatW(null)}
+              title="Arrastar para redimensionar (duplo clique para repor)"
+              className="hidden lg:block absolute top-0 left-0 h-full w-1.5 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors z-10"
+            />
             <div className="flex items-center justify-between p-4 border-b border-border">
               <div>
                 <h2 className="text-base font-semibold">
