@@ -443,9 +443,16 @@ function CategoriasPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_280px_1fr] gap-4">
+        <div
+          className="flex flex-col lg:flex-row gap-4 items-stretch"
+        >
           {/* Especialidades */}
-          <Card className="bg-card border-border p-2 h-fit">
+          <Card style={{ width: espW }} className="bg-card border-border p-2 h-fit shrink-0 relative w-full lg:w-auto">
+            <div
+              onMouseDown={startResize("esp")}
+              title="Arrastar para redimensionar"
+              className="hidden lg:block absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors"
+            />
             <div className="px-2 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Especialidades</div>
             <ul className="space-y-0.5">
               {esps.filter((e) => !searching || matchedEspIds.has(e.id)).map((e) => {
