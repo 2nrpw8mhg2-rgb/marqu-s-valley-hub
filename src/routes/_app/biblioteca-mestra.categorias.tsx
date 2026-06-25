@@ -78,6 +78,42 @@ function CategoriasPage() {
   const [moveArtSub, setMoveArtSub] = useState<string>("");
   const [moveArtCat, setMoveArtCat] = useState<string>("");
 
+  const [espW, setEspW] = useState<number>(() => {
+    if (typeof window === "undefined") return 280;
+    const v = Number(window.localStorage.getItem("bm-cat-espW"));
+    return v >= 160 && v <= 600 ? v : 280;
+  });
+  const [subW, setSubW] = useState<number>(() => {
+    if (typeof window === "undefined") return 280;
+    const v = Number(window.localStorage.getItem("bm-cat-subW"));
+    return v >= 160 && v <= 600 ? v : 280;
+  });
+  useEffect(() => { window.localStorage.setItem("bm-cat-espW", String(espW)); }, [espW]);
+  useEffect(() => { window.localStorage.setItem("bm-cat-subW", String(subW)); }, [subW]);
+
+  const startResize = (which: "esp" | "sub") => (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = which === "esp" ? espW : subW;
+    const setter = which === "esp" ? setEspW : setSubW;
+    const prevCursor = document.body.style.cursor;
+    const prevSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.min(600, Math.max(180, startW + (ev.clientX - startX)));
+      setter(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevSelect;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
   const { data: esps = [] } = useQuery({
     queryKey: ["bm-esp"],
     queryFn: async () => (await supabase.from("biblioteca_especialidades").select("*").order("ordem")).data as Especialidade[],
