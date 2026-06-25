@@ -23,6 +23,7 @@ import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos
 import { Route as AppBibliotecaMestraIndexRouteImport } from './routes/_app/biblioteca-mestra.index'
 import { Route as AppProcurementPacotesRouteImport } from './routes/_app/procurement.pacotes'
 import { Route as AppOrcamentosDecomposicaoRouteImport } from './routes/_app/orcamentos.decomposicao'
+import { Route as AppBibliotecaMestraTemplatesRouteImport } from './routes/_app/biblioteca-mestra.templates'
 import { Route as AppBibliotecaMestraSubespecialidadesRouteImport } from './routes/_app/biblioteca-mestra.subespecialidades'
 import { Route as AppBibliotecaMestraKeywordsRouteImport } from './routes/_app/biblioteca-mestra.keywords'
 import { Route as AppBibliotecaMestraEspecialidadesRouteImport } from './routes/_app/biblioteca-mestra.especialidades'
@@ -102,6 +103,12 @@ const AppOrcamentosDecomposicaoRoute =
     path: '/orcamentos/decomposicao',
     getParentRoute: () => AppRoute,
   } as any)
+const AppBibliotecaMestraTemplatesRoute =
+  AppBibliotecaMestraTemplatesRouteImport.update({
+    id: '/templates',
+    path: '/templates',
+    getParentRoute: () => AppBibliotecaMestraRoute,
+  } as any)
 const AppBibliotecaMestraSubespecialidadesRoute =
   AppBibliotecaMestraSubespecialidadesRouteImport.update({
     id: '/subespecialidades',
@@ -157,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
   '/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
   '/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
+  '/biblioteca-mestra/templates': typeof AppBibliotecaMestraTemplatesRoute
   '/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/procurement/pacotes': typeof AppProcurementPacotesRouteWithChildren
   '/biblioteca-mestra/': typeof AppBibliotecaMestraIndexRoute
@@ -178,6 +186,7 @@ export interface FileRoutesByTo {
   '/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
   '/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
   '/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
+  '/biblioteca-mestra/templates': typeof AppBibliotecaMestraTemplatesRoute
   '/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/procurement/pacotes': typeof AppProcurementPacotesRouteWithChildren
   '/biblioteca-mestra': typeof AppBibliotecaMestraIndexRoute
@@ -202,6 +211,7 @@ export interface FileRoutesById {
   '/_app/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
   '/_app/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
   '/_app/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
+  '/_app/biblioteca-mestra/templates': typeof AppBibliotecaMestraTemplatesRoute
   '/_app/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/_app/procurement/pacotes': typeof AppProcurementPacotesRouteWithChildren
   '/_app/biblioteca-mestra/': typeof AppBibliotecaMestraIndexRoute
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
     | '/biblioteca-mestra/especialidades'
     | '/biblioteca-mestra/keywords'
     | '/biblioteca-mestra/subespecialidades'
+    | '/biblioteca-mestra/templates'
     | '/orcamentos/decomposicao'
     | '/procurement/pacotes'
     | '/biblioteca-mestra/'
@@ -247,6 +258,7 @@ export interface FileRouteTypes {
     | '/biblioteca-mestra/especialidades'
     | '/biblioteca-mestra/keywords'
     | '/biblioteca-mestra/subespecialidades'
+    | '/biblioteca-mestra/templates'
     | '/orcamentos/decomposicao'
     | '/procurement/pacotes'
     | '/biblioteca-mestra'
@@ -270,6 +282,7 @@ export interface FileRouteTypes {
     | '/_app/biblioteca-mestra/especialidades'
     | '/_app/biblioteca-mestra/keywords'
     | '/_app/biblioteca-mestra/subespecialidades'
+    | '/_app/biblioteca-mestra/templates'
     | '/_app/orcamentos/decomposicao'
     | '/_app/procurement/pacotes'
     | '/_app/biblioteca-mestra/'
@@ -385,6 +398,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrcamentosDecomposicaoRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/biblioteca-mestra/templates': {
+      id: '/_app/biblioteca-mestra/templates'
+      path: '/templates'
+      fullPath: '/biblioteca-mestra/templates'
+      preLoaderRoute: typeof AppBibliotecaMestraTemplatesRouteImport
+      parentRoute: typeof AppBibliotecaMestraRoute
+    }
     '/_app/biblioteca-mestra/subespecialidades': {
       id: '/_app/biblioteca-mestra/subespecialidades'
       path: '/subespecialidades'
@@ -442,6 +462,7 @@ interface AppBibliotecaMestraRouteChildren {
   AppBibliotecaMestraEspecialidadesRoute: typeof AppBibliotecaMestraEspecialidadesRoute
   AppBibliotecaMestraKeywordsRoute: typeof AppBibliotecaMestraKeywordsRoute
   AppBibliotecaMestraSubespecialidadesRoute: typeof AppBibliotecaMestraSubespecialidadesRoute
+  AppBibliotecaMestraTemplatesRoute: typeof AppBibliotecaMestraTemplatesRoute
   AppBibliotecaMestraIndexRoute: typeof AppBibliotecaMestraIndexRoute
 }
 
@@ -452,6 +473,7 @@ const AppBibliotecaMestraRouteChildren: AppBibliotecaMestraRouteChildren = {
   AppBibliotecaMestraKeywordsRoute: AppBibliotecaMestraKeywordsRoute,
   AppBibliotecaMestraSubespecialidadesRoute:
     AppBibliotecaMestraSubespecialidadesRoute,
+  AppBibliotecaMestraTemplatesRoute: AppBibliotecaMestraTemplatesRoute,
   AppBibliotecaMestraIndexRoute: AppBibliotecaMestraIndexRoute,
 }
 
