@@ -17,9 +17,20 @@ export type Subespecialidade = {
   ativa: boolean;
 };
 
+export type Categoria = {
+  id: string;
+  subespecialidade_id: string;
+  nome: string;
+  codigo: string | null;
+  descricao: string | null;
+  ordem: number;
+  ativa: boolean;
+};
+
 export type ArtigoMestre = {
   id: string;
   subespecialidade_id: string;
+  categoria_id: string;
   codigo: string | null;
   descricao: string;
   unidade: string | null;
