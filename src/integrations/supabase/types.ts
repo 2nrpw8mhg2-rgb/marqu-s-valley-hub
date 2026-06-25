@@ -1149,11 +1149,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "orcamentista" | "diretor_obra" | "comprador"
-      biblioteca_artigo_estado_ia:
-        | "validado"
-        | "revisto"
-        | "criado_auto"
-        | "pendente"
+      biblioteca_artigo_estado_ia: "validado" | "criado_auto" | "obsoleto"
       biblioteca_artigo_tipo:
         | "servico"
         | "material"
@@ -1313,12 +1309,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "orcamentista", "diretor_obra", "comprador"],
-      biblioteca_artigo_estado_ia: [
-        "validado",
-        "revisto",
-        "criado_auto",
-        "pendente",
-      ],
+      biblioteca_artigo_estado_ia: ["validado", "criado_auto", "obsoleto"],
       biblioteca_artigo_tipo: [
         "servico",
         "material",
