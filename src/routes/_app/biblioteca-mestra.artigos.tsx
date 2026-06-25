@@ -365,20 +365,25 @@ function ArtigosPage() {
                 <TableHead className="w-24">Código</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead>Categoria</TableHead>
+                <TableHead className="w-28">Tipo</TableHead>
                 <TableHead className="w-16">Un.</TableHead>
+                <TableHead className="w-36">Estado IA</TableHead>
                 <TableHead>Palavras-chave</TableHead>
                 <TableHead className="w-40 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">A carregar...</TableCell></TableRow>}
-              {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">Sem artigos</TableCell></TableRow>}
+              {isLoading && <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground">A carregar...</TableCell></TableRow>}
+              {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground">Sem artigos</TableCell></TableRow>}
               {filtered.map((r) => {
                 const sub = subMap.get(r.subespecialidade_id);
                 const esp = sub ? espMap.get(sub.especialidade_id) : null;
                 const cat = catMap.get(r.categoria_id);
                 const isPorClassificar = cat?.nome === "Por Classificar" && cat.ordem === 0;
                 const arrKw = kwsByArt.get(r.id) ?? [];
+                const tipoLabel = ARTIGO_TIPOS.find((t) => t.value === r.tipo)?.label ?? r.tipo;
+                const estado = ARTIGO_ESTADOS_IA.find((s) => s.value === r.estado_ia);
+                const unidade = unidades.find((u) => u.id === r.unidade_id);
                 return (
                   <TableRow key={r.id} className={isPorClassificar ? "bg-amber-50/40 dark:bg-amber-900/10" : ""}>
                     <TableCell><Checkbox checked={selected.has(r.id)} onCheckedChange={() => toggleOne(r.id)} /></TableCell>
@@ -388,7 +393,16 @@ function ArtigosPage() {
                       <div className="text-muted-foreground text-xs">{esp?.nome} / {sub?.nome ?? "—"}</div>
                       <div className={isPorClassificar ? "text-amber-700 dark:text-amber-400 font-medium" : ""}>{cat?.nome ?? "—"}</div>
                     </TableCell>
-                    <TableCell>{r.unidade ?? "—"}</TableCell>
+                    <TableCell><Badge variant="outline" className="text-xs">{tipoLabel}</Badge></TableCell>
+                    <TableCell>{unidade?.simbolo ?? r.unidade ?? "—"}</TableCell>
+                    <TableCell>
+                      {estado && (
+                        <Badge variant="outline" className={`gap-1.5 ${estado.className}`}>
+                          <span className={`inline-block h-2 w-2 rounded-full ${estado.dot}`} />
+                          {estado.label}
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {arrKw.slice(0, 5).map((k) => (
