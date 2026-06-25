@@ -291,6 +291,45 @@ function CategoriasPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const removeArtigo = useMutation({
+    mutationFn: async (a: ArtigoMestre) => {
+      const { error } = await supabase.from("biblioteca_artigos").delete().eq("id", a.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["bm-art"] });
+      qc.invalidateQueries({ queryKey: ["bm-art-cat-counts"] });
+      setDeleteArt(null);
+      toast.success("Artigo eliminado");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleAtivoArtigo = useMutation({
+    mutationFn: async (a: ArtigoMestre) => {
+      const { error } = await supabase.from("biblioteca_artigos").update({ ativo: !a.ativo }).eq("id", a.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["bm-art"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const moveArtigo = useMutation({
+    mutationFn: async ({ a, categoria_id }: { a: ArtigoMestre; categoria_id: string }) => {
+      const cat = cats.find((c) => c.id === categoria_id);
+      if (!cat) throw new Error("Categoria inválida");
+      const { error } = await supabase.from("biblioteca_artigos").update({ categoria_id, subespecialidade_id: cat.subespecialidade_id }).eq("id", a.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["bm-art"] });
+      qc.invalidateQueries({ queryKey: ["bm-art-cat-counts"] });
+      setMoveArt(null);
+      toast.success("Artigo movido");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const handleMoveUpDown = (c: Categoria, dir: -1 | 1) => {
     const siblings = cats
       .filter((x) => x.subespecialidade_id === c.subespecialidade_id && !isProtected(x))
