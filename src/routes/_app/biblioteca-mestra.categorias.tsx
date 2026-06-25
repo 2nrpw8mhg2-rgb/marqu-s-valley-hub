@@ -27,6 +27,37 @@ export const Route = createFileRoute("/_app/biblioteca-mestra/categorias")({
 
 type ArtCount = { categoria_id: string; count: number };
 
+async function fetchAllArtigoCategoriaIds() {
+  const pageSize = 1000;
+  const rows: { categoria_id: string | null }[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("biblioteca_artigos")
+      .select("categoria_id")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data || data.length < pageSize) break;
+  }
+  return rows;
+}
+
+async function fetchAllArtigos() {
+  const pageSize = 1000;
+  const rows: ArtigoMestre[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("biblioteca_artigos")
+      .select("*")
+      .order("descricao")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as ArtigoMestre[]));
+    if (!data || data.length < pageSize) break;
+  }
+  return rows;
+}
+
 function CategoriasPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -62,15 +93,17 @@ function CategoriasPage() {
   const { data: artCounts = [] } = useQuery({
     queryKey: ["bm-art-cat-counts"],
     queryFn: async () => {
-      const { data } = await supabase.from("biblioteca_artigos").select("categoria_id").range(0, 99999);
+      const data = await fetchAllArtigoCategoriaIds();
       const m = new Map<string, number>();
-      (data ?? []).forEach((r) => m.set(r.categoria_id as string, (m.get(r.categoria_id as string) ?? 0) + 1));
+      data.forEach((r) => {
+        if (r.categoria_id) m.set(r.categoria_id, (m.get(r.categoria_id) ?? 0) + 1);
+      });
       return Array.from(m.entries()).map(([categoria_id, count]) => ({ categoria_id, count })) as ArtCount[];
     },
   });
   const { data: allArtigos = [] } = useQuery({
     queryKey: ["bm-art"],
-    queryFn: async () => (await supabase.from("biblioteca_artigos").select("*").order("descricao").range(0, 99999)).data as ArtigoMestre[],
+    queryFn: fetchAllArtigos,
   });
   const { data: allKws = [] } = useQuery({
     queryKey: ["bm-kw"],
