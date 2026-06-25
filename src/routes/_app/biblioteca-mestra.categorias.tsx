@@ -14,9 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowLeftRight, Lock } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowLeftRight, Lock, ChevronRight, ChevronDown, Copy, FolderInput } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Especialidade, Subespecialidade, Categoria } from "@/lib/biblioteca-mestra/types";
+import type { Especialidade, Subespecialidade, Categoria, ArtigoMestre, ArtigoKeyword, Unidade } from "@/lib/biblioteca-mestra/types";
+import { ARTIGO_TIPOS, ARTIGO_ESTADOS_IA } from "@/lib/biblioteca-mestra/types";
+import { ArtigoMestreFormDialog, type ArtigoFormState } from "@/components/biblioteca-mestra/ArtigoMestreFormDialog";
 
 export const Route = createFileRoute("/_app/biblioteca-mestra/categorias")({
   head: () => ({ meta: [{ title: "Categorias — Biblioteca Mestra — MV OS" }] }),
