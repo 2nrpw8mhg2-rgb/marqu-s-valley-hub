@@ -68,10 +68,88 @@ function CategoriasPage() {
       return Array.from(m.entries()).map(([categoria_id, count]) => ({ categoria_id, count })) as ArtCount[];
     },
   });
+  const { data: allArtigos = [] } = useQuery({
+    queryKey: ["bm-art"],
+    queryFn: async () => (await supabase.from("biblioteca_artigos").select("*").order("descricao")).data as ArtigoMestre[],
+  });
+  const { data: allKws = [] } = useQuery({
+    queryKey: ["bm-kw"],
+    queryFn: async () => (await supabase.from("biblioteca_artigo_keywords").select("*")).data as ArtigoKeyword[],
+  });
+  const { data: unidades = [] } = useQuery({
+    queryKey: ["bm-unidades"],
+    queryFn: async () => (await supabase.from("biblioteca_unidades").select("*").eq("ativa", true).order("ordem")).data as Unidade[],
+  });
 
   const espMap = useMemo(() => new Map(esps.map((e) => [e.id, e])), [esps]);
   const subMap = useMemo(() => new Map(subs.map((s) => [s.id, s])), [subs]);
   const countMap = useMemo(() => new Map(artCounts.map((a) => [a.categoria_id, a.count])), [artCounts]);
+  const artigosByCat = useMemo(() => {
+    const m = new Map<string, ArtigoMestre[]>();
+    for (const a of allArtigos) {
+      if (!m.has(a.categoria_id)) m.set(a.categoria_id, []);
+      m.get(a.categoria_id)!.push(a);
+    }
+    return m;
+  }, [allArtigos]);
+  const kwCountByArt = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const k of allKws) m.set(k.artigo_id, (m.get(k.artigo_id) ?? 0) + 1);
+    return m;
+  }, [allKws]);
+  const unidadeMap = useMemo(() => new Map(unidades.map((u) => [u.id, u])), [unidades]);
+  const defaultUnidadeId = useMemo(() => unidades.find((u) => u.codigo === "vg")?.id ?? unidades[0]?.id, [unidades]);
+
+  const toggleExpanded = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const openNewArtigo = (cat: Categoria) => {
+    setArtFormInitial({
+      ativo: true,
+      positivas: [],
+      negativas: [],
+      subespecialidade_id: cat.subespecialidade_id,
+      categoria_id: cat.id,
+      tipo: "outros",
+      estado_ia: "validado",
+      unidade_id: defaultUnidadeId,
+    });
+    setArtFormOpen(true);
+  };
+
+  const openEditArtigo = (a: ArtigoMestre) => {
+    const list = allKws.filter((k) => k.artigo_id === a.id);
+    setArtFormInitial({
+      ...a,
+      positivas: list.filter((k) => k.tipo === "positiva").map((k) => k.termo),
+      negativas: list.filter((k) => k.tipo === "negativa").map((k) => k.termo),
+    });
+    setArtFormOpen(true);
+  };
+
+  const openDuplicateArtigo = (a: ArtigoMestre) => {
+    const list = allKws.filter((k) => k.artigo_id === a.id);
+    setArtFormInitial({
+      subespecialidade_id: a.subespecialidade_id,
+      categoria_id: a.categoria_id,
+      codigo: a.codigo ?? undefined,
+      descricao: `${a.descricao} (cópia)`,
+      unidade_id: a.unidade_id,
+      tipo: a.tipo,
+      estado_ia: a.estado_ia,
+      observacoes: a.observacoes ?? undefined,
+      ativo: a.ativo,
+      positivas: list.filter((k) => k.tipo === "positiva").map((k) => k.termo),
+      negativas: list.filter((k) => k.tipo === "negativa").map((k) => k.termo),
+    });
+    setArtFormOpen(true);
+  };
+
 
   const searching = search.trim().length > 0;
   const term = search.trim().toLowerCase();
