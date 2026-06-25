@@ -36,6 +36,8 @@ function ArtigosPage() {
   const [espFilter, setEspFilter] = useState<string>("all");
   const [subFilter, setSubFilter] = useState<string>("all");
   const [catFilter, setCatFilter] = useState<string>("all");
+  const [tipoFilter, setTipoFilter] = useState<string>("all");
+  const [estadoFilter, setEstadoFilter] = useState<string>("all");
   const [onlyPorClassificar, setOnlyPorClassificar] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<EditState | null>(null);
@@ -69,6 +71,10 @@ function ArtigosPage() {
   const { data: kws = [] } = useQuery({
     queryKey: ["bm-kw"],
     queryFn: async () => (await supabase.from("biblioteca_artigo_keywords").select("*")).data as ArtigoKeyword[],
+  });
+  const { data: unidades = [] } = useQuery({
+    queryKey: ["bm-unidades"],
+    queryFn: async () => (await supabase.from("biblioteca_unidades").select("*").eq("ativa", true).order("ordem")).data as Unidade[],
   });
 
   const subMap = useMemo(() => new Map(subs.map((s) => [s.id, s])), [subs]);
