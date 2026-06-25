@@ -279,8 +279,8 @@ function ArtigosPage() {
   return (
     <>
       <PageHeader
-        title="Artigos Mestre"
-        subtitle="Conhecimento técnico atómico — cada artigo pertence a uma categoria"
+        title="Pesquisa Global de Artigos"
+        subtitle="Pesquisa transversal a toda a Biblioteca Mestra. Para navegar pela hierarquia, use o Explorador → Categorias."
         actions={<Button onClick={() => openEdit()}><Plus className="h-4 w-4 mr-1" /> Novo</Button>}
       />
       <div className="p-6 space-y-4">
