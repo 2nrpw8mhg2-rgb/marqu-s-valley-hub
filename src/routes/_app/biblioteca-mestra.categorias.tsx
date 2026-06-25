@@ -62,7 +62,7 @@ function CategoriasPage() {
   const { data: artCounts = [] } = useQuery({
     queryKey: ["bm-art-cat-counts"],
     queryFn: async () => {
-      const { data } = await supabase.from("biblioteca_artigos").select("categoria_id");
+      const { data } = await supabase.from("biblioteca_artigos").select("categoria_id").range(0, 99999);
       const m = new Map<string, number>();
       (data ?? []).forEach((r) => m.set(r.categoria_id as string, (m.get(r.categoria_id as string) ?? 0) + 1));
       return Array.from(m.entries()).map(([categoria_id, count]) => ({ categoria_id, count })) as ArtCount[];
@@ -70,7 +70,7 @@ function CategoriasPage() {
   });
   const { data: allArtigos = [] } = useQuery({
     queryKey: ["bm-art"],
-    queryFn: async () => (await supabase.from("biblioteca_artigos").select("*").order("descricao")).data as ArtigoMestre[],
+    queryFn: async () => (await supabase.from("biblioteca_artigos").select("*").order("descricao").range(0, 99999)).data as ArtigoMestre[],
   });
   const { data: allKws = [] } = useQuery({
     queryKey: ["bm-kw"],
