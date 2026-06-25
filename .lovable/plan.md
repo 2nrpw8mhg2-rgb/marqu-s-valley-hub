@@ -1,45 +1,36 @@
-## Simplificar estados dos Artigos Mestre
+## Especialidade 070 — Estruturas
 
-Reduzir o enum `biblioteca_artigo_estado_ia` aos três estados oficiais e ajustar a UI da Biblioteca Mestra.
+Mesmo padrão usado nas 040/050/060: uma única operação SQL idempotente que popula toda a hierarquia, sem alterações de frontend.
 
-### 1. Migração de base de dados
+### O que vai ser criado
 
-Recriar o tipo `biblioteca_artigo_estado_ia` apenas com:
-- `validado`
-- `criado_auto`
-- `obsoleto`
+**1 Especialidade**
+- `070` — Estruturas (ordem 70, ativa)
 
-Passos da migração (num único bloco):
-1. Criar novo tipo `biblioteca_artigo_estado_ia_new` com os três valores.
-2. Em `biblioteca_artigos`: remover o `DEFAULT` antigo, mapear valores existentes (`pendente` → `validado`, `revisto` → `validado`, `criado_auto` → `criado_auto`, `validado` → `validado`), converter a coluna para o novo tipo e voltar a aplicar `DEFAULT 'validado'`.
-3. `DROP TYPE` antigo e renomear o novo para `biblioteca_artigo_estado_ia`.
+**10 Subespecialidades** (`070.01` a `070.10`)
+- Fundações, Cofragens, Armaduras, Betão, Estruturas Metálicas, Estruturas de Madeira, Pré-fabricados, Estruturas Mistas, Reforço Estrutural, Ensaios e Controlo Estrutural
 
-Resultado: o default passa a ser `validado`, eliminando o "Pendente de validação" para tudo o que é criado manualmente.
+**24 Categorias** com códigos sequenciais `070.XX.YY`
+- 070.01: Fundações Diretas, Fundações Profundas, Blocos de Fundação
+- 070.02: Cofragens Horizontais, Cofragens Verticais, Sistemas de Cofragem, Escoramentos
+- 070.03: Aço em Varão, Malhas, Armaduras Especiais
+- 070.04: Betão Estrutural, Betonagem, Tratamentos
+- 070.05: Perfis, Montagem
+- 070.06: Madeira Estrutural, Ligações
+- 070.07: Betão Pré-fabricado, Elementos Especiais
+- 070.08: Betão + Aço, Betão + Madeira
+- 070.09: Reforço em Betão, Reforço Metálico, Reforço com Compósitos
+- 070.10: Controlo de Qualidade, Monitorização
 
-### 2. Frontend
+**~110 Artigos Mestre** — todos os listados no briefing, com `unidade_id`=`vg`, `tipo='outros'`, `estado_ia='validado'`, `ativo=true`.
 
-- `src/lib/biblioteca-mestra/types.ts`
-  - `ArtigoEstadoIA = "validado" | "criado_auto" | "obsoleto"`
-  - `ARTIGO_ESTADOS_IA`:
-    - `validado` — label "Validado", ponto verde
-    - `criado_auto` — label "IA", ponto azul
-    - `obsoleto` — label "Obsoleto", ponto amarelo
-  - Sem entradas vermelhas / sem `pendente` / sem `revisto`.
+**Keywords** (`biblioteca_especialidade_keywords`)
+- 34 positivas (fundação, sapata, estaca, cofragem, armadura, betão, betonagem, estrutura metálica, CLT, CFRP, etc.)
+- 14 negativas (reboco, pintura, cerâmica, cobertura, impermeabilização, ETICS, caixilharia, AVAC, etc.)
 
-- `src/components/biblioteca-mestra/ArtigoMestreFormDialog.tsx` e `src/routes/_app/biblioteca-mestra.artigos.tsx`
-  - O seletor de estado no formulário passa a mostrar apenas os três valores acima (já lê de `ARTIGO_ESTADOS_IA`, basta a lista nova).
-  - Default ao criar manualmente continua `validado` (já está).
-  - O badge da coluna "Estado" nas listagens (artigos e categorias) usa automaticamente os novos labels/cores.
+### Execução
 
-- `src/routes/_app/biblioteca-mestra.artigos.tsx`
-  - Filtro de estado: as opções do `Select` passam a ser as três novas (sem "Pendente"/"Revisto").
-
-### 3. Validação
-
-- Após a migração: confirmar contagens por estado em `biblioteca_artigos`.
-- Verificar no Explorador que nenhum artigo aparece com badge vermelho de "Pendente de validação".
-
-### Notas
-
-- Não se acrescenta agora um botão "Validar Artigo" — só fará sentido quando existirem agentes de IA a criar artigos com `criado_auto`. A infraestrutura (estado + badge azul) fica preparada.
-- Eliminar artigos continua possível; "Obsoleto" é uma escolha do utilizador via edição (sem fluxo dedicado neste passo).
+- Se a especialidade `070` já existir vazia, apagar as suas subespecialidades antigas (cascade) e inserir a nova estrutura — tal como foi feito para 060.
+- Bloco `DO $$ ... $$` com estruturas `jsonb`.
+- Sem alterações em código TS/React — aparece automaticamente no Explorador.
+- Verificação final por contagens (subespecialidades, categorias, artigos, keywords).
