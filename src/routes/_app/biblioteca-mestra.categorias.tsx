@@ -350,13 +350,13 @@ function CategoriasPage() {
                     {(searching || protectedCat) && <div className="w-3.5" />}
                     <span className="font-mono text-xs text-muted-foreground w-20 truncate">{c.codigo ?? "—"}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        {protectedCat && <Lock className="h-3 w-3 text-amber-600" />}
+                      <div className="flex items-center gap-2 min-w-0">
+                        {protectedCat && <Lock className="h-3 w-3 text-amber-600 shrink-0" />}
                         <span className="font-medium text-sm truncate">{c.nome}</span>
-                        <Badge variant="outline" className="text-xs h-5">{count} artigo{count === 1 ? "" : "s"}</Badge>
+                        <Badge variant="outline" className="text-xs h-5 whitespace-nowrap shrink-0">{count} artigo{count === 1 ? "" : "s"}</Badge>
                       </div>
                       {searching && (
-                        <div className="text-xs text-muted-foreground">{esp?.nome} / {sub?.nome}</div>
+                        <div className="text-xs text-muted-foreground truncate">{esp?.nome} / {sub?.nome}</div>
                       )}
                       {c.descricao && !searching && (
                         <div className="text-xs text-muted-foreground truncate">{c.descricao}</div>
@@ -364,17 +364,18 @@ function CategoriasPage() {
                     </div>
                     {!protectedCat && (
                       <>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                           <Switch checked={c.ativa} onCheckedChange={() => toggleAtiva.mutate(c)} aria-label="Ativa" />
-                          <span className="text-xs text-muted-foreground w-12">{c.ativa ? "Ativa" : "Inativa"}</span>
+                          <span className="text-xs text-muted-foreground hidden xl:inline">{c.ativa ? "Ativa" : "Inativa"}</span>
                         </div>
-                        <div className="flex items-center">
+                        <div className="flex items-center shrink-0">
                           <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setEditOpen(true); }} title="Editar"><Pencil className="h-4 w-4" /></Button>
                           <Button size="icon" variant="ghost" onClick={() => { setMoveCat(c); setMoveEsp(esp?.id ?? ""); setMoveSub(""); }} title="Mover para outra subespecialidade"><ArrowLeftRight className="h-4 w-4" /></Button>
                           <Button size="icon" variant="ghost" onClick={() => setDeleteCat(c)} title="Eliminar"><Trash2 className="h-4 w-4" /></Button>
                         </div>
                       </>
                     )}
+
                     {protectedCat && (
                       <span className="text-xs text-amber-700 dark:text-amber-400 italic">protegida</span>
                     )}
