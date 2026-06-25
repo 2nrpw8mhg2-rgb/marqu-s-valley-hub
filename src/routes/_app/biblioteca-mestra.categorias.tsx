@@ -461,7 +461,7 @@ function CategoriasPage() {
         </div>
 
         <div
-          className="flex flex-col lg:flex-row gap-4 items-stretch"
+          className="flex flex-col lg:flex-row gap-4 items-stretch lg:overflow-x-auto"
         >
           {/* Especialidades */}
           <Card style={{ width: espW }} className="bg-card border-border p-2 h-fit shrink-0 relative w-full lg:w-auto">
