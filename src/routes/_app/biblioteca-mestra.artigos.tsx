@@ -108,6 +108,8 @@ function ArtigosPage() {
     if (espFilter !== "all" && sub?.especialidade_id !== espFilter) return false;
     if (subFilter !== "all" && r.subespecialidade_id !== subFilter) return false;
     if (catFilter !== "all" && r.categoria_id !== catFilter) return false;
+    if (tipoFilter !== "all" && r.tipo !== tipoFilter) return false;
+    if (estadoFilter !== "all" && r.estado_ia !== estadoFilter) return false;
     if (onlyPorClassificar && !(cat?.nome === "Por Classificar" && cat.ordem === 0)) return false;
     if (search.trim()) {
       const t = search.toLowerCase();
@@ -122,6 +124,8 @@ function ArtigosPage() {
     return true;
   });
 
+  const defaultUnidadeId = useMemo(() => unidades.find((u) => u.codigo === "vg")?.id ?? unidades[0]?.id, [unidades]);
+
   const openEdit = (a?: ArtigoMestre) => {
     if (a) {
       const list = kwsByArt.get(a.id) ?? [];
@@ -133,7 +137,16 @@ function ArtigosPage() {
     } else {
       const defSub = subFilter !== "all" ? subFilter : undefined;
       const defCat = catFilter !== "all" ? catFilter : (defSub ? cats.find((c) => c.subespecialidade_id === defSub && c.ordem === 0)?.id : undefined);
-      setEditing({ ativo: true, positivas: [], negativas: [], subespecialidade_id: defSub, categoria_id: defCat });
+      setEditing({
+        ativo: true,
+        positivas: [],
+        negativas: [],
+        subespecialidade_id: defSub,
+        categoria_id: defCat,
+        tipo: "outros",
+        estado_ia: "validado",
+        unidade_id: defaultUnidadeId,
+      });
     }
     setKwInputPos("");
     setKwInputNeg("");
@@ -144,6 +157,8 @@ function ArtigosPage() {
     mutationFn: async (e: EditState) => {
       if (!e.descricao?.trim()) throw new Error("Descrição obrigatória");
       if (!e.categoria_id) throw new Error("Categoria obrigatória");
+      if (!e.tipo) throw new Error("Tipo obrigatório");
+      if (!e.unidade_id) throw new Error("Unidade obrigatória");
       const cat = catMap.get(e.categoria_id);
       if (!cat) throw new Error("Categoria inválida");
       const payload = {
@@ -151,7 +166,9 @@ function ArtigosPage() {
         categoria_id: e.categoria_id,
         codigo: e.codigo ?? null,
         descricao: e.descricao.trim(),
-        unidade: e.unidade ?? null,
+        unidade_id: e.unidade_id,
+        tipo: e.tipo,
+        estado_ia: e.estado_ia ?? "validado",
         observacoes: e.observacoes ?? null,
         ativo: e.ativo ?? true,
       };
