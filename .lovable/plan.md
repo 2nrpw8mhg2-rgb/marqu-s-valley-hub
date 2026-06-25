@@ -1,41 +1,37 @@
-# Expansão das Especialidades da Biblioteca Mestra
+## Reestruturação das Especialidades da Biblioteca Mestra
 
-## Objetivo
-Substituir a lista atual (6 especialidades base) por uma estrutura completa de macro-especialidades, organizada por fases de obra, alinhada com a realidade de empresas de construção em Portugal.
+Aplicar 4 ajustes solicitados, mantendo numeração sequencial em múltiplos de 10. Resultado: **14 macro-especialidades**.
 
-## Estrutura proposta (10 macro-especialidades, nível 1)
+### Nova estrutura
 
-Organização por fases lógicas de obra. Cada macro-especialidade recebe um código sequencial em múltiplos de 10 (para deixar espaço a inserções futuras sem renumerar) e uma `ordem` correspondente.
-
-| Código | Especialidade | Âmbito |
+| Código | Especialidade | Origem / Notas |
 |---|---|---|
-| 010 | Preparação da Obra | Estaleiro, Implantação, Trabalhos Preparatórios |
-| 020 | Demolições e Gestão de Resíduos | Demolições, Remoções, Gestão e transporte de RCD |
-| 030 | Movimento de Terras e Contenções | Terraplanagens, Escavações, Aterros, Contenções periféricas |
-| 040 | Drenagens e Redes Enterradas | Drenagens pluviais/residuais, Redes enterradas de infraestruturas |
-| 050 | Estruturas | Fundações, Cofragens, Armaduras, Betão, Estruturas metálicas, Pré-fabricados |
-| 060 | Construção Civil e Envolvente | Alvenarias, Rebocos, Fachadas, ETICS, Impermeabilizações, Cobertura, Cantarias, Isolamentos |
-| 070 | Acabamentos Interiores | Tetos falsos, Pladur, Revestimentos, Pavimentos, Pinturas, Carpintarias, Caixilharias, Serralharias, Espelhos |
-| 080 | Especialidades Técnicas (MEP) | Eletricidade, ITED, SCIE, AVAC, Ventilação, Águas e Esgotos, Gás, Domótica, CCTV, Controlo de Acessos, Fotovoltaico, Bomba de Calor, Elevadores, Automação |
-| 090 | Equipamentos | Eletrodomésticos, Equipamentos sanitários, Lavandarias, Equipamentos industriais |
-| 100 | Arranjos Exteriores | Pavimentos exteriores, Muros, Jardins, Rega, Piscinas, Portões, Vedação, Iluminação exterior |
-| 110 | Finalização e Entrega | Limpeza final, Ensaios, Comissionamento, Telas finais, Certificações |
+| 010 | Preparação da Obra | mantém |
+| 020 | **Instalações Provisórias** | NOVA (Estaleiro, Tapumes, Contentores, Água/Eletricidade provisórias, Sinalização, Proteções Coletivas, IS provisórias) |
+| 030 | Demolições e Gestão de Resíduos | renumerada (era 020) |
+| 040 | **Movimento de Terras** | divisão de "Movimento de Terras e Contenções" |
+| 050 | **Contenções** | divisão de "Movimento de Terras e Contenções" |
+| 060 | **Infraestruturas** | NOVA — absorve "Drenagens e Redes Enterradas" (Águas, Esgotos, Pluviais, Drenagens, Caixas de Visita, ETAR, Reservatórios, Estações Elevatórias) |
+| 070 | Estruturas | renumerada (era 050) |
+| 080 | **Construção Civil** | divisão (Alvenarias, Rebocos, Betonilhas) |
+| 090 | **Envolvente** | divisão (ETICS, Fachadas, Cobertura, Impermeabilizações, Cantarias, Isolamentos) |
+| 100 | Acabamentos Interiores | renumerada (era 070) |
+| 110 | Especialidades Técnicas (MEP) | renumerada (era 080) |
+| 120 | Equipamentos | renumerada (era 090) |
+| 130 | Arranjos Exteriores | renumerada (era 100) |
+| 140 | Finalização e Entrega | renumerada (era 110) |
 
-(Total: 11 macro-especialidades.)
+### Abordagem técnica
 
-Nota: os blocos que listaste (ex.: Estaleiro, Implantação, ETICS, AVAC, ITED, Piscinas, Jardins, etc.) serão tratados como **subespecialidades** dentro das macro-especialidades acima — fica preparado para a Fase 2 (Subespecialidades), sem necessidade de mexer no código.
+Uma migração SQL única em `public.biblioteca_especialidades`:
 
-## Alterações técnicas
+1. `DELETE` das 11 especialidades atuais que não tenham subespecialidades nem artigos associados (verificar `biblioteca_subespecialidades` e `biblioteca_artigos`). Como ainda não foram criadas subespecialidades/artigos, a tabela pode ser limpa em segurança.
+2. `INSERT` das 14 novas especialidades com os códigos, nomes, descrições breves e `ordem` correspondente (10, 20, …, 140).
+3. Sem alterações de schema — colunas existentes (`codigo`, `nome`, `descricao`, `ordem`, `ativo`) cobrem tudo.
+4. Sem alterações de UI — a página `especialidades.tsx` lê dinamicamente a tabela.
 
-1. **Migração SQL** sobre `public.biblioteca_especialidades`:
-   - Remover as 6 especialidades seed atuais que não tenham subespecialidades/artigos associados (verificar com `NOT EXISTS` em `biblioteca_subespecialidades`); manter as que tiverem dependências e renomear/recodificar via `UPDATE` quando aplicável.
-   - `INSERT` das 11 macro-especialidades acima (`codigo`, `nome`, `descricao`, `ordem`, `ativo = true`).
-   - Operação idempotente (`ON CONFLICT (codigo) DO UPDATE`).
+### Fora de âmbito (próximas fases)
 
-2. **Sem alterações de schema** — as colunas existentes (`codigo`, `nome`, `descricao`, `ordem`, `ativo`) já cobrem tudo.
-
-3. **Sem alterações de UI** — a página `biblioteca-mestra/especialidades.tsx` já lista, ordena e edita especialidades; passará a mostrar a nova lista automaticamente.
-
-## Fora do âmbito (próximas fases)
-- Subespecialidades (Fase 2) — entrarão os itens detalhados de cada bloco (Estaleiro, ETICS, AVAC, etc.).
-- Artigos e palavras-chave (Fase 3).
+- Subespecialidades listadas (Alvenarias, ETICS, Escavações, Muros Berlim, Estaleiro, etc.) → Fase 2.
+- Artigos e palavras-chave → Fase 3.
+- Lógica de classificação automática e Pacotes de Consulta → módulos seguintes.
