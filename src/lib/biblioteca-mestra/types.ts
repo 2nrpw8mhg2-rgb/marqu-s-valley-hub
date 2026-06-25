@@ -37,7 +37,7 @@ export type ArtigoTipo =
   | "taxa_licenca"
   | "outros";
 
-export type ArtigoEstadoIA = "validado" | "revisto" | "criado_auto" | "pendente";
+export type ArtigoEstadoIA = "validado" | "criado_auto" | "obsoleto";
 
 export type ArtigoMestre = {
   id: string;
