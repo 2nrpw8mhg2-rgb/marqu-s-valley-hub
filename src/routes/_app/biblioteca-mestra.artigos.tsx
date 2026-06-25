@@ -310,6 +310,20 @@ function ArtigosPage() {
               {catsBySub.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Select value={tipoFilter} onValueChange={setTipoFilter}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              {ARTIGO_TIPOS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os estados IA</SelectItem>
+              {ARTIGO_ESTADOS_IA.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Button
             variant={onlyPorClassificar ? "default" : "outline"}
             size="sm"
