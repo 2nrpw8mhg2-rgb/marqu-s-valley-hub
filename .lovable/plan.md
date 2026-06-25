@@ -1,59 +1,68 @@
-## Especialidade 030 — Demolições e Gestão de Resíduos
+## Objetivo
 
-Popular a Biblioteca Mestra com a estrutura completa da Especialidade 030, seguindo o mesmo padrão usado para a Especialidade 020.
+Transformar a página **Categorias** num verdadeiro **Explorador da Biblioteca Mestra**, permitindo navegar até ao último nível (Artigos Mestre) sem mudar de página, e reposicionar o menu "Artigos Mestre" como pesquisa global.
 
-### 1. Subespecialidades (10 novas)
+---
 
-Inserir em `biblioteca_subespecialidades` (especialidade 030):
+## 1. Expansão de Categorias → Artigos Mestre (na página Categorias)
 
-- 030.01 — Demolições Gerais
-- 030.02 — Demolições Estruturais
-- 030.03 — Demolições Não Estruturais
-- 030.04 — Desmontagens Técnicas
-- 030.05 — Desmontagem de Instalações Técnicas
-- 030.06 — Separação e Triagem de Resíduos
-- 030.07 — Transporte e Gestão de RCD
-- 030.08 — Resíduos Especiais
-- 030.09 — Limpeza Pós-Demolição
-- 030.10 — Monitorização e Controlo
+Na coluna direita de `biblioteca-mestra.categorias.tsx`, cada linha de categoria passa a ser **expansível** (estilo explorador de ficheiros):
 
-Se já existirem subespecialidades vazias na 030 com nomes conflituantes, renomear com sufixo "(antigo)" antes da inserção (mesma estratégia da 020).
+- Adicionar uma seta `▶ / ▼` (ícones `ChevronRight` / `ChevronDown`) no início de cada linha.
+- Toda a linha (ou o badge "N artigos") fica clicável para alternar expansão.
+- Estado local: `Set<string>` com os IDs de categorias expandidas.
+- Ao expandir pela primeira vez, fazer fetch dos artigos dessa categoria (`useQuery` por `categoria_id`, cacheado em `["bm-art-by-cat", categoria_id]`).
+- Lista de artigos renderizada **indentada** por baixo da categoria, com:
+  - Código (`codigo`)
+  - Descrição
+  - Unidade (`unidade`)
+  - Tipo (Badge: Serviço/Material/Equipamento/Sistema/Outros)
+  - Estado IA (Badge: validado / sugerido / por_classificar)
+  - Nº de keywords (contagem a partir de `biblioteca_artigo_keywords`)
+  - Estado Ativo/Inativo (Switch pequeno ou Badge)
+- Ações por artigo (ícones à direita): **Editar**, **Duplicar**, **Mover**, **Eliminar**.
+  - Para edição completa abre-se um **Dialog reaproveitando o formulário já existente** em `biblioteca-mestra.artigos.tsx` (extraído para um componente partilhado `ArtigoMestreFormDialog` em `src/components/biblioteca-mestra/`).
+- Estado vazio: "Sem artigos nesta categoria — clique para adicionar".
+- Botão **"+ Novo artigo"** dentro da categoria expandida, pré-preenchendo `especialidade_id / subespecialidade_id / categoria_id`.
 
-O trigger `tg_subesp_por_classificar` cria automaticamente a categoria "Por Classificar" em cada nova subespecialidade.
+Mantêm-se intactas as funcionalidades atuais de Categorias (criar/editar/eliminar/mover/reordenar).
 
-### 2. Categorias manuais (20 no total)
+## 2. Componente partilhado de Artigo Mestre
 
-Inserir em `biblioteca_categorias`, distribuídas pelas subespecialidades acima:
+Extrair do ficheiro `biblioteca-mestra.artigos.tsx` (≈625 linhas) a UI do **Dialog de edição de Artigo** e a UI da **linha/card de artigo** para componentes reutilizáveis:
 
-- 030.01: Demolições Totais, Demolições Parciais
-- 030.02: Betão, Estruturas Metálicas
-- 030.03: Alvenarias, Acabamentos
-- 030.04: Carpintarias, Caixilharias
-- 030.05: Instalações
-- 030.06: Separação, Triagem
-- 030.07: Transporte, Gestão
-- 030.08: Resíduos Perigosos, Resíduos Especiais
-- 030.09: Limpeza, Preparação
-- 030.10: Controlo
+- `src/components/biblioteca-mestra/ArtigoMestreFormDialog.tsx` — criar/editar artigo (com keywords pos/neg, sugestão IA, etc.).
+- `src/components/biblioteca-mestra/ArtigoMestreRow.tsx` — linha compacta com metadados e ações.
 
-### 3. Artigos Mestre (~85 artigos)
+Ambos passam a ser usados tanto pelo Explorador (Categorias) como pela pesquisa global (página Artigos).
 
-Inserir em `biblioteca_artigos` todos os artigos listados no pedido, com:
+## 3. Renomear "Artigos Mestre" → "Pesquisa Global de Artigos"
 
-- `unidade_id` correspondente a `vg` (mesma convenção da 020)
-- `tipo = 'outros'`
-- `estado_ia = 'validado'`
-- `ativo = true`
+- Em `src/components/AppSidebar.tsx`: renomear o item `"Artigos Mestre"` para `"Pesquisa de Artigos"` (mantendo a rota `/biblioteca-mestra/artigos`).
+- A página `biblioteca-mestra.artigos.tsx` mantém-se como pesquisa transversal a toda a Biblioteca (filtros por especialidade/subesp/categoria/tipo/estado já existentes).
+- Atualizar `PageHeader` para "Pesquisa Global de Artigos".
 
-### 4. Palavras-chave da Especialidade
+> Decisão: **não eliminamos** o menu — apenas o reposicionamos como pesquisa global, conforme sugerido. Se preferir eliminar por completo, dizei e removo o item da sidebar.
 
-Inserir em `biblioteca_especialidade_keywords` para a especialidade 030:
+## 4. Detalhes técnicos
 
-- 16 positivas (demolição, desmontagem, remoção, picagem, corte, desmantelamento, entulho, resíduos, RCD, triagem, separação, operador licenciado, guia de resíduos, amianto, fibrocimento, limpeza pós-demolição)
-- 10 negativas (fundação, cofragem, armadura, betão novo, reboco novo, pintura nova, instalação nova, pavimento novo, cobertura nova, fornecimento) — nota: "execução" é demasiado genérica, será omitida ou marcada com peso reduzido para evitar falsos negativos
+- Sem alterações de BD nem migrations — toda a informação necessária já existe (`biblioteca_artigos`, `biblioteca_artigo_keywords`).
+- Queries novas:
+  - `["bm-art-by-cat", catId]` — `select * from biblioteca_artigos where categoria_id = ?`
+  - Contagem de keywords por artigo: aproveitar `["bm-kw"]` já existente (carrega todas) ou criar agregação por artigo.
+- Invalidações: ao criar/editar/eliminar/mover artigo, invalidar `["bm-art"]`, `["bm-art-by-cat", *]` e `["bm-art-cat-counts"]`.
+- Acessibilidade: setas de expandir com `aria-expanded` e `aria-controls`.
 
-### Notas técnicas
+## 5. Fora de scope (para confirmar)
 
-- Operação puramente de dados (INSERT/UPDATE), sem migrações de schema nem alterações de frontend.
-- Verificação final por SQL: contagem de subespecialidades, categorias, artigos e keywords inseridas.
-- Caso encontre conflitos de código/nome na 030, aplica-se o mesmo padrão de "(antigo)" usado na 020.
+- "Ver relações com outros artigos" e "Ver histórico de preços" — funcionalidades novas que ainda não existem no projeto. **Proponho deixar fora desta entrega** e tratar em iteração separada quando definirmos a fonte de dados.
+
+---
+
+### Ficheiros afetados
+
+- `src/routes/_app/biblioteca-mestra.categorias.tsx` (principal — adicionar expansão e lista de artigos)
+- `src/routes/_app/biblioteca-mestra.artigos.tsx` (passa a usar componentes partilhados; título alterado)
+- `src/components/biblioteca-mestra/ArtigoMestreFormDialog.tsx` (novo)
+- `src/components/biblioteca-mestra/ArtigoMestreRow.tsx` (novo)
+- `src/components/AppSidebar.tsx` (renomear label)
