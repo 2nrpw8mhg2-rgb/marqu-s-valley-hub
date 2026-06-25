@@ -473,7 +473,39 @@ function ArtigosPage() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div><Label>Código</Label><Input value={editing?.codigo ?? ""} onChange={(e) => setEditing({ ...editing, codigo: e.target.value })} /></div>
-              <div className="col-span-2"><Label>Unidade</Label><Input value={editing?.unidade ?? ""} onChange={(e) => setEditing({ ...editing, unidade: e.target.value })} placeholder="m², m³, vg, ..." /></div>
+              <div>
+                <Label>Unidade *</Label>
+                <Select value={editing?.unidade_id} onValueChange={(v) => setEditing({ ...editing, unidade_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                  <SelectContent>
+                    {unidades.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.simbolo} — {u.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Tipo *</Label>
+                <Select value={editing?.tipo} onValueChange={(v) => setEditing({ ...editing, tipo: v as ArtigoTipo })}>
+                  <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                  <SelectContent>
+                    {ARTIGO_TIPOS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Estado IA *</Label>
+              <Select value={editing?.estado_ia} onValueChange={(v) => setEditing({ ...editing, estado_ia: v as ArtigoEstadoIA })}>
+                <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                <SelectContent>
+                  {ARTIGO_ESTADOS_IA.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      <span className="inline-flex items-center gap-2"><span className={`inline-block h-2 w-2 rounded-full ${s.dot}`} />{s.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div><Label>Descrição *</Label><Textarea value={editing?.descricao ?? ""} onChange={(e) => setEditing({ ...editing, descricao: e.target.value })} /></div>
             <div><Label>Observações</Label><Textarea value={editing?.observacoes ?? ""} onChange={(e) => setEditing({ ...editing, observacoes: e.target.value })} /></div>
