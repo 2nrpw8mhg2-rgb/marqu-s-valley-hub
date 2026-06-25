@@ -191,6 +191,50 @@ export type Database = {
           },
         ]
       }
+      biblioteca_especialidade_keywords: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          especialidade_id: string
+          id: string
+          origem: Database["public"]["Enums"]["biblioteca_keyword_origem"]
+          peso: number
+          termo: string
+          tipo: Database["public"]["Enums"]["biblioteca_keyword_tipo"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          especialidade_id: string
+          id?: string
+          origem?: Database["public"]["Enums"]["biblioteca_keyword_origem"]
+          peso?: number
+          termo: string
+          tipo?: Database["public"]["Enums"]["biblioteca_keyword_tipo"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          especialidade_id?: string
+          id?: string
+          origem?: Database["public"]["Enums"]["biblioteca_keyword_origem"]
+          peso?: number
+          termo?: string
+          tipo?: Database["public"]["Enums"]["biblioteca_keyword_tipo"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_especialidade_keywords_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_especialidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       biblioteca_especialidades: {
         Row: {
           ativa: boolean
@@ -1053,6 +1097,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "orcamentista" | "diretor_obra" | "comprador"
+      biblioteca_keyword_origem: "manual" | "ia"
       biblioteca_keyword_tipo: "positiva" | "negativa"
       documento_tipo:
         | "projeto"
@@ -1202,6 +1247,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "orcamentista", "diretor_obra", "comprador"],
+      biblioteca_keyword_origem: ["manual", "ia"],
       biblioteca_keyword_tipo: ["positiva", "negativa"],
       documento_tipo: [
         "projeto",
