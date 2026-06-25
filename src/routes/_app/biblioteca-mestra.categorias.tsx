@@ -38,6 +38,14 @@ function CategoriasPage() {
   const [moveCat, setMoveCat] = useState<Categoria | null>(null);
   const [moveEsp, setMoveEsp] = useState<string>("");
   const [moveSub, setMoveSub] = useState<string>("");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [artFormOpen, setArtFormOpen] = useState(false);
+  const [artFormInitial, setArtFormInitial] = useState<ArtigoFormState | null>(null);
+  const [deleteArt, setDeleteArt] = useState<ArtigoMestre | null>(null);
+  const [moveArt, setMoveArt] = useState<ArtigoMestre | null>(null);
+  const [moveArtEsp, setMoveArtEsp] = useState<string>("");
+  const [moveArtSub, setMoveArtSub] = useState<string>("");
+  const [moveArtCat, setMoveArtCat] = useState<string>("");
 
   const { data: esps = [] } = useQuery({
     queryKey: ["bm-esp"],
