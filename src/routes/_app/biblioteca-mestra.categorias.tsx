@@ -666,6 +666,69 @@ function CategoriasPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ArtigoMestreFormDialog open={artFormOpen} onOpenChange={setArtFormOpen} initial={artFormInitial} />
+
+      <AlertDialog open={!!deleteArt} onOpenChange={(o) => !o && setDeleteArt(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar artigo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteArt && `O artigo "${deleteArt.descricao}" será eliminado definitivamente.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteArt && removeArtigo.mutate(deleteArt)}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={!!moveArt} onOpenChange={(o) => !o && setMoveArt(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Mover artigo para outra categoria</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm">
+              <span className="text-muted-foreground">Artigo: </span>
+              <span className="font-medium">{moveArt?.descricao}</span>
+            </div>
+            <div>
+              <Label>Especialidade</Label>
+              <Select value={moveArtEsp} onValueChange={(v) => { setMoveArtEsp(v); setMoveArtSub(""); setMoveArtCat(""); }}>
+                <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                <SelectContent>
+                  {esps.map((e) => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Subespecialidade</Label>
+              <Select value={moveArtSub} onValueChange={(v) => { setMoveArtSub(v); setMoveArtCat(""); }} disabled={!moveArtEsp}>
+                <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                <SelectContent>
+                  {subs.filter((s) => s.especialidade_id === moveArtEsp).map((s) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Categoria destino *</Label>
+              <Select value={moveArtCat} onValueChange={setMoveArtCat} disabled={!moveArtSub}>
+                <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                <SelectContent>
+                  {cats.filter((c) => c.subespecialidade_id === moveArtSub).map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveArt(null)}>Cancelar</Button>
+            <Button
+              disabled={!moveArtCat || moveArtCat === moveArt?.categoria_id || moveArtigo.isPending}
+              onClick={() => moveArt && moveArtigo.mutate({ a: moveArt, categoria_id: moveArtCat })}
+            >Mover</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
