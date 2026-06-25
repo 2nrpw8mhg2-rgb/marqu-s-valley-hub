@@ -477,7 +477,12 @@ function CategoriasPage() {
           </Card>
 
           {/* Subespecialidades */}
-          <Card className="bg-card border-border p-2 h-fit">
+          <Card style={{ width: subW }} className="bg-card border-border p-2 h-fit shrink-0 relative w-full lg:w-auto">
+            <div
+              onMouseDown={startResize("sub")}
+              title="Arrastar para redimensionar"
+              className="hidden lg:block absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors"
+            />
             <div className="px-2 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Subespecialidades</div>
             <ul className="space-y-0.5">
               {visibleSubs.map((s) => {
