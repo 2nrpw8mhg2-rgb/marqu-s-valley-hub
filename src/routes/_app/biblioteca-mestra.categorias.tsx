@@ -462,49 +462,114 @@ function CategoriasPage() {
                 const count = countMap.get(c.id) ?? 0;
                 const sub = subMap.get(c.subespecialidade_id);
                 const esp = sub ? espMap.get(sub.especialidade_id) : null;
+                const isExpanded = expanded.has(c.id);
+                const catArtigos = artigosByCat.get(c.id) ?? [];
                 return (
-                  <div key={c.id} className={cn("flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors", protectedCat && "bg-amber-50/40 dark:bg-amber-900/10")}>
-                    {!searching && !protectedCat && (
-                      <div className="flex flex-col gap-0.5">
-                        <button disabled={!canUp} onClick={() => handleMoveUpDown(c, -1)} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Mover para cima">
-                          <ArrowUp className="h-3.5 w-3.5" />
-                        </button>
-                        <button disabled={!canDown} onClick={() => handleMoveUpDown(c, 1)} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Mover para baixo">
-                          <ArrowDown className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    )}
-                    {(searching || protectedCat) && <div className="w-3.5" />}
-                    <span className="font-mono text-xs text-muted-foreground w-20 truncate">{c.codigo ?? "—"}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {protectedCat && <Lock className="h-3 w-3 text-amber-600 shrink-0" />}
-                        <span className="font-medium text-sm truncate">{c.nome}</span>
-                        <Badge variant="outline" className="text-xs h-5 whitespace-nowrap shrink-0">{count} artigo{count === 1 ? "" : "s"}</Badge>
-                      </div>
-                      {searching && (
-                        <div className="text-xs text-muted-foreground truncate">{esp?.nome} / {sub?.nome}</div>
+                  <div key={c.id}>
+                    <div className={cn("flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors", protectedCat && "bg-amber-50/40 dark:bg-amber-900/10")}>
+                      <button
+                        onClick={() => toggleExpanded(c.id)}
+                        aria-expanded={isExpanded}
+                        aria-label={isExpanded ? "Recolher artigos" : "Expandir artigos"}
+                        className="text-muted-foreground hover:text-foreground shrink-0"
+                      >
+                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </button>
+                      {!searching && !protectedCat && (
+                        <div className="flex flex-col gap-0.5">
+                          <button disabled={!canUp} onClick={() => handleMoveUpDown(c, -1)} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Mover para cima">
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          </button>
+                          <button disabled={!canDown} onClick={() => handleMoveUpDown(c, 1)} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Mover para baixo">
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       )}
-                      {c.descricao && !searching && (
-                        <div className="text-xs text-muted-foreground truncate">{c.descricao}</div>
+                      {(searching || protectedCat) && <div className="w-3.5" />}
+                      <span className="font-mono text-xs text-muted-foreground w-20 truncate">{c.codigo ?? "—"}</span>
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleExpanded(c.id)}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          {protectedCat && <Lock className="h-3 w-3 text-amber-600 shrink-0" />}
+                          <span className="font-medium text-sm truncate">{c.nome}</span>
+                          <Badge variant="outline" className="text-xs h-5 whitespace-nowrap shrink-0">{count} artigo{count === 1 ? "" : "s"}</Badge>
+                        </div>
+                        {searching && (
+                          <div className="text-xs text-muted-foreground truncate">{esp?.nome} / {sub?.nome}</div>
+                        )}
+                        {c.descricao && !searching && (
+                          <div className="text-xs text-muted-foreground truncate">{c.descricao}</div>
+                        )}
+                      </div>
+                      {!protectedCat && (
+                        <>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Switch checked={c.ativa} onCheckedChange={() => toggleAtiva.mutate(c)} aria-label="Ativa" />
+                            <span className="text-xs text-muted-foreground hidden xl:inline">{c.ativa ? "Ativa" : "Inativa"}</span>
+                          </div>
+                          <div className="flex items-center shrink-0">
+                            <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setEditOpen(true); }} title="Editar"><Pencil className="h-4 w-4" /></Button>
+                            <Button size="icon" variant="ghost" onClick={() => { setMoveCat(c); setMoveEsp(esp?.id ?? ""); setMoveSub(""); }} title="Mover para outra subespecialidade"><ArrowLeftRight className="h-4 w-4" /></Button>
+                            <Button size="icon" variant="ghost" onClick={() => setDeleteCat(c)} title="Eliminar"><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        </>
+                      )}
+
+                      {protectedCat && (
+                        <span className="text-xs text-amber-700 dark:text-amber-400 italic">protegida</span>
                       )}
                     </div>
-                    {!protectedCat && (
-                      <>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Switch checked={c.ativa} onCheckedChange={() => toggleAtiva.mutate(c)} aria-label="Ativa" />
-                          <span className="text-xs text-muted-foreground hidden xl:inline">{c.ativa ? "Ativa" : "Inativa"}</span>
-                        </div>
-                        <div className="flex items-center shrink-0">
-                          <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setEditOpen(true); }} title="Editar"><Pencil className="h-4 w-4" /></Button>
-                          <Button size="icon" variant="ghost" onClick={() => { setMoveCat(c); setMoveEsp(esp?.id ?? ""); setMoveSub(""); }} title="Mover para outra subespecialidade"><ArrowLeftRight className="h-4 w-4" /></Button>
-                          <Button size="icon" variant="ghost" onClick={() => setDeleteCat(c)} title="Eliminar"><Trash2 className="h-4 w-4" /></Button>
-                        </div>
-                      </>
-                    )}
 
-                    {protectedCat && (
-                      <span className="text-xs text-amber-700 dark:text-amber-400 italic">protegida</span>
+                    {isExpanded && (
+                      <div className="bg-muted/20 border-t border-border">
+                        <div className="flex items-center justify-between px-12 py-2 border-b border-border/60">
+                          <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Artigos Mestre ({catArtigos.length})</span>
+                          <Button size="sm" variant="outline" onClick={() => openNewArtigo(c)}>
+                            <Plus className="h-3.5 w-3.5 mr-1" /> Novo artigo
+                          </Button>
+                        </div>
+                        {catArtigos.length === 0 && (
+                          <div className="px-12 py-6 text-center text-xs text-muted-foreground">
+                            Sem artigos nesta categoria — clique em "Novo artigo" para adicionar.
+                          </div>
+                        )}
+                        <ul className="divide-y divide-border/40">
+                          {catArtigos.map((a) => {
+                            const tipoLabel = ARTIGO_TIPOS.find((t) => t.value === a.tipo)?.label ?? a.tipo;
+                            const estado = ARTIGO_ESTADOS_IA.find((s) => s.value === a.estado_ia);
+                            const unidade = unidadeMap.get(a.unidade_id);
+                            const nKw = kwCountByArt.get(a.id) ?? 0;
+                            return (
+                              <li key={a.id} className="flex items-center gap-3 pl-12 pr-4 py-2 hover:bg-muted/30 transition-colors">
+                                <span className="font-mono text-[11px] text-muted-foreground w-20 truncate shrink-0">{a.codigo ?? "—"}</span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm truncate">{a.descricao}</div>
+                                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                    <Badge variant="outline" className="text-[10px] h-4 px-1.5">{tipoLabel}</Badge>
+                                    <span className="text-[11px] text-muted-foreground font-mono">{unidade?.simbolo ?? a.unidade ?? "—"}</span>
+                                    {estado && (
+                                      <Badge variant="outline" className={`text-[10px] h-4 px-1.5 gap-1 ${estado.className}`}>
+                                        <span className={`inline-block h-1.5 w-1.5 rounded-full ${estado.dot}`} />
+                                        {estado.label}
+                                      </Badge>
+                                    )}
+                                    <span className="text-[11px] text-muted-foreground">{nKw} palavra{nKw === 1 ? "" : "s"}-chave</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Switch checked={a.ativo} onCheckedChange={() => toggleAtivoArtigo.mutate(a)} aria-label="Ativo" />
+                                  <span className="text-[11px] text-muted-foreground hidden xl:inline w-12">{a.ativo ? "Ativo" : "Inativo"}</span>
+                                </div>
+                                <div className="flex items-center shrink-0">
+                                  <Button size="icon" variant="ghost" onClick={() => openEditArtigo(a)} title="Editar"><Pencil className="h-3.5 w-3.5" /></Button>
+                                  <Button size="icon" variant="ghost" onClick={() => openDuplicateArtigo(a)} title="Duplicar"><Copy className="h-3.5 w-3.5" /></Button>
+                                  <Button size="icon" variant="ghost" onClick={() => { setMoveArt(a); const s = subMap.get(a.subespecialidade_id); setMoveArtEsp(s?.especialidade_id ?? ""); setMoveArtSub(a.subespecialidade_id); setMoveArtCat(""); }} title="Mover para outra categoria"><FolderInput className="h-3.5 w-3.5" /></Button>
+                                  <Button size="icon" variant="ghost" onClick={() => setDeleteArt(a)} title="Eliminar"><Trash2 className="h-3.5 w-3.5" /></Button>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
                     )}
                   </div>
                 );
