@@ -96,6 +96,7 @@ export type Database = {
       biblioteca_artigos: {
         Row: {
           ativo: boolean
+          categoria_id: string
           codigo: string | null
           created_at: string
           descricao: string
@@ -107,6 +108,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          categoria_id: string
           codigo?: string | null
           created_at?: string
           descricao: string
@@ -118,6 +120,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          categoria_id?: string
           codigo?: string | null
           created_at?: string
           descricao?: string
@@ -129,7 +132,58 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "biblioteca_artigos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_categorias"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "biblioteca_artigos_subespecialidade_id_fkey"
+            columns: ["subespecialidade_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_subespecialidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      biblioteca_categorias: {
+        Row: {
+          ativa: boolean
+          codigo: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          ordem: number
+          subespecialidade_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          codigo?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          ordem?: number
+          subespecialidade_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          codigo?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          ordem?: number
+          subespecialidade_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_categorias_subespecialidade_id_fkey"
             columns: ["subespecialidade_id"]
             isOneToOne: false
             referencedRelation: "biblioteca_subespecialidades"
