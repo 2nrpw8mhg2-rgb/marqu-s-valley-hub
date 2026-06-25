@@ -19,7 +19,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Search, X, Sparkles, FolderInput, Power } from "lucide-react";
-import type { Especialidade, Subespecialidade, Categoria, ArtigoMestre, ArtigoKeyword } from "@/lib/biblioteca-mestra/types";
+import type { Especialidade, Subespecialidade, Categoria, ArtigoMestre, ArtigoKeyword, Unidade, ArtigoTipo, ArtigoEstadoIA } from "@/lib/biblioteca-mestra/types";
+import { ARTIGO_TIPOS, ARTIGO_ESTADOS_IA } from "@/lib/biblioteca-mestra/types";
 
 export const Route = createFileRoute("/_app/biblioteca-mestra/artigos")({
   head: () => ({ meta: [{ title: "Artigos Mestre — Biblioteca Mestra — MV OS" }] }),
