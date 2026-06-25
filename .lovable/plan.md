@@ -1,37 +1,67 @@
-## Reestruturação das Especialidades da Biblioteca Mestra
+## Fase 2 — Subespecialidades da Biblioteca Mestra
 
-Aplicar 4 ajustes solicitados, mantendo numeração sequencial em múltiplos de 10. Resultado: **14 macro-especialidades**.
+A tabela `biblioteca_subespecialidades` já tem todas as colunas necessárias (`especialidade_id`, `nome`, `codigo`, `descricao`, `ordem`, `ativa`). **Nenhuma alteração de schema.** Foco em UX + seed.
 
-### Nova estrutura
+### 1. Nova interface master/detail (substitui a tabela atual)
 
-| Código | Especialidade | Origem / Notas |
-|---|---|---|
-| 010 | Preparação da Obra | mantém |
-| 020 | **Instalações Provisórias** | NOVA (Estaleiro, Tapumes, Contentores, Água/Eletricidade provisórias, Sinalização, Proteções Coletivas, IS provisórias) |
-| 030 | Demolições e Gestão de Resíduos | renumerada (era 020) |
-| 040 | **Movimento de Terras** | divisão de "Movimento de Terras e Contenções" |
-| 050 | **Contenções** | divisão de "Movimento de Terras e Contenções" |
-| 060 | **Infraestruturas** | NOVA — absorve "Drenagens e Redes Enterradas" (Águas, Esgotos, Pluviais, Drenagens, Caixas de Visita, ETAR, Reservatórios, Estações Elevatórias) |
-| 070 | Estruturas | renumerada (era 050) |
-| 080 | **Construção Civil** | divisão (Alvenarias, Rebocos, Betonilhas) |
-| 090 | **Envolvente** | divisão (ETICS, Fachadas, Cobertura, Impermeabilizações, Cantarias, Isolamentos) |
-| 100 | Acabamentos Interiores | renumerada (era 070) |
-| 110 | Especialidades Técnicas (MEP) | renumerada (era 080) |
-| 120 | Equipamentos | renumerada (era 090) |
-| 130 | Arranjos Exteriores | renumerada (era 100) |
-| 140 | Finalização e Entrega | renumerada (era 110) |
+`src/routes/_app/biblioteca-mestra.subespecialidades.tsx` reescrito:
 
-### Abordagem técnica
+```text
+┌────────────────────────┬─────────────────────────────────────────┐
+│ Especialidades         │  [Especialidade selecionada]    [+Nova] │
+│ ──────────────         │  ─────────────────────────────────────  │
+│ ▸ 010 Preparação    3  │  🔍 pesquisar nome / código             │
+│ ▸ 020 Inst. Prov.   7  │                                         │
+│ ● 070 Estruturas    7  │  ⇅  Cód  Nome           Estado   Ações  │
+│ ▸ 080 Const. Civil  3  │  ↑↓  051  Fundações     ●Ativa  ✎ ⇆ 🗑  │
+│ ▸ ...                  │  ↑↓  052  Cofragens     ●Ativa  ✎ ⇆ 🗑  │
+└────────────────────────┴─────────────────────────────────────────┘
+```
 
-Uma migração SQL única em `public.biblioteca_especialidades`:
+- **Coluna esquerda (≈ 320px)**: lista das 14 especialidades, com contador de subespecialidades por especialidade; clique seleciona; estilo realçado para a ativa.
+- **Coluna direita**: cabeçalho com nome da especialidade selecionada + botão "Nova subespecialidade" + pesquisa local (nome/código). Lista das subespecialidades dessa especialidade.
+- **Pesquisa global** (acima das duas colunas): pesquisa por nome/código em todas; ao escrever, a coluna esquerda mostra contadores dos resultados e a direita lista todos os matches (com etiqueta da especialidade) — permite cumprir o requisito "pesquisa por especialidade/nome/código" sem perder a navegação.
 
-1. `DELETE` das 11 especialidades atuais que não tenham subespecialidades nem artigos associados (verificar `biblioteca_subespecialidades` e `biblioteca_artigos`). Como ainda não foram criadas subespecialidades/artigos, a tabela pode ser limpa em segurança.
-2. `INSERT` das 14 novas especialidades com os códigos, nomes, descrições breves e `ordem` correspondente (10, 20, …, 140).
-3. Sem alterações de schema — colunas existentes (`codigo`, `nome`, `descricao`, `ordem`, `ativo`) cobrem tudo.
-4. Sem alterações de UI — a página `especialidades.tsx` lê dinamicamente a tabela.
+### 2. Funcionalidades por subespecialidade
 
-### Fora de âmbito (próximas fases)
+- **Criar / Editar** via Dialog (Nome*, Código, Descrição, Ordem, Ativa) — a Especialidade vem pré-selecionada da coluna esquerda mas pode ser alterada.
+- **Eliminar** via AlertDialog. Bloqueado se existirem artigos associados (futuro — por agora apenas confirmação).
+- **Reordenar** com botões ↑/↓ que trocam `ordem` com a linha vizinha (mutation batch de 2 updates).
+- **Mover para outra Especialidade** com botão ⇆ que abre um pequeno Dialog com Select das especialidades.
+- **Ativar/Desativar** toggle inline (Switch na linha).
 
-- Subespecialidades listadas (Alvenarias, ETICS, Escavações, Muros Berlim, Estaleiro, etc.) → Fase 2.
-- Artigos e palavras-chave → Fase 3.
-- Lógica de classificação automática e Pacotes de Consulta → módulos seguintes.
+### 3. Seed inicial de subespecialidades
+
+Migração de dados (via insert tool) que popula subespecialidades padrão para cada especialidade, com `codigo` sequencial dentro da especialidade (ex.: `070.10`, `070.20`, ...) e `ordem` em múltiplos de 10:
+
+| Especialidade | Subespecialidades |
+|---|---|
+| 010 Preparação da Obra | Implantação Topográfica, Sondagens, Trabalhos Preparatórios, Desmatação |
+| 020 Instalações Provisórias | Estaleiro, Tapumes, Contentores, Água Provisória, Eletricidade Provisória, Sinalização de Obra, Proteções Coletivas, IS Provisórias |
+| 030 Demolições e Gestão de Resíduos | Demolições Estruturais, Demolições Não-Estruturais, Remoções, Transporte e Deposição RCD |
+| 040 Movimento de Terras | Escavações, Aterros, Desaterros, Compactações, Modelação de Terreno, Transporte de Terras |
+| 050 Contenções | Muros de Berlim, Estacas, Microestacas, Pregagens, Cortinas de Contenção, Ancoragens |
+| 060 Infraestruturas | Redes de Águas, Redes de Esgotos, Redes Pluviais, Drenagens, Caixas de Visita, Redes Enterradas, ETAR, Reservatórios, Estações Elevatórias |
+| 070 Estruturas | Fundações, Cofragens, Armaduras, Betão, Estruturas Metálicas, Pré-fabricados, Reparação Estrutural |
+| 080 Construção Civil | Alvenarias, Rebocos, Betonilhas |
+| 090 Envolvente | ETICS, Fachadas, Cobertura, Impermeabilizações, Cantarias, Isolamentos, Claraboias |
+| 100 Acabamentos Interiores | Tetos Falsos, Pladur, Revestimentos de Parede, Revestimentos de Pavimento, Pinturas, Carpintarias, Caixilharias, Serralharias, Espelhos, Louças e Torneiras |
+| 110 Especialidades Técnicas (MEP) | Eletricidade, ITED, SCIE, AVAC, Ventilação, Águas e Esgotos, Gás, Domótica, CCTV, Controlo de Acessos, Fotovoltaico, Bomba de Calor, Elevadores, Automação |
+| 120 Equipamentos | Eletrodomésticos, Equipamentos Sanitários, Lavandarias, Equipamentos Industriais |
+| 130 Arranjos Exteriores | Pavimentos Exteriores, Muros, Jardins, Rega, Piscinas, Portões, Vedação, Iluminação Exterior |
+| 140 Finalização e Entrega | Limpeza Final, Ensaios, Comissionamento, Telas Finais, Certificações |
+
+Total: ~95 subespecialidades-base. Como ainda não há artigos associados, a inserção é segura (limpa primeiro a tabela `biblioteca_subespecialidades`).
+
+### 4. Fora de âmbito (próximas fases)
+
+- Artigos Mestre e ligação Subespecialidade → Artigos (Fase 3).
+- Pacotes de Consulta (módulo Procurement futuro).
+- Drag-and-drop de reordenação — usa-se ↑/↓ por simplicidade e consistência.
+- Classificação automática / IA.
+
+### Arquivos afetados
+
+- **Reescrito:** `src/routes/_app/biblioteca-mestra.subespecialidades.tsx`
+- **Seed de dados:** insert SQL em `public.biblioteca_subespecialidades`
+- **Sem migração de schema, sem alterações noutros ficheiros.**
