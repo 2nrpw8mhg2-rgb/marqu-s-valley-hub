@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { suggestCategoria } from "@/lib/biblioteca-mestra/biblioteca.functions";
 import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,13 +12,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Search, X } from "lucide-react";
-import type { Especialidade, Subespecialidade, ArtigoMestre, ArtigoKeyword } from "@/lib/biblioteca-mestra/types";
+import { Plus, Pencil, Trash2, Search, X, Sparkles, FolderInput, Power } from "lucide-react";
+import type { Especialidade, Subespecialidade, Categoria, ArtigoMestre, ArtigoKeyword } from "@/lib/biblioteca-mestra/types";
 
 export const Route = createFileRoute("/_app/biblioteca-mestra/artigos")({
   head: () => ({ meta: [{ title: "Artigos Mestre — Biblioteca Mestra — MV OS" }] }),
@@ -27,14 +30,24 @@ type EditState = Partial<ArtigoMestre> & { positivas?: string[]; negativas?: str
 
 function ArtigosPage() {
   const qc = useQueryClient();
+  const suggest = useServerFn(suggestCategoria);
   const [search, setSearch] = useState("");
   const [espFilter, setEspFilter] = useState<string>("all");
   const [subFilter, setSubFilter] = useState<string>("all");
+  const [catFilter, setCatFilter] = useState<string>("all");
+  const [onlyPorClassificar, setOnlyPorClassificar] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<EditState | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [kwInputPos, setKwInputPos] = useState("");
   const [kwInputNeg, setKwInputNeg] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moveTargetCat, setMoveTargetCat] = useState<string>("");
+  const [moveEsp, setMoveEsp] = useState<string>("all");
+  const [moveSub, setMoveSub] = useState<string>("all");
+  const [suggestingId, setSuggestingId] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<{ artigoId: string; categoriaId: string; confianca: number; nomeCategoria: string } | null>(null);
 
   const { data: esps = [] } = useQuery({
     queryKey: ["bm-esp"],
@@ -43,6 +56,10 @@ function ArtigosPage() {
   const { data: subs = [] } = useQuery({
     queryKey: ["bm-sub"],
     queryFn: async () => (await supabase.from("biblioteca_subespecialidades").select("*").order("nome")).data as Subespecialidade[],
+  });
+  const { data: cats = [] } = useQuery({
+    queryKey: ["bm-cat"],
+    queryFn: async () => (await supabase.from("biblioteca_categorias").select("*").order("ordem").order("nome")).data as Categoria[],
   });
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["bm-art"],
@@ -55,6 +72,7 @@ function ArtigosPage() {
 
   const subMap = useMemo(() => new Map(subs.map((s) => [s.id, s])), [subs]);
   const espMap = useMemo(() => new Map(esps.map((e) => [e.id, e])), [esps]);
+  const catMap = useMemo(() => new Map(cats.map((c) => [c.id, c])), [cats]);
   const kwsByArt = useMemo(() => {
     const m = new Map<string, ArtigoKeyword[]>();
     for (const k of kws) {
@@ -69,10 +87,21 @@ function ArtigosPage() {
     return subs.filter((s) => s.especialidade_id === espFilter);
   }, [subs, espFilter]);
 
+  const catsBySub = useMemo(() => {
+    if (subFilter === "all") return cats;
+    return cats.filter((c) => c.subespecialidade_id === subFilter);
+  }, [cats, subFilter]);
+
+  const moveSubs = useMemo(() => moveEsp === "all" ? subs : subs.filter((s) => s.especialidade_id === moveEsp), [subs, moveEsp]);
+  const moveCats = useMemo(() => moveSub === "all" ? [] : cats.filter((c) => c.subespecialidade_id === moveSub), [cats, moveSub]);
+
   const filtered = rows.filter((r) => {
     const sub = subMap.get(r.subespecialidade_id);
+    const cat = catMap.get(r.categoria_id);
     if (espFilter !== "all" && sub?.especialidade_id !== espFilter) return false;
     if (subFilter !== "all" && r.subespecialidade_id !== subFilter) return false;
+    if (catFilter !== "all" && r.categoria_id !== catFilter) return false;
+    if (onlyPorClassificar && !(cat?.nome === "Por Classificar" && cat.ordem === 0)) return false;
     if (search.trim()) {
       const t = search.toLowerCase();
       const kwHit = (kwsByArt.get(r.id) ?? []).some((k) => k.termo.toLowerCase().includes(t));
@@ -95,7 +124,9 @@ function ArtigosPage() {
         negativas: list.filter((k) => k.tipo === "negativa").map((k) => k.termo),
       });
     } else {
-      setEditing({ ativo: true, positivas: [], negativas: [], subespecialidade_id: subFilter !== "all" ? subFilter : undefined });
+      const defSub = subFilter !== "all" ? subFilter : undefined;
+      const defCat = catFilter !== "all" ? catFilter : (defSub ? cats.find((c) => c.subespecialidade_id === defSub && c.ordem === 0)?.id : undefined);
+      setEditing({ ativo: true, positivas: [], negativas: [], subespecialidade_id: defSub, categoria_id: defCat });
     }
     setKwInputPos("");
     setKwInputNeg("");
@@ -105,9 +136,12 @@ function ArtigosPage() {
   const save = useMutation({
     mutationFn: async (e: EditState) => {
       if (!e.descricao?.trim()) throw new Error("Descrição obrigatória");
-      if (!e.subespecialidade_id) throw new Error("Subespecialidade obrigatória");
+      if (!e.categoria_id) throw new Error("Categoria obrigatória");
+      const cat = catMap.get(e.categoria_id);
+      if (!cat) throw new Error("Categoria inválida");
       const payload = {
-        subespecialidade_id: e.subespecialidade_id,
+        subespecialidade_id: cat.subespecialidade_id,
+        categoria_id: e.categoria_id,
         codigo: e.codigo ?? null,
         descricao: e.descricao.trim(),
         unidade: e.unidade ?? null,
@@ -123,7 +157,6 @@ function ArtigosPage() {
         if (error) throw error;
         artigoId = data.id;
       }
-      // Replace keywords
       await supabase.from("biblioteca_artigo_keywords").delete().eq("artigo_id", artigoId!);
       const all = [
         ...(e.positivas ?? []).map((t) => ({ artigo_id: artigoId!, termo: t, tipo: "positiva" as const })),
@@ -152,6 +185,35 @@ function ArtigosPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["bm-art"] }); setDeleteId(null); toast.success("Eliminado"); },
   });
 
+  const bulkMove = useMutation({
+    mutationFn: async ({ ids, categoria_id }: { ids: string[]; categoria_id: string }) => {
+      const cat = catMap.get(categoria_id);
+      if (!cat) throw new Error("Categoria inválida");
+      const { error } = await supabase.from("biblioteca_artigos").update({ categoria_id, subespecialidade_id: cat.subespecialidade_id }).in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => { qc.invalidateQueries({ queryKey: ["bm-art"] }); setSelected(new Set()); setMoveOpen(false); toast.success(`${v.ids.length} artigo(s) movido(s)`); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const bulkToggle = useMutation({
+    mutationFn: async ({ ids, ativo }: { ids: string[]; ativo: boolean }) => {
+      const { error } = await supabase.from("biblioteca_artigos").update({ ativo }).in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => { qc.invalidateQueries({ queryKey: ["bm-art"] }); toast.success(`${v.ids.length} artigo(s) atualizado(s)`); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const bulkDelete = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from("biblioteca_artigos").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_d, ids) => { qc.invalidateQueries({ queryKey: ["bm-art"] }); setSelected(new Set()); toast.success(`${ids.length} artigo(s) eliminado(s)`); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const addKw = (kind: "positivas" | "negativas", val: string) => {
     const t = val.trim();
     if (!t || !editing) return;
@@ -160,11 +222,41 @@ function ArtigosPage() {
     setEditing({ ...editing, [kind]: [...cur, t] });
   };
 
+  const handleSuggest = async (a: ArtigoMestre) => {
+    setSuggestingId(a.id);
+    try {
+      const res = await suggest({ data: { descricao: a.descricao, subespecialidadeId: a.subespecialidade_id } });
+      const cat = catMap.get(res.categoriaId);
+      if (!cat) throw new Error("Categoria sugerida não encontrada");
+      setSuggestion({ artigoId: a.id, categoriaId: res.categoriaId, confianca: res.confianca, nomeCategoria: cat.nome });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha na sugestão");
+    } finally {
+      setSuggestingId(null);
+    }
+  };
+
+  const applySuggestion = async () => {
+    if (!suggestion) return;
+    await bulkMove.mutateAsync({ ids: [suggestion.artigoId], categoria_id: suggestion.categoriaId });
+    setSuggestion(null);
+  };
+
+  const toggleAll = () => {
+    if (selected.size === filtered.length) setSelected(new Set());
+    else setSelected(new Set(filtered.map((r) => r.id)));
+  };
+  const toggleOne = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  };
+
   return (
     <>
       <PageHeader
         title="Artigos Mestre"
-        subtitle="Conhecimento técnico atómico — cada artigo pertence a uma subespecialidade"
+        subtitle="Conhecimento técnico atómico — cada artigo pertence a uma categoria"
         actions={<Button onClick={() => openEdit()}><Plus className="h-4 w-4 mr-1" /> Novo</Button>}
       />
       <div className="p-6 space-y-4">
@@ -173,47 +265,90 @@ function ArtigosPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Pesquisar..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
-          <Select value={espFilter} onValueChange={(v) => { setEspFilter(v); setSubFilter("all"); }}>
-            <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+          <Select value={espFilter} onValueChange={(v) => { setEspFilter(v); setSubFilter("all"); setCatFilter("all"); }}>
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as especialidades</SelectItem>
               {esps.map((e) => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={subFilter} onValueChange={setSubFilter}>
-            <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+          <Select value={subFilter} onValueChange={(v) => { setSubFilter(v); setCatFilter("all"); }}>
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as subespecialidades</SelectItem>
               {subsByEsp.map((s) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Select value={catFilter} onValueChange={setCatFilter}>
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as categorias</SelectItem>
+              {catsBySub.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button
+            variant={onlyPorClassificar ? "default" : "outline"}
+            size="sm"
+            onClick={() => setOnlyPorClassificar((v) => !v)}
+          >
+            Apenas "Por Classificar"
+          </Button>
         </div>
+
+        {selected.size > 0 && (
+          <Card className="bg-primary/5 border-primary/30 p-3 flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-medium">{selected.size} selecionado(s)</span>
+            <Button size="sm" variant="outline" onClick={() => { setMoveOpen(true); setMoveTargetCat(""); setMoveEsp("all"); setMoveSub("all"); }}>
+              <FolderInput className="h-4 w-4 mr-1" /> Mover para categoria…
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => bulkToggle.mutate({ ids: Array.from(selected), ativo: true })}>
+              <Power className="h-4 w-4 mr-1" /> Ativar
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => bulkToggle.mutate({ ids: Array.from(selected), ativo: false })}>
+              <Power className="h-4 w-4 mr-1" /> Desativar
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => { if (confirm(`Eliminar ${selected.size} artigo(s)?`)) bulkDelete.mutate(Array.from(selected)); }}>
+              <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Limpar seleção</Button>
+          </Card>
+        )}
 
         <Card className="bg-card border-border">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={filtered.length > 0 && selected.size === filtered.length}
+                    onCheckedChange={toggleAll}
+                  />
+                </TableHead>
                 <TableHead className="w-24">Código</TableHead>
                 <TableHead>Descrição</TableHead>
-                <TableHead>Subespecialidade</TableHead>
+                <TableHead>Categoria</TableHead>
                 <TableHead className="w-16">Un.</TableHead>
                 <TableHead>Palavras-chave</TableHead>
-                <TableHead className="w-32 text-right">Ações</TableHead>
+                <TableHead className="w-40 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground">A carregar...</TableCell></TableRow>}
-              {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground">Sem artigos</TableCell></TableRow>}
+              {isLoading && <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">A carregar...</TableCell></TableRow>}
+              {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">Sem artigos</TableCell></TableRow>}
               {filtered.map((r) => {
                 const sub = subMap.get(r.subespecialidade_id);
                 const esp = sub ? espMap.get(sub.especialidade_id) : null;
+                const cat = catMap.get(r.categoria_id);
+                const isPorClassificar = cat?.nome === "Por Classificar" && cat.ordem === 0;
                 const arrKw = kwsByArt.get(r.id) ?? [];
                 return (
-                  <TableRow key={r.id}>
+                  <TableRow key={r.id} className={isPorClassificar ? "bg-amber-50/40 dark:bg-amber-900/10" : ""}>
+                    <TableCell><Checkbox checked={selected.has(r.id)} onCheckedChange={() => toggleOne(r.id)} /></TableCell>
                     <TableCell className="font-mono text-xs">{r.codigo ?? "—"}</TableCell>
                     <TableCell className="font-medium">{r.descricao}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {esp?.nome} / {sub?.nome ?? "—"}
+                    <TableCell className="text-sm">
+                      <div className="text-muted-foreground text-xs">{esp?.nome} / {sub?.nome ?? "—"}</div>
+                      <div className={isPorClassificar ? "text-amber-700 dark:text-amber-400 font-medium" : ""}>{cat?.nome ?? "—"}</div>
                     </TableCell>
                     <TableCell>{r.unidade ?? "—"}</TableCell>
                     <TableCell>
@@ -227,6 +362,11 @@ function ArtigosPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
+                      {isPorClassificar && (
+                        <Button size="icon" variant="ghost" onClick={() => handleSuggest(r)} disabled={suggestingId === r.id} title="Sugerir categoria com IA">
+                          <Sparkles className={`h-4 w-4 ${suggestingId === r.id ? "animate-pulse" : ""}`} />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => setDeleteId(r.id)}><Trash2 className="h-4 w-4" /></Button>
                     </TableCell>
@@ -238,22 +378,46 @@ function ArtigosPage() {
         </Card>
       </div>
 
+      {/* Editar/Criar */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{editing?.id ? "Editar" : "Novo"} Artigo Mestre</DialogTitle></DialogHeader>
           <div className="space-y-3 max-h-[70vh] overflow-y-auto">
-            <div>
-              <Label>Subespecialidade *</Label>
-              <Select value={editing?.subespecialidade_id} onValueChange={(v) => setEditing({ ...editing, subespecialidade_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
-                <SelectContent>
-                  {subs.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {espMap.get(s.especialidade_id)?.nome} / {s.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Subespecialidade *</Label>
+                <Select
+                  value={editing?.subespecialidade_id}
+                  onValueChange={(v) => {
+                    const firstCat = cats.find((c) => c.subespecialidade_id === v && c.ordem === 0);
+                    setEditing({ ...editing, subespecialidade_id: v, categoria_id: firstCat?.id });
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                  <SelectContent>
+                    {subs.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {espMap.get(s.especialidade_id)?.nome} / {s.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Categoria *</Label>
+                <Select
+                  value={editing?.categoria_id}
+                  onValueChange={(v) => setEditing({ ...editing, categoria_id: v })}
+                  disabled={!editing?.subespecialidade_id}
+                >
+                  <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                  <SelectContent>
+                    {cats.filter((c) => c.subespecialidade_id === editing?.subespecialidade_id).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div><Label>Código</Label><Input value={editing?.codigo ?? ""} onChange={(e) => setEditing({ ...editing, codigo: e.target.value })} /></div>
@@ -301,6 +465,67 @@ function ArtigosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Mover em massa */}
+      <Dialog open={moveOpen} onOpenChange={setMoveOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Mover {selected.size} artigo(s) para categoria</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Especialidade</Label>
+              <Select value={moveEsp} onValueChange={(v) => { setMoveEsp(v); setMoveSub("all"); setMoveTargetCat(""); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">—</SelectItem>
+                  {esps.map((e) => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Subespecialidade</Label>
+              <Select value={moveSub} onValueChange={(v) => { setMoveSub(v); setMoveTargetCat(""); }} disabled={moveEsp === "all"}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">—</SelectItem>
+                  {moveSubs.map((s) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Categoria *</Label>
+              <Select value={moveTargetCat} onValueChange={setMoveTargetCat} disabled={moveSub === "all"}>
+                <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                <SelectContent>
+                  {moveCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveOpen(false)}>Cancelar</Button>
+            <Button disabled={!moveTargetCat || bulkMove.isPending} onClick={() => bulkMove.mutate({ ids: Array.from(selected), categoria_id: moveTargetCat })}>Mover</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sugestão IA */}
+      <AlertDialog open={!!suggestion} onOpenChange={(o) => !o && setSuggestion(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sugestão da IA</AlertDialogTitle>
+          </AlertDialogHeader>
+          {suggestion && (
+            <div className="text-sm space-y-2">
+              <p>Categoria sugerida: <span className="font-medium">{suggestion.nomeCategoria}</span></p>
+              <p>Confiança: <span className="font-mono">{(suggestion.confianca * 100).toFixed(0)}%</span></p>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={applySuggestion}>Aplicar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
