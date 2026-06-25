@@ -1,74 +1,50 @@
 
-# Melhorias aos Artigos Mestre
+# Especialidade 020 — Instalações Provisórias
 
-Três melhorias estruturais à tabela `biblioteca_artigos` e respetiva UI em `/biblioteca-mestra/artigos`.
+Mesma estrutura usada na 010: criar Subespecialidades, Categorias e Artigos Mestre da especialidade já existente `020 — Instalações Provisórias` e popular as palavras-chave em `biblioteca_especialidade_keywords`.
 
-## 1. Campo "Tipo" do artigo
+## Subespecialidades (10)
 
-Novo enum `biblioteca_artigo_tipo` com os valores:
-`servico`, `material`, `equipamento`, `sistema`, `mao_obra`, `transporte`, `taxa_licenca`, `outros`.
+| Código | Nome |
+|---|---|
+| 020.01 | Estaleiro |
+| 020.02 | Tapumes e Vedação |
+| 020.03 | Contentores e Instalações de Apoio |
+| 020.04 | Água Provisória |
+| 020.05 | Eletricidade Provisória |
+| 020.06 | Comunicações |
+| 020.07 | Segurança do Estaleiro |
+| 020.08 | Sinalização de Obra |
+| 020.09 | Equipamentos Temporários |
+| 020.10 | Desmobilização |
 
-- Coluna `tipo biblioteca_artigo_tipo NOT NULL DEFAULT 'outros'` em `biblioteca_artigos`.
-- Backfill: todos os artigos existentes ficam `'outros'` (utilizador refina depois).
-- Índice `btree(tipo)` para filtros rápidos.
+Cada subespecialidade gera automaticamente a categoria `Por Classificar` via trigger.
 
-## 2. Campo "Estado IA"
+## Categorias manuais
 
-Novo enum `biblioteca_artigo_estado_ia` com os valores:
-`validado`, `revisto`, `criado_auto`, `pendente`.
+Exatamente as listadas pelo utilizador (22 no total): Implantação do Estaleiro, Infraestruturas do Estaleiro, Tapumes, Portões, Escritórios, Apoio aos Trabalhadores, Armazéns, Rede Provisória, Equipamentos (em 020.04), Alimentação, Distribuição, Telecomunicações, Controlo, Segurança Física, Equipamentos (em 020.07), Sinalização, Informação, Equipamentos (em 020.09), Apoio, Encerramento.
 
-- Coluna `estado_ia biblioteca_artigo_estado_ia NOT NULL DEFAULT 'pendente'` em `biblioteca_artigos`.
-- Backfill: artigos atuais (criados manualmente via SQL pelo utilizador) → `'validado'`.
-- Índice `btree(estado_ia)`.
+## Artigos Mestre
 
-## 3. Unidades normalizadas
+Todos os listados pelo utilizador (≈90), criados como atualmente:
+- `tipo = 'outros'` (default; utilizador refina depois)
+- `unidade_id` = `vg` (default global, igual à 010)
+- `estado_ia = 'validado'` (artigos criados manualmente)
+- `ativo = true`
+- Sem código (à imagem dos da 010); o utilizador pode preencher mais tarde.
 
-Nova tabela `public.biblioteca_unidades`:
+## Palavras-chave da especialidade
 
-| coluna | tipo | notas |
-|---|---|---|
-| `id` | uuid PK | |
-| `codigo` | text UNIQUE NOT NULL | ex: `m2`, `m3`, `un`, `vg` (sigla canónica usada em código) |
-| `simbolo` | text NOT NULL | ex: `m²`, `m³`, `un` (apresentado na UI) |
-| `nome` | text NOT NULL | ex: "Metro quadrado" |
-| `categoria` | text | "comprimento", "área", "volume", "massa", "tempo", "global"… (opcional, ajuda agrupar no dropdown) |
-| `ordem` | int default 100 | |
-| `ativa` | boolean default true | |
-| `created_at`/`updated_at` | timestamptz | + trigger `set_updated_at` |
+Inserir em `biblioteca_especialidade_keywords` para `especialidade_id = 0642a69d-…` (já existe):
+- 21 positivas, 14 negativas
+- `peso = 1.00`, `origem = 'manual'`, `ativo = true`
 
-Seed inicial: `un`, `m`, `m2`, `m3`, `ml`, `kg`, `t`, `vg`, `h`, `dia`, `mes`, `lote`, `cj`, `par`, `km`, `l`.
+## Execução
 
-RLS + GRANTs: leitura para `authenticated`, escrita reservada a `admin` (via `has_role(auth.uid(),'admin')`).
-
-### Migração de `biblioteca_artigos.unidade`
-
-- Adicionar `unidade_id uuid REFERENCES biblioteca_unidades(id) ON DELETE RESTRICT`.
-- Backfill: mapear texto livre atual → `unidade_id` via lookup case-insensitive contra `codigo`/`simbolo` (apenas `vg` existe hoje, fica trivial).
-- Manter a coluna `unidade` (texto) por agora como cache de leitura, alimentada por trigger a partir de `unidade_id`, para não partir consultas/orçamentos existentes. Pode ser removida em migração futura quando todo o código consumir `unidade_id`.
-- Após backfill: `ALTER COLUMN unidade_id SET NOT NULL`.
-
-## UI — `biblioteca-mestra.artigos.tsx`
-
-- **Listagem**: novas colunas `Tipo` (badge) e `Estado IA` (badge colorido com bolinha 🟢🟡🔵🔴). Coluna `Un.` passa a mostrar `simbolo` da unidade ligada.
-- **Filtros**: dropdowns adicionais `Tipo` e `Estado IA`.
-- **Ficha de edição**: novos campos obrigatórios `Tipo` (Select) e `Estado IA` (Select); `Unidade` passa de `Input` para `Select` (autocomplete via Command/Popover) alimentado por `biblioteca_unidades` ativas, ordenadas por categoria/ordem.
-- Validação no `save`: `tipo` e `unidade_id` obrigatórios; `estado_ia` default `'validado'` em novos artigos criados manualmente.
-- Atualizar `src/lib/biblioteca-mestra/types.ts` (`ArtigoMestre` ganha `tipo`, `estado_ia`, `unidade_id`; novo tipo `Unidade`).
-
-## Nova página: Gestão de Unidades
-
-- Rota `src/routes/_app/biblioteca-mestra.unidades.tsx` (CRUD simples idêntico ao das categorias): listar, criar, editar, ativar/desativar.
-- Entrada no menu/cards de `biblioteca-mestra.index.tsx`.
+Tudo numa única operação `INSERT` (ferramenta de dados, não migração de schema), idêntica ao padrão usado na 010. Não há alterações de schema, código frontend nem types.
 
 ## Fora de âmbito
 
-- Cor/ícone do badge "Estado IA" em outras páginas (orçamentos, procurement) — só Biblioteca Mestra.
-- Conversões automáticas entre unidades.
-- Remoção definitiva da coluna `unidade` texto (deferida).
-- Lógica de IA que muda `estado_ia` automaticamente (fica para a fase do motor de classificação).
-
-## Resumo técnico
-
-1 migração SQL: 2 enums + 3 colunas em `biblioteca_artigos` + tabela `biblioteca_unidades` (com GRANTs, RLS, trigger) + backfill + índices.
-1 insert SQL: seed das 16 unidades + backfill de `unidade_id`.
-Edições: `types.ts`, `biblioteca-mestra.artigos.tsx`, `biblioteca-mestra.index.tsx`, nova rota `biblioteca-mestra.unidades.tsx`.
+- Códigos numéricos por artigo
+- Classificação fina de `tipo` por artigo
+- Templates de obra, equivalências com 110 (MEP) ou 030 (Demolições)
