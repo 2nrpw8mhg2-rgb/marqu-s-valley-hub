@@ -1,15 +1,47 @@
-## Especialidade 050 — Contenções
+## Especialidade 060 — Redes Hidráulicas e Enterradas
 
-Inserir a Especialidade 050 com toda a estrutura fornecida, seguindo o mesmo padrão usado para 030 e 040.
+Seguir o mesmo padrão usado nas Especialidades 040 (Movimento de Terras) e 050 (Contenções): uma única migração SQL idempotente que popula toda a hierarquia, sem alterações de frontend (o Explorador já mostra automaticamente novas especialidades).
 
-### Inserção (uma operação SQL)
+### O que vai ser criado
 
-1. **`biblioteca_especialidades`** — código `050`, nome `Contenções`, ordem 50.
-2. **`biblioteca_subespecialidades`** — 10 subespecialidades (050.01 a 050.10): Cortinas de Contenção, Muros de Contenção, Pregagens e Ancoragens, Microestacas, Estabilização de Taludes, Betão Projetado, Drenagem de Contenções, Monitorização Geotécnica, Trabalhos Auxiliares, Contenções Temporárias. O trigger cria automaticamente a categoria "Por Classificar" em cada uma.
-3. **`biblioteca_categorias`** — todas as categorias listadas (Cortinas de Estacas, Cortinas Moldadas, Muros em Betão Armado, Muros Especiais, Pregagens, Ancoragens, Microestacas Estruturais, Reforço de Fundações, Proteção Superficial, Reforço, Shotcrete, Drenagem, Alívio Hidrostático, Instrumentação, Monitorização, Perfuração, Injeções, Sistemas Temporários, Proteção de Escavações), com código `050.XX.YY`.
-4. **`biblioteca_artigos`** — todos os artigos mestre listados (~85), unidade por defeito `vg` (a ajustar pelo utilizador), tipo `outros`, estado IA `pendente`.
-5. **`biblioteca_especialidade_keywords`** — palavras-chave positivas (24) e negativas (12).
+**1 Especialidade**
+- `060` — Redes Hidráulicas e Enterradas (ordem 60, ativo)
 
-### Sem alterações de UI
+**10 Subespecialidades** (`060.01` a `060.10`)
+- Rede de Abastecimento de Água
+- Rede de Saneamento Doméstico
+- Rede de Águas Pluviais
+- Drenagens
+- Reservatórios e Depósitos
+- Estações Elevatórias
+- ETAR e Tratamento de Águas
+- Ensaios e Colocação em Serviço
+- Trabalhos Complementares
+- Monitorização e Controlo
 
-A nova especialidade aparece automaticamente no Explorador da Biblioteca Mestra. Nenhum ficheiro de frontend é tocado.
+**~25 Categorias** com códigos sequenciais `060.XX.YY`
+- 060.01: Tubagens, Acessórios, Órgãos Hidráulicos, Ligações
+- 060.02: Coletores, Caixas, Ligações
+- 060.03: Coletores, Captação, Descarga
+- 060.04: Drenagem Periférica, Drenagem de Pavimentos
+- 060.05: Reservatórios, Equipamentos
+- 060.06: Obras Civis, Equipamentos
+- 060.07: Tratamento, Equipamentos
+- 060.08: Ensaios, Comissionamento
+- 060.09: Proteção, Identificação
+- 060.10: Controlo
+
+**~95 Artigos Mestre** (todos os listados no briefing)
+- `unidade_id` = unidade `vg` (vazia/genérica), `tipo='outros'`, `estado_ia='pendente'`, `ativo=true`
+
+**Keywords da especialidade** (`biblioteca_especialidade_keywords`)
+- 27 positivas (abastecimento de água, saneamento, PEAD, PVC, coletor, válvula, ETAR, etc.)
+- 13 negativas (cofragem, armaduras, betão estrutural, AVAC, ITED, etc.)
+
+### Detalhes técnicos
+
+- Ficheiro: `src/migrations/060_populate_redes_hidraulicas.sql`
+- Bloco `DO $$ ... $$` com estruturas `jsonb` para definir hierarquia
+- `ON CONFLICT DO NOTHING` em todas as inserções (idempotente / re-executável)
+- Sem alterações em código TS/React — a nova especialidade aparece automaticamente no Explorador da Biblioteca Mestra (Especialidade → Subespecialidade → Categoria → Artigo Mestre)
+- Verificação final por contagens (subespecialidades, categorias, artigos, keywords)
