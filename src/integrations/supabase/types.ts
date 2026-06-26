@@ -260,6 +260,7 @@ export type Database = {
           id: string
           nome: string
           ordem: number
+          subesp_como_disciplina: boolean
           updated_at: string
         }
         Insert: {
@@ -270,6 +271,7 @@ export type Database = {
           id?: string
           nome: string
           ordem?: number
+          subesp_como_disciplina?: boolean
           updated_at?: string
         }
         Update: {
@@ -280,42 +282,150 @@ export type Database = {
           id?: string
           nome?: string
           ordem?: number
+          subesp_como_disciplina?: boolean
           updated_at?: string
         }
         Relationships: []
+      }
+      biblioteca_subespecialidade_keywords: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          origem: Database["public"]["Enums"]["biblioteca_keyword_origem"]
+          peso: number
+          subespecialidade_id: string
+          termo: string
+          tipo: Database["public"]["Enums"]["biblioteca_keyword_tipo"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          origem?: Database["public"]["Enums"]["biblioteca_keyword_origem"]
+          peso?: number
+          subespecialidade_id: string
+          termo: string
+          tipo?: Database["public"]["Enums"]["biblioteca_keyword_tipo"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          origem?: Database["public"]["Enums"]["biblioteca_keyword_origem"]
+          peso?: number
+          subespecialidade_id?: string
+          termo?: string
+          tipo?: Database["public"]["Enums"]["biblioteca_keyword_tipo"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_subespecialidade_keywords_subespecialidade_id_fkey"
+            columns: ["subespecialidade_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_subespecialidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      biblioteca_subespecialidade_regras: {
+        Row: {
+          ativo: boolean
+          categoria_id: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          padrao: string
+          prioridade: number
+          subespecialidade_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          padrao: string
+          prioridade?: number
+          subespecialidade_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          padrao?: string
+          prioridade?: number
+          subespecialidade_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_subespecialidade_regras_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "biblioteca_subespecialidade_regras_subespecialidade_id_fkey"
+            columns: ["subespecialidade_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_subespecialidades"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       biblioteca_subespecialidades: {
         Row: {
           ativa: boolean
           codigo: string | null
+          cor: string | null
           created_at: string
           descricao: string | null
           especialidade_id: string
           id: string
           nome: string
           ordem: number
+          pastas_padrao: string[]
+          sequencia_construtiva: Json | null
+          slug: string | null
           updated_at: string
         }
         Insert: {
           ativa?: boolean
           codigo?: string | null
+          cor?: string | null
           created_at?: string
           descricao?: string | null
           especialidade_id: string
           id?: string
           nome: string
           ordem?: number
+          pastas_padrao?: string[]
+          sequencia_construtiva?: Json | null
+          slug?: string | null
           updated_at?: string
         }
         Update: {
           ativa?: boolean
           codigo?: string | null
+          cor?: string | null
           created_at?: string
           descricao?: string | null
           especialidade_id?: string
           id?: string
           nome?: string
           ordem?: number
+          pastas_padrao?: string[]
+          sequencia_construtiva?: Json | null
+          slug?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -902,6 +1012,7 @@ export type Database = {
           obra_id: string | null
           observacoes: string | null
           orcamento_id: string
+          subespecialidade_id: string | null
           updated_at: string
         }
         Insert: {
@@ -915,6 +1026,7 @@ export type Database = {
           obra_id?: string | null
           observacoes?: string | null
           orcamento_id: string
+          subespecialidade_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -928,6 +1040,7 @@ export type Database = {
           obra_id?: string | null
           observacoes?: string | null
           orcamento_id?: string
+          subespecialidade_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -943,6 +1056,13 @@ export type Database = {
             columns: ["orcamento_id"]
             isOneToOne: false
             referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procurement_pacotes_subespecialidade_id_fkey"
+            columns: ["subespecialidade_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_subespecialidades"
             referencedColumns: ["id"]
           },
         ]
@@ -989,6 +1109,7 @@ export type Database = {
           nome: string
           notas: string | null
           seguro_valido_ate: string | null
+          subespecialidades: string[]
           telefone: string | null
           telefones: string[]
           tipo: string | null
@@ -1012,6 +1133,7 @@ export type Database = {
           nome: string
           notas?: string | null
           seguro_valido_ate?: string | null
+          subespecialidades?: string[]
           telefone?: string | null
           telefones?: string[]
           tipo?: string | null
@@ -1035,6 +1157,7 @@ export type Database = {
           nome?: string
           notas?: string | null
           seguro_valido_ate?: string | null
+          subespecialidades?: string[]
           telefone?: string | null
           telefones?: string[]
           tipo?: string | null
