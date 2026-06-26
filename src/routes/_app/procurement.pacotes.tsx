@@ -26,10 +26,12 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
-  Plus, Sparkles, MoreHorizontal, Trash2, Copy, Pencil, Send, FolderOpen, ShoppingCart,
+  Plus, Sparkles, MoreHorizontal, Trash2, Copy, Pencil, Send, FolderOpen, ShoppingCart, Split,
 } from "lucide-react";
 import { ESPECIALIDADES, inferirEspecialidade, classificarArtigo, CONFIANCA_MINIMA, validarArtigoParaEspecialidade, isBetaoArtigo, type Especialidade } from "@/lib/procurement/especialidades";
 import { pertenceAoPacote } from "@/lib/procurement/classifier";
+import { useServerFn } from "@tanstack/react-start";
+import { splitPacoteMepEmDisciplinas } from "@/lib/procurement/disciplinas-mep.functions";
 
 export const BETAO_KEY = "__betao__";
 
