@@ -1,50 +1,53 @@
-# Expansão da Subespecialidade 100.05 — Carpintarias Interiores
 
-## Objetivo
+## Plano: Carregar Especialidade 110 — MEP na Biblioteca Mestra
 
-Acrescentar à Biblioteca Mestra a estrutura detalhada fornecida para **100.05 — Carpintarias Interiores**, com 6 categorias e cerca de 120 artigos mestre, sem afetar as restantes subespecialidades de `100`.
+### Estado atual
+A especialidade `110 — Especialidades Técnicas (MEP)` já existe, mas tem 14 subespecialidades antigas com códigos inconsistentes (dois `110.10`, sem categorias reais nem artigos). Apenas "Por Classificar" em cada uma.
 
-## Estrutura a inserir
+### O que vai ser feito (1 migração SQL)
 
-Subespecialidade alvo: **100.05 — Carpintarias Interiores** (já existente).
+**1. Limpar estrutura atual da MEP**
+- Apagar as 14 subespecialidades existentes da 110 (cascade elimina as categorias "Por Classificar" automáticas e os 0 artigos).
+- Não toca em mais nada da biblioteca.
 
-Categorias novas (códigos sequenciais a seguir aos já existentes da subespecialidade):
+**2. Criar 14 subespecialidades novas** (códigos 110.01 → 110.14) conforme a tua spec:
+```
+110.01 Instalações Elétricas        110.08 Segurança Eletrónica
+110.02 ITED e Telecomunicações      110.09 Energias Renováveis
+110.03 SCIE                          110.10 Bombas de Calor / AQS
+110.04 AVAC                          110.11 Elevadores e Transporte Vertical
+110.05 Redes Hidráulicas Interiores  110.12 Sistemas Especiais
+110.06 Gás                           110.13 Ensaios e Comissionamento
+110.07 Domótica e Automação          110.14 Gestão Técnica Centralizada (BMS)
+```
+(O trigger `tg_subesp_por_classificar` cria automaticamente a categoria "Por Classificar" em cada uma.)
 
-1. **100.05.XX — Portas** (30 artigos)
-2. **100.05.XX — Roupeiros** (17 artigos)
-3. **100.05.XX — Rodapés e Guarnições** (15 artigos)
-4. **100.05.XX — Escadas** (11 artigos)
-5. **100.05.XX — Mobiliário Fixo** (20 artigos)
-6. **100.05.XX — Revestimentos em Madeira** (13 artigos)
+**3. Criar ~40 categorias reais** (todas as listadas na spec — ex. "Quadros Elétricos", "Cablagem", "Tubagens e Caminhos", "Aparelhagem", "Iluminação" para 110.01, etc.).
 
-Total: **6 categorias novas** + **~106 artigos mestre**.
+**4. Criar ~150 artigos mestre** com:
+- `descricao` = nome do artigo da spec
+- `tipo` por defeito:
+  - `equipamento` — quadros, luminárias, bombas, inversores, elevadores, câmaras, centrais…
+  - `material` — cabos, tubagens, eletrocalhas, painéis, baterias…
+  - `sistema` — KNX, DALI, BMS, SCADA, gases medicinais…
+  - `servico` — ensaios, comissionamento, formação, certificação…
+- `unidade` por defeito:
+  - `un` para equipamentos / aparelhagem / luminárias
+  - `ml` para cabos, tubagens, eletrocalhas, condutas
+  - `vg` para sistemas, ensaios, comissionamento
+- `estado_ia = 'validado'` (entrada manual confirmada por ti)
+- `ativo = true`
 
-## Abordagem técnica
+**5. Adicionar keywords positivas e negativas** na tabela `biblioteca_especialidade_keywords` para a 110, exatamente as da spec, para alimentar o `suggestCategoria` e futuros classificadores.
 
-Uma única operação de inserção idempotente (`DO $$ ... $$`) através da ferramenta de dados:
+### O que NÃO faz
+- Não mexe noutras especialidades (010 a 100, 120+).
+- Não toca em código frontend — a página `/biblioteca-mestra/categorias` e `/artigos` já mostram tudo automaticamente.
+- Não cria pacotes de procurement nem templates de obra (fica para passo seguinte se quiseres).
 
-1. Localizar o `id` da subespecialidade `100.05`.
-2. Calcular o próximo `ordem` e o próximo sufixo de `codigo` (`100.05.YY`) com base nas categorias já existentes (excluindo a "Por Classificar").
-3. Para cada uma das 6 categorias:
-   - `INSERT ... ON CONFLICT (subespecialidade_id, nome) DO NOTHING` em `biblioteca_categorias`.
-   - Inserir os artigos correspondentes em `biblioteca_artigos` com:
-     - `subespecialidade_id` = 100.05
-     - `categoria_id` = nova categoria
-     - `unidade_id` = `un` quando aplicável (portas, roupeiros, ferragens, escadas isoladas, mobiliário por unidade); `ml` para rodapés/guarnições/perfis/corrimãos; `m2` para revestimentos/painéis/lambrins/tetos em madeira; `vg` para kits e conjuntos.
-     - `tipo='outros'`, `estado_ia='validado'`, `ativo=true`
-     - `ON CONFLICT (subespecialidade_id, descricao) DO NOTHING` para idempotência.
+### Pontos a confirmar antes de avançar
+1. **Unidades por defeito** — concordas com `un` / `ml` / `vg` conforme acima, ou queres rever caso a caso (são ~150 artigos)?
+2. **A 110.50 "Ventilação" antiga** desaparece (a spec mete ventilação dentro do AVAC 110.04). Confirmas?
+3. **Códigos dos artigos** — gero códigos sequenciais tipo `110.01.01.001`, ou deixo `codigo = NULL` (a app não exige)?
 
-Sem alterações de schema, sem alterações de frontend (aparecem automaticamente no Explorer da Biblioteca Mestra).
-
-## Verificação
-
-Após a inserção, query de contagem confirmando:
-- 6 novas categorias em `100.05`
-- ~106 novos artigos em `100.05`
-- Distribuição por categoria conforme tabela acima
-
-## Notas
-
-- Mantém-se a categoria automática "Por Classificar" intacta.
-- Caso já existam categorias com os mesmos nomes (ex.: "Portas"), o `ON CONFLICT` impede duplicação e os artigos são associados à existente.
-- Unidades atribuídas por heurística por categoria; podem ser afinadas individualmente depois.
+Assim que confirmares (ou disseres "avança com os defaults"), passo a build mode e executo a migração numa única transação.
