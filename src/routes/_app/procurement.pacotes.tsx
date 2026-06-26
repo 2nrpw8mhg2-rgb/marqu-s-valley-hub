@@ -350,6 +350,7 @@ function PacotesListPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setEditPacote(p)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => duplicar.mutate(p)}><Copy className="h-4 w-4 mr-2" /> Duplicar</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => dividir.mutate(p.id)}><Split className="h-4 w-4 mr-2" /> Dividir por disciplina (MEP)</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => prepararEnvio.mutate(p.id)}><Send className="h-4 w-4 mr-2" /> Preparar envio</DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => setEliminarId(p.id)}>
                               <Trash2 className="h-4 w-4 mr-2" /> Eliminar
