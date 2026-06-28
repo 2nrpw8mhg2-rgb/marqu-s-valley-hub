@@ -38,14 +38,26 @@ export type ClassificacaoResultado = {
 };
 
 // Pesos configuráveis (preparado para configuração futura)
+// Política conservadora: keywords de ESP/SUBESP nunca classificam sozinhas;
+// só reforçam um candidato com forte similaridade textual ao artigo mestre.
 export const PESOS_CLASSIFICACAO = {
-  ESP: 20,
-  SUBESP: 30,
-  CAT: 40,
-  ART: 60,
+  ESP_CAP: 10,           // teto de reforço por hits da especialidade
+  SUBESP_CAP: 15,        // teto de reforço por hits da subespecialidade
+  ART_KEYWORD: 60,       // por keyword positiva de artigo
   NEGATIVA: -80,
-  LIMIAR_AUTO: 90,
-  LIMIAR_REVER: 70,
+  UNIDADE_OK: 15,
+  UNIDADE_BAD: -25,
+  NGRAMA2: 15,
+  NGRAMA3: 25,
+  NGRAMA_CAP: 40,
+  TOKEN_RARO: 10,
+  TOKEN_RARO_CAP: 20,
+  MIN_TEXTO: 40,         // score_texto mínimo para ser candidato
+  MIN_TEXTO_UNIDADE: 30, // mínimo se unidade compatível
+  LIMIAR_AUTO: 85,
+  LIMIAR_REVER: 60,
+  MIN_TEXTO_AUTO: 50,    // score_texto mínimo para classificado_auto
+  MARGEM_AUTO: 15,       // diferença top1-top2 mínima para auto
 } as const;
 
 // Abreviaturas e expansões comuns no setor
