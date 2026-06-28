@@ -203,7 +203,21 @@ export function ClassificacaoSidePanel({
 
               <Separator />
 
-              {/* Ações */}
+              {/* Biblioteca Analisada */}
+              <BibliotecaAnalisadaSection
+                orcamentoId={orcamentoId}
+                candidatosCount={row.candidatos?.length ?? 0}
+                semClassificacao={row.estado === "sem_classificacao"}
+              />
+
+              {/* Como Ensinar a IA — só para sem classificação ou confiança baixa */}
+              {(row.estado === "sem_classificacao" || row.confianca < 70) && (
+                <ComoEnsinarIASection onAction={handleEnsinar} />
+              )}
+
+              <Separator />
+
+              {/* Ações principais */}
               <Section title="Ações">
                 <div className="grid grid-cols-2 gap-2">
                   <Button
@@ -217,25 +231,6 @@ export function ClassificacaoSidePanel({
                   <Button size="sm" variant="outline" onClick={() => onCorrigir(row)}>
                     <Edit3 className="h-4 w-4 mr-1" /> Corrigir
                   </Button>
-                  <Button
-                    size="sm" variant="outline"
-                    onClick={() => navigate({ to: "/biblioteca-mestra/artigos", search: { novo: 1, desc: row.descricao_original } as any })}
-                  >
-                    <Plus className="h-4 w-4 mr-1" /> Criar Artigo Mestre
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setKwOpen(true)}>
-                    <Tag className="h-4 w-4 mr-1" /> Adicionar Palavra-chave
-                  </Button>
-                  <Button size="sm" variant="outline" disabled onClick={() => toast.info("Motor de regras em breve")}>
-                    <Sparkles className="h-4 w-4 mr-1" /> Criar Regra
-                  </Button>
-                  <Button
-                    size="sm" variant="outline"
-                    disabled={!row.artigo_mestre_id}
-                    onClick={() => navigate({ to: "/biblioteca-mestra/artigos" })}
-                  >
-                    <GitBranch className="h-4 w-4 mr-1" /> Adicionar Relação
-                  </Button>
                 </div>
               </Section>
             </div>
@@ -245,8 +240,9 @@ export function ClassificacaoSidePanel({
               artigoMestreId={row.artigo_mestre_id}
               subespecialidadeId={row.subespecialidade_id}
               especialidadeId={row.especialidade_id}
-              onSaved={onRefresh}
+              onSaved={() => { invalidateStats(); onRefresh(); }}
             />
+
           </>
         )}
       </SheetContent>
