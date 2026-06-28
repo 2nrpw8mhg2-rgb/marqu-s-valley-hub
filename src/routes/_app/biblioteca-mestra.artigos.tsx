@@ -18,9 +18,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Search, X, Sparkles, FolderInput, Power } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, X, Sparkles, FolderInput, Power, GitBranch } from "lucide-react";
 import type { Especialidade, Subespecialidade, Categoria, ArtigoMestre, ArtigoKeyword, Unidade, ArtigoTipo, ArtigoEstadoIA } from "@/lib/biblioteca-mestra/types";
 import { ARTIGO_TIPOS, ARTIGO_ESTADOS_IA } from "@/lib/biblioteca-mestra/types";
+import { ArtigoRelacoesDialog } from "@/components/biblioteca-mestra/ArtigoRelacoesDialog";
 
 export const Route = createFileRoute("/_app/biblioteca-mestra/artigos")({
   head: () => ({ meta: [{ title: "Artigos Mestre — Biblioteca Mestra — MV OS" }] }),
@@ -51,6 +52,7 @@ function ArtigosPage() {
   const [moveSub, setMoveSub] = useState<string>("all");
   const [suggestingId, setSuggestingId] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<{ artigoId: string; categoriaId: string; confianca: number; nomeCategoria: string } | null>(null);
+  const [relacoesArtId, setRelacoesArtId] = useState<string | null>(null);
 
   const { data: esps = [] } = useQuery({
     queryKey: ["bm-esp"],
@@ -419,6 +421,7 @@ function ArtigosPage() {
                           <Sparkles className={`h-4 w-4 ${suggestingId === r.id ? "animate-pulse" : ""}`} />
                         </Button>
                       )}
+                      <Button size="icon" variant="ghost" onClick={() => setRelacoesArtId(r.id)} title="Relações construtivas"><GitBranch className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => setDeleteId(r.id)}><Trash2 className="h-4 w-4" /></Button>
                     </TableCell>
@@ -620,6 +623,12 @@ function ArtigosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ArtigoRelacoesDialog
+        artigoId={relacoesArtId}
+        open={!!relacoesArtId}
+        onOpenChange={(o) => !o && setRelacoesArtId(null)}
+      />
     </>
   );
 }

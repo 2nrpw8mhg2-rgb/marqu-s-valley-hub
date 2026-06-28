@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, ListChecks, GitBranch, GitCompare, ShoppingCart, CheckCircle2, RotateCw } from "lucide-react";
 import { ImportMQDialog } from "@/components/orcamentos/ImportMQDialog";
 import { runClassificacao, type ClassificacaoProgress } from "@/lib/classificacao/engine";
+import { CoerenciaTecnicaCard } from "@/components/obras/CoerenciaTecnicaCard";
 import { toast } from "sonner";
 import type { ParsedRow } from "@/lib/mq-parser";
 
@@ -272,6 +273,9 @@ function MQModule() {
         <KPI label="A validar" value={orc.rever} tone="yellow" />
         <KPI label="Sem classif." value={orc.sem} tone="muted" />
       </div>
+
+      {/* Coerência técnica — Motor de Relações Construtivas */}
+      <CoerenciaTecnicaCard orcamentoId={orc.orc.id} />
 
       <ImportMQDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
     </div>
