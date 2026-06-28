@@ -421,6 +421,7 @@ function ArtigosPage() {
                           <Sparkles className={`h-4 w-4 ${suggestingId === r.id ? "animate-pulse" : ""}`} />
                         </Button>
                       )}
+                      <Button size="icon" variant="ghost" onClick={() => setRelacoesArtId(r.id)} title="Relações construtivas"><GitBranch className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => setDeleteId(r.id)}><Trash2 className="h-4 w-4" /></Button>
                     </TableCell>
