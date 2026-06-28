@@ -106,6 +106,14 @@ function CentroClassificacao() {
     },
   });
 
+  const { data: memoriaTotal = 0 } = useQuery({
+    queryKey: ["cc-memoria-total"],
+    queryFn: async () => {
+      const { count } = await supabase.from("classificacao_memoria").select("id", { count: "exact", head: true });
+      return count ?? 0;
+    },
+  });
+
   const { data: esps = [] } = useQuery({
     queryKey: ["cc-esps"],
     queryFn: async () => (await supabase.from("biblioteca_especialidades").select("id, nome").order("ordem")).data as any[],
