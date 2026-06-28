@@ -13,7 +13,6 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSubempreiteirosRouteImport } from './routes/_app/subempreiteiros'
-import { Route as AppObrasRouteImport } from './routes/_app/obras'
 import { Route as AppMotorClassificacaoRouteImport } from './routes/_app/motor-classificacao'
 import { Route as AppDocumentosRouteImport } from './routes/_app/documentos'
 import { Route as AppDecomposicaoPrecosRouteImport } from './routes/_app/decomposicao-precos'
@@ -21,6 +20,7 @@ import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppBibliotecaMestraRouteImport } from './routes/_app/biblioteca-mestra'
 import { Route as AppBibliotecaRouteImport } from './routes/_app/biblioteca'
 import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos.index'
+import { Route as AppObrasIndexRouteImport } from './routes/_app/obras.index'
 import { Route as AppBibliotecaMestraIndexRouteImport } from './routes/_app/biblioteca-mestra.index'
 import { Route as AppProcurementPacotesRouteImport } from './routes/_app/procurement.pacotes'
 import { Route as AppOrcamentosDecomposicaoRouteImport } from './routes/_app/orcamentos.decomposicao'
@@ -64,11 +64,6 @@ const AppSubempreiteirosRoute = AppSubempreiteirosRouteImport.update({
   path: '/subempreiteiros',
   getParentRoute: () => AppRoute,
 } as any)
-const AppObrasRoute = AppObrasRouteImport.update({
-  id: '/obras',
-  path: '/obras',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppMotorClassificacaoRoute = AppMotorClassificacaoRouteImport.update({
   id: '/motor-classificacao',
   path: '/motor-classificacao',
@@ -104,6 +99,11 @@ const AppOrcamentosIndexRoute = AppOrcamentosIndexRouteImport.update({
   path: '/orcamentos/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppObrasIndexRoute = AppObrasIndexRouteImport.update({
+  id: '/obras/',
+  path: '/obras/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBibliotecaMestraIndexRoute =
   AppBibliotecaMestraIndexRouteImport.update({
     id: '/',
@@ -122,9 +122,9 @@ const AppOrcamentosDecomposicaoRoute =
     getParentRoute: () => AppRoute,
   } as any)
 const AppObrasIdRoute = AppObrasIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AppObrasRoute,
+  id: '/obras/$id',
+  path: '/obras/$id',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppBibliotecaMestraUnidadesRoute =
   AppBibliotecaMestraUnidadesRouteImport.update({
@@ -239,7 +239,6 @@ export interface FileRoutesByFullPath {
   '/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/documentos': typeof AppDocumentosRoute
   '/motor-classificacao': typeof AppMotorClassificacaoRoute
-  '/obras': typeof AppObrasRouteWithChildren
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
   '/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
@@ -252,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/procurement/pacotes': typeof AppProcurementPacotesRouteWithChildren
   '/biblioteca-mestra/': typeof AppBibliotecaMestraIndexRoute
+  '/obras/': typeof AppObrasIndexRoute
   '/orcamentos/': typeof AppOrcamentosIndexRoute
   '/obras/$id/documentos': typeof AppObrasIdDocumentosRoute
   '/obras/$id/financeira': typeof AppObrasIdFinanceiraRoute
@@ -274,7 +274,6 @@ export interface FileRoutesByTo {
   '/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/documentos': typeof AppDocumentosRoute
   '/motor-classificacao': typeof AppMotorClassificacaoRoute
-  '/obras': typeof AppObrasRouteWithChildren
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
   '/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
@@ -286,6 +285,7 @@ export interface FileRoutesByTo {
   '/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/procurement/pacotes': typeof AppProcurementPacotesRouteWithChildren
   '/biblioteca-mestra': typeof AppBibliotecaMestraIndexRoute
+  '/obras': typeof AppObrasIndexRoute
   '/orcamentos': typeof AppOrcamentosIndexRoute
   '/obras/$id/documentos': typeof AppObrasIdDocumentosRoute
   '/obras/$id/financeira': typeof AppObrasIdFinanceiraRoute
@@ -311,7 +311,6 @@ export interface FileRoutesById {
   '/_app/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/_app/documentos': typeof AppDocumentosRoute
   '/_app/motor-classificacao': typeof AppMotorClassificacaoRoute
-  '/_app/obras': typeof AppObrasRouteWithChildren
   '/_app/subempreiteiros': typeof AppSubempreiteirosRoute
   '/_app/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
   '/_app/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
@@ -324,6 +323,7 @@ export interface FileRoutesById {
   '/_app/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/_app/procurement/pacotes': typeof AppProcurementPacotesRouteWithChildren
   '/_app/biblioteca-mestra/': typeof AppBibliotecaMestraIndexRoute
+  '/_app/obras/': typeof AppObrasIndexRoute
   '/_app/orcamentos/': typeof AppOrcamentosIndexRoute
   '/_app/obras/$id/documentos': typeof AppObrasIdDocumentosRoute
   '/_app/obras/$id/financeira': typeof AppObrasIdFinanceiraRoute
@@ -349,7 +349,6 @@ export interface FileRouteTypes {
     | '/decomposicao-precos'
     | '/documentos'
     | '/motor-classificacao'
-    | '/obras'
     | '/subempreiteiros'
     | '/biblioteca-mestra/artigos'
     | '/biblioteca-mestra/categorias'
@@ -362,6 +361,7 @@ export interface FileRouteTypes {
     | '/orcamentos/decomposicao'
     | '/procurement/pacotes'
     | '/biblioteca-mestra/'
+    | '/obras/'
     | '/orcamentos/'
     | '/obras/$id/documentos'
     | '/obras/$id/financeira'
@@ -384,7 +384,6 @@ export interface FileRouteTypes {
     | '/decomposicao-precos'
     | '/documentos'
     | '/motor-classificacao'
-    | '/obras'
     | '/subempreiteiros'
     | '/biblioteca-mestra/artigos'
     | '/biblioteca-mestra/categorias'
@@ -396,6 +395,7 @@ export interface FileRouteTypes {
     | '/orcamentos/decomposicao'
     | '/procurement/pacotes'
     | '/biblioteca-mestra'
+    | '/obras'
     | '/orcamentos'
     | '/obras/$id/documentos'
     | '/obras/$id/financeira'
@@ -420,7 +420,6 @@ export interface FileRouteTypes {
     | '/_app/decomposicao-precos'
     | '/_app/documentos'
     | '/_app/motor-classificacao'
-    | '/_app/obras'
     | '/_app/subempreiteiros'
     | '/_app/biblioteca-mestra/artigos'
     | '/_app/biblioteca-mestra/categorias'
@@ -433,6 +432,7 @@ export interface FileRouteTypes {
     | '/_app/orcamentos/decomposicao'
     | '/_app/procurement/pacotes'
     | '/_app/biblioteca-mestra/'
+    | '/_app/obras/'
     | '/_app/orcamentos/'
     | '/_app/obras/$id/documentos'
     | '/_app/obras/$id/financeira'
@@ -484,13 +484,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSubempreiteirosRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/obras': {
-      id: '/_app/obras'
-      path: '/obras'
-      fullPath: '/obras'
-      preLoaderRoute: typeof AppObrasRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/motor-classificacao': {
       id: '/_app/motor-classificacao'
       path: '/motor-classificacao'
@@ -540,6 +533,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrcamentosIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/obras/': {
+      id: '/_app/obras/'
+      path: '/obras'
+      fullPath: '/obras/'
+      preLoaderRoute: typeof AppObrasIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/biblioteca-mestra/': {
       id: '/_app/biblioteca-mestra/'
       path: '/'
@@ -563,10 +563,10 @@ declare module '@tanstack/react-router' {
     }
     '/_app/obras/$id': {
       id: '/_app/obras/$id'
-      path: '/$id'
+      path: '/obras/$id'
       fullPath: '/obras/$id'
       preLoaderRoute: typeof AppObrasIdRouteImport
-      parentRoute: typeof AppObrasRoute
+      parentRoute: typeof AppRoute
     }
     '/_app/biblioteca-mestra/unidades': {
       id: '/_app/biblioteca-mestra/unidades'
@@ -759,18 +759,6 @@ const AppObrasIdRouteWithChildren = AppObrasIdRoute._addFileChildren(
   AppObrasIdRouteChildren,
 )
 
-interface AppObrasRouteChildren {
-  AppObrasIdRoute: typeof AppObrasIdRouteWithChildren
-}
-
-const AppObrasRouteChildren: AppObrasRouteChildren = {
-  AppObrasIdRoute: AppObrasIdRouteWithChildren,
-}
-
-const AppObrasRouteWithChildren = AppObrasRoute._addFileChildren(
-  AppObrasRouteChildren,
-)
-
 interface AppProcurementPacotesRouteChildren {
   AppProcurementPacotesIdRoute: typeof AppProcurementPacotesIdRoute
 }
@@ -791,10 +779,11 @@ interface AppRouteChildren {
   AppDecomposicaoPrecosRoute: typeof AppDecomposicaoPrecosRoute
   AppDocumentosRoute: typeof AppDocumentosRoute
   AppMotorClassificacaoRoute: typeof AppMotorClassificacaoRoute
-  AppObrasRoute: typeof AppObrasRouteWithChildren
   AppSubempreiteirosRoute: typeof AppSubempreiteirosRoute
+  AppObrasIdRoute: typeof AppObrasIdRouteWithChildren
   AppOrcamentosDecomposicaoRoute: typeof AppOrcamentosDecomposicaoRoute
   AppProcurementPacotesRoute: typeof AppProcurementPacotesRouteWithChildren
+  AppObrasIndexRoute: typeof AppObrasIndexRoute
   AppOrcamentosIndexRoute: typeof AppOrcamentosIndexRoute
   AppOrcamentosIdDecomposicaoRoute: typeof AppOrcamentosIdDecomposicaoRoute
   AppOrcamentosIdIndexRoute: typeof AppOrcamentosIdIndexRoute
@@ -807,10 +796,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppDecomposicaoPrecosRoute: AppDecomposicaoPrecosRoute,
   AppDocumentosRoute: AppDocumentosRoute,
   AppMotorClassificacaoRoute: AppMotorClassificacaoRoute,
-  AppObrasRoute: AppObrasRouteWithChildren,
   AppSubempreiteirosRoute: AppSubempreiteirosRoute,
+  AppObrasIdRoute: AppObrasIdRouteWithChildren,
   AppOrcamentosDecomposicaoRoute: AppOrcamentosDecomposicaoRoute,
   AppProcurementPacotesRoute: AppProcurementPacotesRouteWithChildren,
+  AppObrasIndexRoute: AppObrasIndexRoute,
   AppOrcamentosIndexRoute: AppOrcamentosIndexRoute,
   AppOrcamentosIdDecomposicaoRoute: AppOrcamentosIdDecomposicaoRoute,
   AppOrcamentosIdIndexRoute: AppOrcamentosIdIndexRoute,
