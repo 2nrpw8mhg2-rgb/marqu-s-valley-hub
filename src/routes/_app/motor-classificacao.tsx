@@ -378,7 +378,7 @@ function CentroClassificacao() {
                       <TableHead>Artigo Original</TableHead>
                       <TableHead>Especialidade / Subespecialidade</TableHead>
                       <TableHead>Artigo Mestre</TableHead>
-                      <TableHead className="w-32">Porquê?</TableHead>
+                      <TableHead className="w-72">Motivo da classificação</TableHead>
                       <TableHead className="w-20">Conf.</TableHead>
                       <TableHead className="w-28">Estado</TableHead>
                       <TableHead className="w-44 text-right">Ações</TableHead>
