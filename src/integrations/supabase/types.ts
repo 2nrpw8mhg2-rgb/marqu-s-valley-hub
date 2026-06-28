@@ -93,6 +93,73 @@ export type Database = {
           },
         ]
       }
+      biblioteca_artigo_relacoes: {
+        Row: {
+          artigo_destino_id: string
+          artigo_origem_id: string
+          confianca: number
+          created_at: string
+          created_by: string | null
+          id: string
+          obrigatoriedade: Database["public"]["Enums"]["obrigatoriedade_relacao"]
+          observacoes: string | null
+          origem: Database["public"]["Enums"]["origem_relacao"]
+          sistema_id: string | null
+          tipo_relacao: Database["public"]["Enums"]["tipo_relacao"]
+          updated_at: string
+        }
+        Insert: {
+          artigo_destino_id: string
+          artigo_origem_id: string
+          confianca?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          obrigatoriedade?: Database["public"]["Enums"]["obrigatoriedade_relacao"]
+          observacoes?: string | null
+          origem?: Database["public"]["Enums"]["origem_relacao"]
+          sistema_id?: string | null
+          tipo_relacao: Database["public"]["Enums"]["tipo_relacao"]
+          updated_at?: string
+        }
+        Update: {
+          artigo_destino_id?: string
+          artigo_origem_id?: string
+          confianca?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          obrigatoriedade?: Database["public"]["Enums"]["obrigatoriedade_relacao"]
+          observacoes?: string | null
+          origem?: Database["public"]["Enums"]["origem_relacao"]
+          sistema_id?: string | null
+          tipo_relacao?: Database["public"]["Enums"]["tipo_relacao"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_artigo_relacoes_artigo_destino_id_fkey"
+            columns: ["artigo_destino_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "biblioteca_artigo_relacoes_artigo_origem_id_fkey"
+            columns: ["artigo_origem_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "biblioteca_artigo_relacoes_sistema_id_fkey"
+            columns: ["sistema_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_sistemas_construtivos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       biblioteca_artigos: {
         Row: {
           ativo: boolean
@@ -280,6 +347,93 @@ export type Database = {
           id?: string
           nome?: string
           ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      biblioteca_sistema_artigos: {
+        Row: {
+          artigo_id: string
+          created_at: string
+          id: string
+          obrigatoriedade: Database["public"]["Enums"]["obrigatoriedade_relacao"]
+          observacoes: string | null
+          ordem_execucao: number
+          papel: Database["public"]["Enums"]["papel_sistema"]
+          sistema_id: string
+          updated_at: string
+        }
+        Insert: {
+          artigo_id: string
+          created_at?: string
+          id?: string
+          obrigatoriedade?: Database["public"]["Enums"]["obrigatoriedade_relacao"]
+          observacoes?: string | null
+          ordem_execucao?: number
+          papel?: Database["public"]["Enums"]["papel_sistema"]
+          sistema_id: string
+          updated_at?: string
+        }
+        Update: {
+          artigo_id?: string
+          created_at?: string
+          id?: string
+          obrigatoriedade?: Database["public"]["Enums"]["obrigatoriedade_relacao"]
+          observacoes?: string | null
+          ordem_execucao?: number
+          papel?: Database["public"]["Enums"]["papel_sistema"]
+          sistema_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_sistema_artigos_artigo_id_fkey"
+            columns: ["artigo_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "biblioteca_sistema_artigos_sistema_id_fkey"
+            columns: ["sistema_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_sistemas_construtivos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      biblioteca_sistemas_construtivos: {
+        Row: {
+          ativo: boolean
+          categoria_sistema: Database["public"]["Enums"]["categoria_sistema"]
+          codigo: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria_sistema?: Database["public"]["Enums"]["categoria_sistema"]
+          codigo?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria_sistema?: Database["public"]["Enums"]["categoria_sistema"]
+          codigo?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -842,6 +996,96 @@ export type Database = {
           valor_estimado?: number | null
         }
         Relationships: []
+      }
+      orcamento_alertas_tecnicos: {
+        Row: {
+          artigo_mestre_esperado_id: string
+          artigo_mestre_origem_id: string | null
+          artigo_mq_id: string | null
+          created_at: string
+          estado: Database["public"]["Enums"]["estado_alerta"]
+          id: string
+          justificacao: string | null
+          obrigatoriedade: Database["public"]["Enums"]["obrigatoriedade_relacao"]
+          orcamento_id: string
+          resolvido_em: string | null
+          resolvido_por: string | null
+          severidade: Database["public"]["Enums"]["severidade_alerta"]
+          sistema_id: string | null
+          tipo_relacao: Database["public"]["Enums"]["tipo_relacao"]
+          updated_at: string
+        }
+        Insert: {
+          artigo_mestre_esperado_id: string
+          artigo_mestre_origem_id?: string | null
+          artigo_mq_id?: string | null
+          created_at?: string
+          estado?: Database["public"]["Enums"]["estado_alerta"]
+          id?: string
+          justificacao?: string | null
+          obrigatoriedade: Database["public"]["Enums"]["obrigatoriedade_relacao"]
+          orcamento_id: string
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          severidade?: Database["public"]["Enums"]["severidade_alerta"]
+          sistema_id?: string | null
+          tipo_relacao: Database["public"]["Enums"]["tipo_relacao"]
+          updated_at?: string
+        }
+        Update: {
+          artigo_mestre_esperado_id?: string
+          artigo_mestre_origem_id?: string | null
+          artigo_mq_id?: string | null
+          created_at?: string
+          estado?: Database["public"]["Enums"]["estado_alerta"]
+          id?: string
+          justificacao?: string | null
+          obrigatoriedade?: Database["public"]["Enums"]["obrigatoriedade_relacao"]
+          orcamento_id?: string
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          severidade?: Database["public"]["Enums"]["severidade_alerta"]
+          sistema_id?: string | null
+          tipo_relacao?: Database["public"]["Enums"]["tipo_relacao"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamento_alertas_tecnicos_artigo_mestre_esperado_id_fkey"
+            columns: ["artigo_mestre_esperado_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamento_alertas_tecnicos_artigo_mestre_origem_id_fkey"
+            columns: ["artigo_mestre_origem_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamento_alertas_tecnicos_artigo_mq_id_fkey"
+            columns: ["artigo_mq_id"]
+            isOneToOne: false
+            referencedRelation: "orcamento_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamento_alertas_tecnicos_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamento_alertas_tecnicos_sistema_id_fkey"
+            columns: ["sistema_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_sistemas_construtivos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       orcamento_artigo_fontes: {
         Row: {
@@ -1491,6 +1735,15 @@ export type Database = {
         | "outros"
       biblioteca_keyword_origem: "manual" | "ia"
       biblioteca_keyword_tipo: "positiva" | "negativa"
+      categoria_sistema:
+        | "cobertura"
+        | "fachada"
+        | "pavimento"
+        | "estrutura"
+        | "impermeabilizacao"
+        | "redes"
+        | "acabamentos"
+        | "outros"
       classificacao_estado:
         | "classificado_auto"
         | "necessita_revisao"
@@ -1511,6 +1764,12 @@ export type Database = {
         | "caderno_encargos"
         | "proposta"
         | "outro"
+      estado_alerta:
+        | "aberto"
+        | "aceite_omissao"
+        | "justificado"
+        | "ignorado"
+        | "resolvido"
       estado_mq:
         | "importado"
         | "em_classificacao"
@@ -1518,12 +1777,36 @@ export type Database = {
         | "validado"
         | "convertido_pacotes"
       obra_estado: "oportunidade" | "em_curso" | "concluida" | "cancelada"
+      obrigatoriedade_relacao:
+        | "obrigatorio"
+        | "muito_frequente"
+        | "frequente"
+        | "opcional"
+        | "raro"
       orcamento_estado:
         | "rascunho"
         | "enviado"
         | "adjudicado"
         | "perdido"
         | "cancelado"
+      origem_relacao:
+        | "manual"
+        | "sistema"
+        | "auto_inverso"
+        | "ia"
+        | "aprendizagem"
+      papel_sistema:
+        | "principal"
+        | "fixacao"
+        | "isolamento"
+        | "impermeabilizacao"
+        | "acabamento"
+        | "acessorio"
+        | "remate"
+        | "drenagem"
+        | "ventilacao"
+        | "ensaio"
+        | "outro"
       procurement_pacote_estado:
         | "por_preparar"
         | "preparado"
@@ -1531,6 +1814,18 @@ export type Database = {
         | "em_analise"
         | "adjudicado"
         | "cancelado"
+      severidade_alerta: "critico" | "aviso" | "info"
+      tipo_relacao:
+        | "complementa"
+        | "depende_de"
+        | "antecede"
+        | "substitui"
+        | "incompativel"
+        | "opcional"
+        | "requerido_por"
+        | "precede"
+        | "substituido_por"
+        | "opcional_em"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1672,6 +1967,16 @@ export const Constants = {
       ],
       biblioteca_keyword_origem: ["manual", "ia"],
       biblioteca_keyword_tipo: ["positiva", "negativa"],
+      categoria_sistema: [
+        "cobertura",
+        "fachada",
+        "pavimento",
+        "estrutura",
+        "impermeabilizacao",
+        "redes",
+        "acabamentos",
+        "outros",
+      ],
       classificacao_estado: [
         "classificado_auto",
         "necessita_revisao",
@@ -1695,6 +2000,13 @@ export const Constants = {
         "proposta",
         "outro",
       ],
+      estado_alerta: [
+        "aberto",
+        "aceite_omissao",
+        "justificado",
+        "ignorado",
+        "resolvido",
+      ],
       estado_mq: [
         "importado",
         "em_classificacao",
@@ -1703,12 +2015,39 @@ export const Constants = {
         "convertido_pacotes",
       ],
       obra_estado: ["oportunidade", "em_curso", "concluida", "cancelada"],
+      obrigatoriedade_relacao: [
+        "obrigatorio",
+        "muito_frequente",
+        "frequente",
+        "opcional",
+        "raro",
+      ],
       orcamento_estado: [
         "rascunho",
         "enviado",
         "adjudicado",
         "perdido",
         "cancelado",
+      ],
+      origem_relacao: [
+        "manual",
+        "sistema",
+        "auto_inverso",
+        "ia",
+        "aprendizagem",
+      ],
+      papel_sistema: [
+        "principal",
+        "fixacao",
+        "isolamento",
+        "impermeabilizacao",
+        "acabamento",
+        "acessorio",
+        "remate",
+        "drenagem",
+        "ventilacao",
+        "ensaio",
+        "outro",
       ],
       procurement_pacote_estado: [
         "por_preparar",
@@ -1717,6 +2056,19 @@ export const Constants = {
         "em_analise",
         "adjudicado",
         "cancelado",
+      ],
+      severidade_alerta: ["critico", "aviso", "info"],
+      tipo_relacao: [
+        "complementa",
+        "depende_de",
+        "antecede",
+        "substitui",
+        "incompativel",
+        "opcional",
+        "requerido_por",
+        "precede",
+        "substituido_por",
+        "opcional_em",
       ],
     },
   },
