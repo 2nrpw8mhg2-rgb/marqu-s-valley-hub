@@ -519,6 +519,106 @@ export type Database = {
         }
         Relationships: []
       }
+      classificacao_artigos: {
+        Row: {
+          artigo_mestre_id: string | null
+          artigo_origem_id: string
+          categoria_id: string | null
+          confianca: number
+          created_at: string
+          descricao_original: string
+          especialidade_id: string | null
+          estado: Database["public"]["Enums"]["classificacao_estado"]
+          id: string
+          orcamento_id: string
+          quantidade_original: number | null
+          subespecialidade_id: string | null
+          unidade_original: string | null
+          updated_at: string
+          validado_em: string | null
+          validado_por: string | null
+        }
+        Insert: {
+          artigo_mestre_id?: string | null
+          artigo_origem_id: string
+          categoria_id?: string | null
+          confianca?: number
+          created_at?: string
+          descricao_original: string
+          especialidade_id?: string | null
+          estado?: Database["public"]["Enums"]["classificacao_estado"]
+          id?: string
+          orcamento_id: string
+          quantidade_original?: number | null
+          subespecialidade_id?: string | null
+          unidade_original?: string | null
+          updated_at?: string
+          validado_em?: string | null
+          validado_por?: string | null
+        }
+        Update: {
+          artigo_mestre_id?: string | null
+          artigo_origem_id?: string
+          categoria_id?: string | null
+          confianca?: number
+          created_at?: string
+          descricao_original?: string
+          especialidade_id?: string | null
+          estado?: Database["public"]["Enums"]["classificacao_estado"]
+          id?: string
+          orcamento_id?: string
+          quantidade_original?: number | null
+          subespecialidade_id?: string | null
+          unidade_original?: string | null
+          updated_at?: string
+          validado_em?: string | null
+          validado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classificacao_artigos_artigo_mestre_id_fkey"
+            columns: ["artigo_mestre_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classificacao_artigos_artigo_origem_id_fkey"
+            columns: ["artigo_origem_id"]
+            isOneToOne: true
+            referencedRelation: "orcamento_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classificacao_artigos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classificacao_artigos_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classificacao_artigos_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classificacao_artigos_subespecialidade_id_fkey"
+            columns: ["subespecialidade_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_subespecialidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classificacao_cache: {
         Row: {
           created_at: string
@@ -1281,6 +1381,11 @@ export type Database = {
         | "outros"
       biblioteca_keyword_origem: "manual" | "ia"
       biblioteca_keyword_tipo: "positiva" | "negativa"
+      classificacao_estado:
+        | "classificado_auto"
+        | "necessita_revisao"
+        | "sem_classificacao"
+        | "validado"
       documento_tipo:
         | "projeto"
         | "mq"
@@ -1442,6 +1547,12 @@ export const Constants = {
       ],
       biblioteca_keyword_origem: ["manual", "ia"],
       biblioteca_keyword_tipo: ["positiva", "negativa"],
+      classificacao_estado: [
+        "classificado_auto",
+        "necessita_revisao",
+        "sem_classificacao",
+        "validado",
+      ],
       documento_tipo: [
         "projeto",
         "mq",
