@@ -62,10 +62,11 @@ function CentroClassificacao() {
   const { data: orcamentos = [] } = useQuery({
     queryKey: ["cc-orcamentos"],
     queryFn: async () => {
-      const { data } = await supabase.from("orcamentos").select("id, nome, versao").order("created_at", { ascending: false });
-      return (data ?? []) as { id: string; nome: string; versao: number }[];
+      const { data } = await supabase.from("orcamentos").select("id, nome, versao, obra_id").order("created_at", { ascending: false });
+      return (data ?? []) as { id: string; nome: string; versao: number; obra_id: string | null }[];
     },
   });
+  const obraIdAtual = orcamentos.find((o) => o.id === orcamento)?.obra_id ?? null;
 
   const { data: artigosCount = 0 } = useQuery({
     queryKey: ["cc-artigos-count", orcamento],
@@ -153,6 +154,16 @@ function CentroClassificacao() {
     }).eq("id", row.id);
     if (error) return toast.error(error.message);
     await aprenderClassificacao(row.descricao_original, row.artigo_mestre_id);
+    const espFinal = row.especialidade_id ? (espMap.get(row.especialidade_id) as string) ?? "—" : "—";
+    const espSug = (row.candidatos?.[0] as any)?.keywords_hit?.find?.((h: any) => h.nivel === "especialidade")?.entidade_nome ?? null;
+    await registarAprendizagem({
+      descricaoOriginal: row.descricao_original,
+      especialidadeSugerida: espSug,
+      especialidadeFinal: espFinal,
+      confiancaSugerida: row.confianca,
+      obraId: obraIdAtual,
+      acao: "validar",
+    });
     toast.success("Validado e guardado na memória");
     qc.invalidateQueries({ queryKey: ["cc-rows"] });
   };
@@ -164,6 +175,15 @@ function CentroClassificacao() {
       validado_por: null, validado_em: null,
     }).eq("id", row.id);
     if (error) return toast.error(error.message);
+    const espSug = row.especialidade_id ? (espMap.get(row.especialidade_id) as string) ?? null : null;
+    await registarAprendizagem({
+      descricaoOriginal: row.descricao_original,
+      especialidadeSugerida: espSug,
+      especialidadeFinal: "(removido)",
+      confiancaSugerida: row.confianca,
+      obraId: obraIdAtual,
+      acao: "remover",
+    });
     toast.success("Classificação removida");
     qc.invalidateQueries({ queryKey: ["cc-rows"] });
   };
@@ -172,15 +192,26 @@ function CentroClassificacao() {
     const art: any = artMap.get(artigoMestreId);
     if (!art) return;
     const sub: any = subMap.get(art.subespecialidade_id);
+    const espFinalId = sub?.especialidade_id ?? null;
     const { error } = await supabase.from("classificacao_artigos").update({
       artigo_mestre_id: artigoMestreId,
       categoria_id: art.categoria_id,
       subespecialidade_id: art.subespecialidade_id,
-      especialidade_id: sub?.especialidade_id ?? null,
+      especialidade_id: espFinalId,
       confianca: 100, estado: "classificado_auto", metodo_match: "manual",
       motivo: "Atribuído manualmente pelo utilizador",
     }).eq("id", row.id);
     if (error) return toast.error(error.message);
+    const espSug = row.especialidade_id ? (espMap.get(row.especialidade_id) as string) ?? null : null;
+    const espFinal = espFinalId ? (espMap.get(espFinalId) as string) ?? "—" : "—";
+    await registarAprendizagem({
+      descricaoOriginal: row.descricao_original,
+      especialidadeSugerida: espSug,
+      especialidadeFinal: espFinal,
+      confiancaSugerida: row.confianca,
+      obraId: obraIdAtual,
+      acao: row.artigo_mestre_id === artigoMestreId ? "validar" : "corrigir",
+    });
     toast.success("Artigo Mestre atribuído");
     qc.invalidateQueries({ queryKey: ["cc-rows"] });
     setDialogRow(null);
