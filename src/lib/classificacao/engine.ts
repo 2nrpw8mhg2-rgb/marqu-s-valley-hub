@@ -450,6 +450,14 @@ export async function runClassificacao(orcamentoId: string, onProgress?: (snapsh
     sem_classificacao: stats.sem_classificacao,
   }).eq("id", run.id);
 
+  // Motor de Relações Construtivas — análise de omissões
+  try {
+    const { analisarOmissoes } = await import("@/lib/relacoes/analise");
+    await analisarOmissoes(orcamentoId);
+  } catch (err) {
+    console.warn("[classificacao] análise de omissões falhou:", err);
+  }
+
   return { runId: run.id, stats };
 }
 
