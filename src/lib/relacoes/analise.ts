@@ -160,7 +160,12 @@ export type AcaoAlerta = "aceitar_omissao" | "justificar" | "ignorar" | "reabrir
 
 export async function marcarAlerta(id: string, acao: AcaoAlerta, justificacao?: string) {
   const { data: u } = await supabase.auth.getUser();
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const patch: {
+    estado?: EstadoAlerta;
+    justificacao?: string | null;
+    resolvido_por?: string | null;
+    resolvido_em?: string | null;
+  } = {};
   if (acao === "aceitar_omissao") patch.estado = "aceite_omissao";
   if (acao === "ignorar") patch.estado = "ignorado";
   if (acao === "reabrir") { patch.estado = "aberto"; patch.justificacao = null; patch.resolvido_em = null; patch.resolvido_por = null; }
