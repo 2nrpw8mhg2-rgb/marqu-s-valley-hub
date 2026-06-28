@@ -10,10 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, CheckCircle2, X, Edit3, RotateCw, Sparkles, Info, Play } from "lucide-react";
+import { Search, CheckCircle2, X, Edit3, Sparkles, Play, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { runClassificacao, aprenderClassificacao, registarAprendizagem, type Candidato, type Metodo } from "@/lib/classificacao/engine";
-import { ClassificacaoDetailDialog } from "@/components/classificacao/ClassificacaoDetailDialog";
+import { ClassificacaoSidePanel, type PanelRow } from "@/components/classificacao/ClassificacaoSidePanel";
+import { ResultadoIABadge } from "@/components/classificacao/ResultadoIABadge";
+import { ConfiancaBar } from "@/components/classificacao/ConfiancaBar";
+import { ProximaAcaoChip, calcularProximaAcao } from "@/components/classificacao/ProximaAcaoChip";
 
 export const Route = createFileRoute("/_app/motor-classificacao")({
   head: () => ({ meta: [{ title: "Centro de Classificação Inteligente — MV OS" }] }),
