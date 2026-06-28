@@ -10,10 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Search, CheckCircle2, X, Edit3, RotateCw, Sparkles, Info, Play } from "lucide-react";
 import { toast } from "sonner";
-import { runClassificacao, aprenderClassificacao, type Candidato, type Metodo } from "@/lib/classificacao/engine";
+import { runClassificacao, aprenderClassificacao, registarAprendizagem, type Candidato, type Metodo } from "@/lib/classificacao/engine";
+import { ClassificacaoDetailDialog } from "@/components/classificacao/ClassificacaoDetailDialog";
 
 export const Route = createFileRoute("/_app/motor-classificacao")({
   head: () => ({ meta: [{ title: "Centro de Classificação Inteligente — MV OS" }] }),
@@ -55,6 +55,7 @@ function CentroClassificacao() {
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [dialogRow, setDialogRow] = useState<ClsRow | null>(null);
+  const [detailRow, setDetailRow] = useState<ClsRow | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ total: number; done: number; classificados: number; pendentes: number; porAnalisar: number } | null>(null);
 
