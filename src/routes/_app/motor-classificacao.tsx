@@ -130,9 +130,9 @@ function CentroClassificacao() {
   const iniciar = async () => {
     if (!orcamento) return;
     setRunning(true);
-    setProgress({ done: 0, total: artigosCount });
+    setProgress({ total: artigosCount, done: 0, classificados: 0, pendentes: 0, porAnalisar: artigosCount });
     try {
-      await runClassificacao(orcamento, (done, total) => setProgress({ done, total }));
+      await runClassificacao(orcamento, (snap) => setProgress(snap));
       toast.success("Classificação concluída");
       qc.invalidateQueries({ queryKey: ["cc-run", orcamento] });
       qc.invalidateQueries({ queryKey: ["cc-rows", orcamento] });
