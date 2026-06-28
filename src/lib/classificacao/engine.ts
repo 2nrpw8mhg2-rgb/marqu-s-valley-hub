@@ -589,6 +589,114 @@ function classifyArtigo(
   };
 }
 
+export type ClassificacaoProgress = {
+  total: number;
+  done: number;
+  classificados: number;
+  pendentes: number;
+  porAnalisar: number;
+};
+
+export async function runClassificacao(orcamentoId: string, onProgress?: (snapshot: ClassificacaoProgress) => void) {
+  const { data: u } = await supabase.auth.getUser();
+  const { data: run, error: runErr } = await supabase.from("orcamento_classificacao_run").insert({
+    orcamento_id: orcamentoId, estado: "em_curso", iniciado_em: new Date().toISOString(), iniciado_por: u.user?.id ?? null,
+  }).select("id").single();
+  if (runErr) throw runErr;
+
+  const { data: artigos } = await supabase
+    .from("orcamento_artigos").select("id, orcamento_id, descricao, unidade, quantidade")
+    .eq("orcamento_id", orcamentoId);
+
+  const { data: existentes } = await supabase
+    .from("classificacao_artigos").select("artigo_origem_id, estado")
+    .eq("orcamento_id", orcamentoId);
+  const validados = new Set((existentes ?? []).filter((e: any) => e.estado === "validado").map((e: any) => e.artigo_origem_id));
+
+  if ((existentes ?? []).some((e: any) => e.estado !== "validado")) {
+    await supabase.from("classificacao_artigos").delete()
+      .eq("orcamento_id", orcamentoId)
+      .neq("estado", "validado");
+  }
+
+  const bib = await loadBib();
+
+  const stats = { total: 0, auto_exato: 0, auto_aprendido: 0, parcial: 0, sem_classificacao: 0 };
+  const toInsert: any[] = [];
+  const lista = (artigos ?? []).filter((a: any) => !validados.has(a.id));
+  stats.total = (artigos ?? []).length;
+
+  const totalArtigos = stats.total;
+  const jaValidados = totalArtigos - lista.length;
+  const emit = (processados: number, cls: number, pend: number) => {
+    if (!onProgress) return;
+    onProgress({
+      total: totalArtigos,
+      done: jaValidados + processados,
+      classificados: jaValidados + cls,
+      pendentes: pend,
+      porAnalisar: lista.length - processados,
+    });
+  };
+  emit(0, 0, 0);
+
+  let i = 0;
+  let classificadosRun = 0;
+  let pendentesRun = 0;
+  for (const a of lista) {
+    const r = classifyArtigo(a as any, bib);
+    toInsert.push({
+      artigo_origem_id: r.artigo_origem_id,
+      orcamento_id: r.orcamento_id,
+      descricao_original: r.descricao_original,
+      unidade_original: r.unidade_original,
+      quantidade_original: r.quantidade_original,
+      artigo_mestre_id: r.artigo_mestre_id,
+      categoria_id: r.categoria_id,
+      subespecialidade_id: r.subespecialidade_id,
+      especialidade_id: r.especialidade_id,
+      confianca: r.confianca,
+      estado: r.estado,
+      metodo_match: r.metodo_match,
+      motivo: r.motivo,
+      candidatos: r.candidatos,
+    });
+    if (r.metodo_match === "exato" && r.estado === "classificado_auto") { stats.auto_exato++; classificadosRun++; }
+    else if (r.metodo_match === "aprendido") { stats.auto_aprendido++; classificadosRun++; }
+    else if (r.estado === "classificado_auto") { stats.auto_exato++; classificadosRun++; }
+    else if (r.estado === "necessita_revisao") { stats.parcial++; pendentesRun++; }
+    else { stats.sem_classificacao++; pendentesRun++; }
+    i++;
+    if (i % 10 === 0 || i === lista.length) emit(i, classificadosRun, pendentesRun);
+  }
+
+  for (let k = 0; k < toInsert.length; k += 200) {
+    const chunk = toInsert.slice(k, k + 200);
+    const { error } = await supabase.from("classificacao_artigos").insert(chunk);
+    if (error) throw error;
+  }
+
+  await supabase.from("orcamento_classificacao_run").update({
+    estado: "concluido", concluido_em: new Date().toISOString(),
+    total_artigos: stats.total,
+    auto_exato: stats.auto_exato,
+    auto_aprendido: stats.auto_aprendido,
+    parcial: stats.parcial,
+    sem_classificacao: stats.sem_classificacao,
+  }).eq("id", run.id);
+
+  // Motor de Relações Construtivas — análise de omissões
+  try {
+    const { analisarOmissoes } = await import("@/lib/relacoes/analise");
+    await analisarOmissoes(orcamentoId);
+  } catch (err) {
+    console.warn("[classificacao] análise de omissões falhou:", err);
+  }
+
+  return { runId: run.id, stats };
+}
+
+
 
 export async function aprenderClassificacao(descricao: string, artigoMestreId: string) {
   const norm = normalizar(descricao);
