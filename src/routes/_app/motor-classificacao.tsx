@@ -353,7 +353,7 @@ function CentroClassificacao() {
               <StatCard label="Total" value={stats.total} />
               <StatCard label="Validados" value={stats.validados} tone="green" />
               <StatCard label="Exato" value={stats.auto_exato} tone="blue" />
-              <StatCard label="Aprendido" value={stats.auto_aprendido} tone="blue" />
+              <StatCard label="Aprendido" value={stats.auto_aprendido} tone="blue" sub={`${memoriaTotal.toLocaleString("pt-PT")} total na memória`} prefix="+" />
               <StatCard label="A rever" value={stats.parcial} tone="yellow" />
               <StatCard label="Sem classif." value={stats.sem} tone="muted" />
             </div>
