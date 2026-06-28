@@ -49,7 +49,7 @@ const sections: { title: string; items: NavItem[] }[] = [
   {
     title: "Motor de Classificação",
     items: [
-      { to: "/motor-classificacao", label: "Motor de Classificação", icon: Wand2 },
+      { to: "/motor-classificacao", label: "Centro de Classificação", icon: Wand2 },
     ],
   },
   {
