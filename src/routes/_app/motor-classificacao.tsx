@@ -248,8 +248,8 @@ function CentroClassificacao() {
         subtitle="Analisa, explica e aprende com a classificação dos artigos do MQ"
         actions={
           run?.estado === "concluido" ? (
-            <Button variant="outline" size="sm" onClick={iniciar} disabled={running}>
-              <RotateCw className="h-4 w-4 mr-1" /> Reprocessar classificação
+            <Button variant="outline" size="sm" onClick={iniciar} disabled={running} title="Aplica novas palavras-chave, regras, relações e Artigos Mestre">
+              <Sparkles className="h-4 w-4 mr-1" /> Reexecutar Motor IA
             </Button>
           ) : null
         }
