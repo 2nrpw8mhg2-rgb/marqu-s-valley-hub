@@ -10,10 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Search, CheckCircle2, X, Edit3, RotateCw, Sparkles, Info, Play } from "lucide-react";
 import { toast } from "sonner";
-import { runClassificacao, aprenderClassificacao, type Candidato, type Metodo } from "@/lib/classificacao/engine";
+import { runClassificacao, aprenderClassificacao, registarAprendizagem, type Candidato, type Metodo } from "@/lib/classificacao/engine";
+import { ClassificacaoDetailDialog } from "@/components/classificacao/ClassificacaoDetailDialog";
 
 export const Route = createFileRoute("/_app/motor-classificacao")({
   head: () => ({ meta: [{ title: "Centro de Classificação Inteligente — MV OS" }] }),
@@ -55,16 +55,18 @@ function CentroClassificacao() {
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [dialogRow, setDialogRow] = useState<ClsRow | null>(null);
+  const [detailRow, setDetailRow] = useState<ClsRow | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ total: number; done: number; classificados: number; pendentes: number; porAnalisar: number } | null>(null);
 
   const { data: orcamentos = [] } = useQuery({
     queryKey: ["cc-orcamentos"],
     queryFn: async () => {
-      const { data } = await supabase.from("orcamentos").select("id, nome, versao").order("created_at", { ascending: false });
-      return (data ?? []) as { id: string; nome: string; versao: number }[];
+      const { data } = await supabase.from("orcamentos").select("id, nome, versao, obra_id").order("created_at", { ascending: false });
+      return (data ?? []) as { id: string; nome: string; versao: number; obra_id: string | null }[];
     },
   });
+  const obraIdAtual = orcamentos.find((o) => o.id === orcamento)?.obra_id ?? null;
 
   const { data: artigosCount = 0 } = useQuery({
     queryKey: ["cc-artigos-count", orcamento],
@@ -152,6 +154,16 @@ function CentroClassificacao() {
     }).eq("id", row.id);
     if (error) return toast.error(error.message);
     await aprenderClassificacao(row.descricao_original, row.artigo_mestre_id);
+    const espFinal = row.especialidade_id ? (espMap.get(row.especialidade_id) as string) ?? "—" : "—";
+    const espSug = (row.candidatos?.[0] as any)?.keywords_hit?.find?.((h: any) => h.nivel === "especialidade")?.entidade_nome ?? null;
+    await registarAprendizagem({
+      descricaoOriginal: row.descricao_original,
+      especialidadeSugerida: espSug,
+      especialidadeFinal: espFinal,
+      confiancaSugerida: row.confianca,
+      obraId: obraIdAtual,
+      acao: "validar",
+    });
     toast.success("Validado e guardado na memória");
     qc.invalidateQueries({ queryKey: ["cc-rows"] });
   };
@@ -163,6 +175,15 @@ function CentroClassificacao() {
       validado_por: null, validado_em: null,
     }).eq("id", row.id);
     if (error) return toast.error(error.message);
+    const espSug = row.especialidade_id ? (espMap.get(row.especialidade_id) as string) ?? null : null;
+    await registarAprendizagem({
+      descricaoOriginal: row.descricao_original,
+      especialidadeSugerida: espSug,
+      especialidadeFinal: "(removido)",
+      confiancaSugerida: row.confianca,
+      obraId: obraIdAtual,
+      acao: "remover",
+    });
     toast.success("Classificação removida");
     qc.invalidateQueries({ queryKey: ["cc-rows"] });
   };
@@ -171,15 +192,26 @@ function CentroClassificacao() {
     const art: any = artMap.get(artigoMestreId);
     if (!art) return;
     const sub: any = subMap.get(art.subespecialidade_id);
+    const espFinalId = sub?.especialidade_id ?? null;
     const { error } = await supabase.from("classificacao_artigos").update({
       artigo_mestre_id: artigoMestreId,
       categoria_id: art.categoria_id,
       subespecialidade_id: art.subespecialidade_id,
-      especialidade_id: sub?.especialidade_id ?? null,
+      especialidade_id: espFinalId,
       confianca: 100, estado: "classificado_auto", metodo_match: "manual",
       motivo: "Atribuído manualmente pelo utilizador",
     }).eq("id", row.id);
     if (error) return toast.error(error.message);
+    const espSug = row.especialidade_id ? (espMap.get(row.especialidade_id) as string) ?? null : null;
+    const espFinal = espFinalId ? (espMap.get(espFinalId) as string) ?? "—" : "—";
+    await registarAprendizagem({
+      descricaoOriginal: row.descricao_original,
+      especialidadeSugerida: espSug,
+      especialidadeFinal: espFinal,
+      confiancaSugerida: row.confianca,
+      obraId: obraIdAtual,
+      acao: row.artigo_mestre_id === artigoMestreId ? "validar" : "corrigir",
+    });
     toast.success("Artigo Mestre atribuído");
     qc.invalidateQueries({ queryKey: ["cc-rows"] });
     setDialogRow(null);
@@ -206,7 +238,7 @@ function CentroClassificacao() {
         actions={
           run?.estado === "concluido" ? (
             <Button variant="outline" size="sm" onClick={iniciar} disabled={running}>
-              <RotateCw className="h-4 w-4 mr-1" /> Re-correr
+              <RotateCw className="h-4 w-4 mr-1" /> Reprocessar classificação
             </Button>
           ) : null
         }
@@ -346,7 +378,7 @@ function CentroClassificacao() {
                       <TableHead>Artigo Original</TableHead>
                       <TableHead>Especialidade / Subespecialidade</TableHead>
                       <TableHead>Artigo Mestre</TableHead>
-                      <TableHead className="w-32">Porquê?</TableHead>
+                      <TableHead className="w-72">Motivo da classificação</TableHead>
                       <TableHead className="w-20">Conf.</TableHead>
                       <TableHead className="w-28">Estado</TableHead>
                       <TableHead className="w-44 text-right">Ações</TableHead>
@@ -373,8 +405,17 @@ function CentroClassificacao() {
                             <div className="text-muted-foreground">{subNome ?? ""}{catNome ? ` · ${catNome}` : ""}</div>
                           </TableCell>
                           <TableCell className="text-sm">{art?.descricao ?? <span className="text-muted-foreground">—</span>}</TableCell>
-                          <TableCell>
-                            <WhyPopover row={r} onPickCandidate={(id) => atribuir(r, id)} />
+                          <TableCell className="max-w-[280px]">
+                            <div className="text-xs text-muted-foreground line-clamp-2" title={r.motivo ?? ""}>
+                              {r.motivo ?? "—"}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setDetailRow(r)}
+                              className="mt-1 inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                            >
+                              <Info className="h-3 w-3" /> Detalhes · {METODO_LABEL[r.metodo_match]}
+                            </button>
                           </TableCell>
                           <TableCell><Badge variant="outline">{r.confianca}%</Badge></TableCell>
                           <TableCell><Badge variant="outline" className={ESTADO_META[r.estado].cls}>{ESTADO_META[r.estado].label}</Badge></TableCell>
@@ -412,41 +453,12 @@ function CentroClassificacao() {
         esps={esps} subs={subs} cats={cats} arts={arts}
         suggestion={dialogRow?.descricao_original ?? ""}
       />
+      <ClassificacaoDetailDialog row={detailRow} onClose={() => setDetailRow(null)} />
     </>
   );
 }
 
-function WhyPopover({ row, onPickCandidate }: { row: ClsRow; onPickCandidate: (id: string) => void }) {
-  const candidatos = row.candidatos ?? [];
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1">
-          <Info className="h-3 w-3" /> {METODO_LABEL[row.metodo_match]}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-96 text-sm">
-        <div className="font-medium mb-1">Porquê esta classificação?</div>
-        <p className="text-muted-foreground text-xs">{row.motivo ?? "—"}</p>
-        {candidatos.length > 0 && (
-          <div className="mt-3 space-y-1">
-            <div className="text-xs font-medium">Alternativas</div>
-            {candidatos.map((c) => (
-              <button key={c.artigo_mestre_id} onClick={() => onPickCandidate(c.artigo_mestre_id)}
-                className="w-full text-left p-2 rounded border border-border hover:bg-muted/40 text-xs">
-                <div className="flex justify-between gap-2">
-                  <span className="font-medium">{c.descricao}</span>
-                  <Badge variant="outline" className="shrink-0">{c.score}</Badge>
-                </div>
-                <div className="text-muted-foreground text-[10px] mt-0.5">{c.motivo}</div>
-              </button>
-            ))}
-          </div>
-        )}
-      </PopoverContent>
-    </Popover>
-  );
-}
+
 
 function StatCard({ label, value, tone }: { label: string; value: number; tone?: "green" | "blue" | "yellow" | "muted" }) {
   const cls =
