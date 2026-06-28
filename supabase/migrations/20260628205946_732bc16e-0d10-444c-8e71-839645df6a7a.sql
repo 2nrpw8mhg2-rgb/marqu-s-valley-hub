@@ -1,0 +1,1 @@
+ALTER TABLE public.biblioteca_especialidades DROP COLUMN IF EXISTS subesp_como_disciplina;
