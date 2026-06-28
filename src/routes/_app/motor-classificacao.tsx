@@ -10,10 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, CheckCircle2, X, Edit3, RotateCw, Sparkles, Info, Play } from "lucide-react";
+import { Search, CheckCircle2, X, Edit3, Sparkles, Play, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { runClassificacao, aprenderClassificacao, registarAprendizagem, type Candidato, type Metodo } from "@/lib/classificacao/engine";
-import { ClassificacaoDetailDialog } from "@/components/classificacao/ClassificacaoDetailDialog";
+import { ClassificacaoSidePanel, type PanelRow } from "@/components/classificacao/ClassificacaoSidePanel";
+import { ResultadoIABadge } from "@/components/classificacao/ResultadoIABadge";
+import { ConfiancaBar } from "@/components/classificacao/ConfiancaBar";
+import { ProximaAcaoChip, calcularProximaAcao } from "@/components/classificacao/ProximaAcaoChip";
 
 export const Route = createFileRoute("/_app/motor-classificacao")({
   head: () => ({ meta: [{ title: "Centro de Classificação Inteligente — MV OS" }] }),
@@ -55,7 +58,7 @@ function CentroClassificacao() {
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [dialogRow, setDialogRow] = useState<ClsRow | null>(null);
-  const [detailRow, setDetailRow] = useState<ClsRow | null>(null);
+  const [panelRow, setPanelRow] = useState<ClsRow | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ total: number; done: number; classificados: number; pendentes: number; porAnalisar: number } | null>(null);
 
@@ -100,6 +103,14 @@ function CentroClassificacao() {
       const { data, error } = await q.limit(2000);
       if (error) throw error;
       return (data ?? []) as ClsRow[];
+    },
+  });
+
+  const { data: memoriaTotal = 0 } = useQuery({
+    queryKey: ["cc-memoria-total"],
+    queryFn: async () => {
+      const { count } = await supabase.from("classificacao_memoria").select("id", { count: "exact", head: true });
+      return count ?? 0;
     },
   });
 
@@ -237,8 +248,8 @@ function CentroClassificacao() {
         subtitle="Analisa, explica e aprende com a classificação dos artigos do MQ"
         actions={
           run?.estado === "concluido" ? (
-            <Button variant="outline" size="sm" onClick={iniciar} disabled={running}>
-              <RotateCw className="h-4 w-4 mr-1" /> Reprocessar classificação
+            <Button variant="outline" size="sm" onClick={iniciar} disabled={running} title="Aplica novas palavras-chave, regras, relações e Artigos Mestre">
+              <Sparkles className="h-4 w-4 mr-1" /> Reexecutar Motor IA
             </Button>
           ) : null
         }
@@ -342,7 +353,7 @@ function CentroClassificacao() {
               <StatCard label="Total" value={stats.total} />
               <StatCard label="Validados" value={stats.validados} tone="green" />
               <StatCard label="Exato" value={stats.auto_exato} tone="blue" />
-              <StatCard label="Aprendido" value={stats.auto_aprendido} tone="blue" />
+              <StatCard label="Aprendido" value={stats.auto_aprendido} tone="blue" sub={`${memoriaTotal.toLocaleString("pt-PT")} total na memória`} prefix="+" />
               <StatCard label="A rever" value={stats.parcial} tone="yellow" />
               <StatCard label="Sem classif." value={stats.sem} tone="muted" />
             </div>
@@ -376,50 +387,56 @@ function CentroClassificacao() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Artigo Original</TableHead>
-                      <TableHead>Especialidade / Subespecialidade</TableHead>
-                      <TableHead>Artigo Mestre</TableHead>
-                      <TableHead className="w-72">Motivo da classificação</TableHead>
-                      <TableHead className="w-20">Conf.</TableHead>
-                      <TableHead className="w-28">Estado</TableHead>
-                      <TableHead className="w-44 text-right">Ações</TableHead>
+                      <TableHead>Classificação</TableHead>
+                      <TableHead className="w-44">Resultado IA</TableHead>
+                      <TableHead className="w-40">Confiança</TableHead>
+                      <TableHead className="w-44">Próxima Ação</TableHead>
+                      <TableHead className="w-32 text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {isLoading && <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">A carregar…</TableCell></TableRow>}
+                    {isLoading && <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">A carregar…</TableCell></TableRow>}
                     {!isLoading && rows.length === 0 && (
-                      <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">Sem resultados para os filtros.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sem resultados para os filtros.</TableCell></TableRow>
                     )}
                     {rows.map((r) => {
                       const art: any = r.artigo_mestre_id ? artMap.get(r.artigo_mestre_id) : null;
                       const espNome = r.especialidade_id ? espMap.get(r.especialidade_id) : null;
                       const subNome = r.subespecialidade_id ? (subMap.get(r.subespecialidade_id) as any)?.nome : null;
                       const catNome = r.categoria_id ? (catMap.get(r.categoria_id) as any)?.nome : null;
+                      const trail = [espNome, subNome, catNome, art?.descricao].filter(Boolean) as string[];
+                      const acao = calcularProximaAcao({ estado: r.estado, metodo: r.metodo_match, confianca: r.confianca, candidatos: r.candidatos });
+                      const onAcao = () => {
+                        if (acao.tipo === "aceitar") validar(r);
+                        else if (acao.tipo === "corrigir" || acao.tipo === "escolher") setDialogRow(r);
+                        else setPanelRow(r);
+                      };
                       return (
-                        <TableRow key={r.id}>
-                          <TableCell className="max-w-[300px]">
-                            <div className="text-sm">{r.descricao_original}</div>
+                        <TableRow key={r.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setPanelRow(r)}>
+                          <TableCell className="max-w-[280px]">
+                            <div className="text-sm line-clamp-2">{r.descricao_original}</div>
                             <div className="text-[10px] text-muted-foreground">{r.unidade_original ?? ""} · qtd {r.quantidade_original ?? "—"}</div>
                           </TableCell>
-                          <TableCell className="text-xs">
-                            <div>{espNome ?? "—"}</div>
-                            <div className="text-muted-foreground">{subNome ?? ""}{catNome ? ` · ${catNome}` : ""}</div>
+                          <TableCell className="max-w-[260px]">
+                            {trail.length === 0 ? (
+                              <Badge variant="outline" className="text-muted-foreground">Sem destino</Badge>
+                            ) : (
+                              <div className="space-y-0.5">
+                                {trail.map((t, i) => (
+                                  <div key={i} className="flex items-center gap-1 text-xs">
+                                    {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+                                    <span className={i === trail.length - 1 ? "font-medium" : "text-muted-foreground"}>{t}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </TableCell>
-                          <TableCell className="text-sm">{art?.descricao ?? <span className="text-muted-foreground">—</span>}</TableCell>
-                          <TableCell className="max-w-[280px]">
-                            <div className="text-xs text-muted-foreground line-clamp-2" title={r.motivo ?? ""}>
-                              {r.motivo ?? "—"}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => setDetailRow(r)}
-                              className="mt-1 inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
-                            >
-                              <Info className="h-3 w-3" /> Detalhes · {METODO_LABEL[r.metodo_match]}
-                            </button>
+                          <TableCell><ResultadoIABadge metodo={r.metodo_match} estado={r.estado} /></TableCell>
+                          <TableCell><ConfiancaBar value={r.confianca} /></TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <ProximaAcaoChip acao={acao} onClick={onAcao} />
                           </TableCell>
-                          <TableCell><Badge variant="outline">{r.confianca}%</Badge></TableCell>
-                          <TableCell><Badge variant="outline" className={ESTADO_META[r.estado].cls}>{ESTADO_META[r.estado].label}</Badge></TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-1 justify-end">
                               <Button size="sm" variant="ghost" title="Pesquisar Artigo Mestre" onClick={() => setDialogRow(r)}>
                                 {r.artigo_mestre_id ? <Edit3 className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
@@ -453,14 +470,24 @@ function CentroClassificacao() {
         esps={esps} subs={subs} cats={cats} arts={arts}
         suggestion={dialogRow?.descricao_original ?? ""}
       />
-      <ClassificacaoDetailDialog row={detailRow} onClose={() => setDetailRow(null)} />
+      <ClassificacaoSidePanel
+        row={panelRow as PanelRow | null}
+        onClose={() => setPanelRow(null)}
+        espMap={espMap as Map<string, string>}
+        subMap={subMap as Map<string, any>}
+        catMap={catMap as Map<string, any>}
+        artMap={artMap as Map<string, any>}
+        onAceitar={(r) => { validar(r as any); setPanelRow(null); }}
+        onCorrigir={(r) => { setDialogRow(r as any); }}
+        onRefresh={() => qc.invalidateQueries({ queryKey: ["cc-rows"] })}
+      />
     </>
   );
 }
 
 
 
-function StatCard({ label, value, tone }: { label: string; value: number; tone?: "green" | "blue" | "yellow" | "muted" }) {
+function StatCard({ label, value, tone, sub, prefix }: { label: string; value: number; tone?: "green" | "blue" | "yellow" | "muted"; sub?: string; prefix?: string }) {
   const cls =
     tone === "green" ? "text-green-600 dark:text-green-400" :
     tone === "blue" ? "text-blue-600 dark:text-blue-400" :
@@ -469,7 +496,8 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone?:
   return (
     <Card className="bg-card border-border p-3">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={`text-2xl font-semibold tabular-nums ${cls}`}>{value}</div>
+      <div className={`text-2xl font-semibold tabular-nums ${cls}`}>{prefix}{value}</div>
+      {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
     </Card>
   );
 }
