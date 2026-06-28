@@ -1,74 +1,125 @@
+## Diagnóstico (confirmado)
 
-## Objetivo
+Investiguei o motor (`src/lib/classificacao/engine.ts`) e o estado real da base de dados para o orçamento atual:
 
-Enriquecer a secção **Artigo Original** da `ClassificacaoSidePanel` para servir como cartão de identificação completo do artigo dentro do Mapa de Quantidades.
+- `biblioteca_artigo_keywords`: **0 registos** (não há sinais ao nível do artigo)
+- `biblioteca_subespecialidade_keywords`: 167
+- `biblioteca_especialidade_keywords`: 583
+- `biblioteca_artigos` ativos: 1.673
 
-## Dados disponíveis na BD (verificado)
+O algoritmo só pontua por keywords de especialidade/subespecialidade e depois **herda essa pontuação para todos os artigos mestres dessa subespecialidade/especialidade**. Com isto, descrições como "betão" tornam ~todos os artigos da especialidade candidatos com o mesmo score; o "vencedor" é arbitrário (ordem de inserção do Map). Daí casos reais observados:
 
-| Pretendido | Fonte | Disponível |
-|---|---|---|
-| Nome/versão do MQ | `orcamentos.nome`, `versao_label`, `versao` | ✅ |
-| Capítulo (código + descrição) | `orcamento_capitulos.codigo`, `descricao` (via `orcamento_artigos.capitulo_id`) | ✅ |
-| Subcapítulo | — não modelado | ⚠️ derivado do prefixo do código do artigo (best-effort) |
-| Código do artigo | `orcamento_artigos.codigo` | ✅ |
-| Nº do artigo (ordem) | `orcamento_artigos.ordem` | ✅ |
-| Descrição / qtd / unidade | já presentes em `PanelRow` | ✅ |
-| Preço unitário | `orcamento_artigos.preco_unitario` | ✅ |
-| Preço total | qtd × preço_unitário (calculado) | ✅ |
-| Página / linha de importação | — não modelado | ❌ omitir (não inventar) |
-| Documento de origem (PDF/Excel) | — não modelado | ❌ omitir |
+```
+"Demolição de laje de betão…"       → "Separação de betão"        (50%)
+"Aterro para base…"                 → "Ensaio Proctor"             (50%)
+"Vedação provisória de terreno…"    → "Vedação em betão"           (50%)
+"Betão armado C25/30…"              → "Cofragem de pilares"        (50%)
+```
 
-Sem migrações nesta fase. Os campos não existentes ficam ocultos (não mostro "—" para não poluir). Quando forem adicionados ao schema, a secção exibe-os automaticamente.
+A descrição do artigo mestre **nunca é comparada** com a do artigo original, e a unidade é ignorada.
 
-## Implementação
+## Princípio orientador (conservador)
 
-### 1. Novo hook `useArtigoOriginal(artigoOrigemId)`
-- `src/components/classificacao/useArtigoOriginal.ts`
-- React Query, key `["artigo-original", artigoOrigemId]`, staleTime 60s
-- Lê `orcamento_artigos` com join a `orcamento_capitulos(codigo, descricao)` e `orcamentos(id, nome, versao, versao_label, obra_id)`
-- Devolve também `prevArtigo` / `nextArtigo` (pesquisa por `ordem ± 1` no mesmo orçamento) para a acção "Ver contexto"
+> Em caso de dúvida, o artigo vai para **`necessita_revisao`** ou **`sem_classificacao`** — nunca para `classificado_auto`.
+>
+> Keywords de especialidade/subespecialidade **nunca** classificam automaticamente por si só. Só servem para reforçar / desambiguar uma forte semelhança textual ao nível do artigo mestre.
 
-### 2. Novo componente `ArtigoOriginalSection`
-- `src/components/classificacao/ArtigoOriginalSection.tsx`
-- Estrutura visual:
-  - **Breadcrumb** (no topo): `MQ {versao_label} › Capítulo {cap.codigo} › Artigo {codigo}` (segmentos como chips minimais)
-  - **Localização** (grid 2 colunas label/valor):
-    - Mapa de Quantidades · `{orcamento.nome} (v{versao})`
-    - Capítulo · `{cap.codigo} — {cap.descricao}`
-    - Subcapítulo · derivado do prefixo do código (`02.03` a partir de `02.03.014`) — apenas se o código tiver ≥ 2 segmentos
-    - Artigo · `{codigo}` ou `#{ordem}` se sem código
-  - **Informação do artigo** (grid 2 col):
-    - Descrição completa (full text, sem truncar)
-    - Quantidade · `{qtd}` formatado pt-PT
-    - Unidade · `{unidade}`
-    - Preço unitário · `€ {preco_unitario}` (apenas se > 0)
-    - Preço total · `€ {qtd × preco}` (apenas se ambos)
-- Loading state: skeleton compacto
-- Acessibilidade: `dl/dt/dd` semântico
+## Alterações (apenas em `src/lib/classificacao/engine.ts`)
 
-### 3. Acções rápidas (mini-toolbar dentro da secção)
-- 📄 **Abrir no Mapa de Quantidades** → `navigate({ to: "/obras/$id/mq", params: { id: obraId }, search: { focus: artigoId } })` (o destino já existe; o `focus` é apenas hint — fora-do-âmbito implementar o scroll/highlight no destino)
-- 📑 **Ver contexto** → `Popover` inline mostrando 3 linhas (anterior, atual destacado, seguinte) usando os dados já carregados
-- 📂 **Abrir documento original** → botão presente mas **disabled** com tooltip "Documento de origem ainda não associado" (sem campo na BD)
-- 📋 **Copiar referência** → `navigator.clipboard.writeText("MQ {versao_label} → Capítulo {cap.codigo} → Artigo {codigo}")` + toast
+Sem alterações de schema, sem migrações, sem mexer na biblioteca.
 
-### 4. Wire-up em `ClassificacaoSidePanel.tsx`
-- Substituir o bloco actual `Section title="Artigo Original"` (que mostra apenas descrição+qtd+unidade) por `<ArtigoOriginalSection artigoOrigemId={row.id_origem} />`
-- A `PanelRow` já contém `id` mas é o ID do `classificacao_artigos`. Precisamos do `artigo_origem_id`. Adicionar `artigo_origem_id` ao tipo `PanelRow` e ao `select` em `motor-classificacao.tsx` (verificar — pode já estar carregado).
+### 1. Similaridade textual artigo↔artigo mestre passa a ser o sinal **obrigatório**
 
-## Ficheiros
+Para cada artigo mestre calcular tokens normalizados (reuso de `tokenize`) e:
 
-**Novos:**
-- `src/components/classificacao/useArtigoOriginal.ts`
-- `src/components/classificacao/ArtigoOriginalSection.tsx`
+```
+overlap     = nº de tokens significativos partilhados
+cobertura   = overlap / max(tokens_mestre, 1)
+score_texto = round(cobertura * 100)            // 0–100
+```
 
-**Editados:**
-- `src/components/classificacao/ClassificacaoSidePanel.tsx` — substituir bloco "Artigo Original"; expor `artigo_origem_id` em `PanelRow`
-- `src/routes/_app/motor-classificacao.tsx` — garantir que `artigo_origem_id` é carregado na query `cc-rows` e passado para `panelRow`
+Bónus textuais (apenas relevantes se já há similaridade):
+- bigrama/trigrama do mestre contido na descrição original: +15 / +25, máx **+40**
+- token raro partilhado (presente em < 2 % dos mestres): +10 cada, máx **+20**
+
+### 2. Candidato só existe se houver evidência textual ao nível do artigo
+
+Um artigo mestre só entra na lista de candidatos se cumprir **uma** das condições:
+
+- `score_texto ≥ 40`
+- `score_texto ≥ 30` **E** unidade compatível
+- tem **keyword de artigo** positiva que casa (caminho preservado para o futuro, quando `biblioteca_artigo_keywords` for povoada)
+
+Keywords de especialidade/subespecialidade **deixam de criar candidatos por si só**. Acaba a herança de pontos para os 1.673 artigos da especialidade.
+
+### 3. Compatibilidade de unidade
+
+Normalização: lowercase, remover espaços, `²/³` → `2/3`, mapear sinónimos óbvios (`m³` ↔ `m3`, `un` ↔ `und` ↔ `unid`, `vg` ↔ `vg.`).
+
+- Ambas presentes e compatíveis: **+15**
+- Ambas presentes e claramente incompatíveis (`m3` vs `un`, `m2` vs `kg`, `vg` vs `m3`): **−25**
+- Alguma ausente: 0 (neutro)
+
+### 4. Score final
+
+```
+score_final = score_texto                       // dominante
+            + bónus_ngrama       (≤ 40)
+            + bónus_token_raro   (≤ 20)
+            + esp_hit_cap        (≤ 10)         // só reforço; teto
+            + subesp_hit_cap     (≤ 15)         // só reforço; teto
+            + bónus/penalização_unidade
+            + soma_keywords_negativas           (mantém −80)
+            + 60 por keyword positiva de artigo (mantém)
+```
+
+ESP/SUBESP entram apenas como **reforço pequeno** (teto, não acumulação) e nunca tornam um candidato com `score_texto = 0` elegível.
+
+### 5. Limiares mais conservadores
+
+- `LIMIAR_AUTO` = **85** (era 90)
+- `LIMIAR_REVER` = **60**
+- Adicional para `classificado_auto`, **todas** estas condições têm de ser verdade:
+  - `score_final ≥ 85`
+  - `score_texto ≥ 50`
+  - unidade não incompatível (compatível **ou** ausente — mas se a unidade do original existir e a do mestre existir, têm de bater certo)
+  - margem `top1 − top2 ≥ 15` pontos
+  - sem keywords negativas a disparar no top-1
+
+Se qualquer uma falhar → desce para `necessita_revisao` (mantendo o top-1 como sugestão visível na sidebar) ou, se `score_final < 60`, para `sem_classificacao`.
+
+### 6. Empates / margens curtas
+
+- Se `top1 − top2 < 15` ou existirem ≥ 2 candidatos com score idêntico no top → força `necessita_revisao` mesmo que o score absoluto seja alto. A intenção é nunca decidir automaticamente em ambiguidade.
+
+### 7. "Exato" e "Aprendido" — mais rigorosos
+
+- **Exato** (`descricao_norm` idêntica): mantém `classificado_auto` apenas se houver **um único** match. Se houver vários, vai para `necessita_revisao` com todos como candidatos (já é o comportamento atual — preservar).
+- **Aprendido** (`classificacao_memoria`): mantém-se `100/classificado_auto` porque foi validado pelo utilizador.
+
+### 8. Motivo legível na sidebar "IA Explica"
+
+Atualizar `motivo` e `keywords_hit` para refletir o sinal real:
+
+> "Similaridade textual 78 % (tokens: betão, armado, c25/30) · unidade compatível (m³) · reforço subespecialidade: betão estrutural."
+
+E adicionar aos `keywords_hit` um hit sintético `{ nivel: "artigo", termo: "<similaridade textual>", pontos: score_texto }` para a sidebar já existente mostrar visualmente o sinal dominante.
+
+## Como o utilizador valida
+
+1. Abrir o Centro de Classificação Inteligente do orçamento atual.
+2. Clicar em **"Reclassificar"** (botão já existente, chama `runClassificacao`).
+3. Esperar que:
+   - associações claramente erradas como `"Demolição de laje de betão…" → "Separação de betão"` deixem de existir;
+   - artigos sem mestre adequado fiquem em `sem_classificacao` em vez de associados arbitrariamente com 50 %;
+   - número de `classificado_auto` desça e o de `necessita_revisao` / `sem_classificacao` suba — é o trade-off pretendido.
 
 ## Fora do âmbito
 
-- Persistir página / linha de importação / documento de origem (precisaria de migração ao parser de MQ).
-- Implementar focus/scroll-to-artigo no destino `/obras/$id/mq` (só passamos o search param).
-- Modelar subcapítulos como entidade real (continua a ser derivado do código).
-- Histórico de versões, ligação a Procurement/Autos de Medição/Histórico de Preços (futuras fases).
+- Não vou popular `biblioteca_artigo_keywords` (já existe fluxo "Como Ensinar a IA" + `AddKeywordQuickDialog`).
+- Sem embeddings / LLM scoring nesta fase.
+- Sem alterações de schema, RLS, ou de outros módulos.
+
+## Ficheiros tocados
+
+- `src/lib/classificacao/engine.ts` (único ficheiro)

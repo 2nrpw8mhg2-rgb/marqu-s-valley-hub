@@ -38,14 +38,26 @@ export type ClassificacaoResultado = {
 };
 
 // Pesos configuráveis (preparado para configuração futura)
+// Política conservadora: keywords de ESP/SUBESP nunca classificam sozinhas;
+// só reforçam um candidato com forte similaridade textual ao artigo mestre.
 export const PESOS_CLASSIFICACAO = {
-  ESP: 20,
-  SUBESP: 30,
-  CAT: 40,
-  ART: 60,
+  ESP_CAP: 10,           // teto de reforço por hits da especialidade
+  SUBESP_CAP: 15,        // teto de reforço por hits da subespecialidade
+  ART_KEYWORD: 60,       // por keyword positiva de artigo
   NEGATIVA: -80,
-  LIMIAR_AUTO: 90,
-  LIMIAR_REVER: 70,
+  UNIDADE_OK: 15,
+  UNIDADE_BAD: -25,
+  NGRAMA2: 15,
+  NGRAMA3: 25,
+  NGRAMA_CAP: 40,
+  TOKEN_RARO: 10,
+  TOKEN_RARO_CAP: 20,
+  MIN_TEXTO: 40,         // score_texto mínimo para ser candidato
+  MIN_TEXTO_UNIDADE: 30, // mínimo se unidade compatível
+  LIMIAR_AUTO: 85,
+  LIMIAR_REVER: 60,
+  MIN_TEXTO_AUTO: 50,    // score_texto mínimo para classificado_auto
+  MARGEM_AUTO: 15,       // diferença top1-top2 mínima para auto
 } as const;
 
 // Abreviaturas e expansões comuns no setor
@@ -96,8 +108,22 @@ function termMatches(normDesc: string, descTokens: Set<string>, termoNorm: strin
   return descTokens.has(termoNorm) || normDesc.includes(termoNorm);
 }
 
+type ArtigoBib = {
+  id: string;
+  descricao: string;
+  descricao_norm: string;
+  unidade: string | null;
+  unidade_norm: string;
+  subespecialidade_id: string;
+  categoria_id: string;
+  tokens: string[];
+  token_set: Set<string>;
+  bigrams: string[];
+  trigrams: string[];
+};
+
 type Bib = {
-  artigos: { id: string; descricao: string; descricao_norm: string; subespecialidade_id: string; categoria_id: string }[];
+  artigos: ArtigoBib[];
   artKw: { artigo_id: string; termo: string; termo_norm: string; tipo: "positiva" | "negativa" }[];
   subKw: { subespecialidade_id: string; termo: string; termo_norm: string; tipo: string; peso: number }[];
   espKw: { especialidade_id: string; termo: string; termo_norm: string; tipo: string; peso: number }[];
@@ -105,11 +131,50 @@ type Bib = {
   esps: Map<string, { id: string; nome: string }>;
   cats: Map<string, { id: string; nome: string; subespecialidade_id: string }>;
   memoria: Map<string, string>;
+  docFreq: Map<string, number>; // token -> nº de artigos mestres que o contêm
 };
+
+// ---- Unidades ------------------------------------------------------------
+
+const UNIDADE_SINONIMOS: Record<string, string> = {
+  "m³": "m3", "m^3": "m3", "m 3": "m3", "metroscubicos": "m3", "metrocubico": "m3",
+  "m²": "m2", "m^2": "m2", "m 2": "m2", "metrosquadrados": "m2", "metroquadrado": "m2",
+  "ml": "m", "metro": "m", "metros": "m",
+  "un": "un", "und": "un", "uni": "un", "unid": "un", "unidade": "un", "unidades": "un", "pç": "un", "pc": "un",
+  "vg": "vg", "vg.": "vg",
+  "kg": "kg", "kgs": "kg", "quilo": "kg", "quilos": "kg",
+  "h": "h", "hora": "h", "horas": "h",
+  "l": "l", "lt": "l", "litro": "l", "litros": "l",
+  "t": "t", "ton": "t", "tonelada": "t", "toneladas": "t",
+};
+
+function normalizarUnidade(u: string | null | undefined): string {
+  if (!u) return "";
+  let s = u.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  s = s.replace(/²/g, "2").replace(/³/g, "3").replace(/\s+/g, "").trim();
+  return UNIDADE_SINONIMOS[s] ?? s;
+}
+
+function compararUnidades(a: string, b: string): 1 | 0 | -1 {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  return -1;
+}
+
+// ---- N-gramas ------------------------------------------------------------
+
+function ngrams(tokens: string[], n: number): string[] {
+  if (tokens.length < n) return [];
+  const out: string[] = [];
+  for (let i = 0; i <= tokens.length - n; i++) out.push(tokens.slice(i, i + n).join(" "));
+  return out;
+}
+
+// ---- Carregamento --------------------------------------------------------
 
 async function loadBib(): Promise<Bib> {
   const [{ data: arts }, { data: artKw }, { data: subKw }, { data: espKw }, { data: subs }, { data: esps }, { data: cats }, { data: mem }] = await Promise.all([
-    supabase.from("biblioteca_artigos").select("id, descricao, subespecialidade_id, categoria_id").eq("ativo", true),
+    supabase.from("biblioteca_artigos").select("id, descricao, unidade, subespecialidade_id, categoria_id").eq("ativo", true),
     supabase.from("biblioteca_artigo_keywords").select("artigo_id, termo, tipo"),
     supabase.from("biblioteca_subespecialidade_keywords").select("subespecialidade_id, termo, tipo, peso").eq("ativo", true),
     supabase.from("biblioteca_especialidade_keywords").select("especialidade_id, termo, tipo, peso").eq("ativo", true),
@@ -119,8 +184,32 @@ async function loadBib(): Promise<Bib> {
     supabase.from("classificacao_memoria").select("descricao_normalizada, artigo_mestre_id"),
   ]);
 
+  const artigos: ArtigoBib[] = (arts ?? []).map((a: any) => {
+    const descricao_norm = normalizar(a.descricao);
+    const tokens = tokenize(a.descricao);
+    return {
+      id: a.id,
+      descricao: a.descricao,
+      descricao_norm,
+      unidade: a.unidade ?? null,
+      unidade_norm: normalizarUnidade(a.unidade),
+      subespecialidade_id: a.subespecialidade_id,
+      categoria_id: a.categoria_id,
+      tokens,
+      token_set: new Set(tokens),
+      bigrams: ngrams(tokens, 2),
+      trigrams: ngrams(tokens, 3),
+    };
+  });
+
+  // Document frequency
+  const docFreq = new Map<string, number>();
+  for (const a of artigos) {
+    for (const t of a.token_set) docFreq.set(t, (docFreq.get(t) ?? 0) + 1);
+  }
+
   return {
-    artigos: (arts ?? []).map((a: any) => ({ ...a, descricao_norm: normalizar(a.descricao) })),
+    artigos,
     artKw: (artKw ?? []).map((k: any) => ({ ...k, termo_norm: normalizar(k.termo) })),
     subKw: (subKw ?? []).map((k: any) => ({ ...k, termo_norm: normalizar(k.termo), peso: Number(k.peso) || 1 })),
     espKw: (espKw ?? []).map((k: any) => ({ ...k, termo_norm: normalizar(k.termo), peso: Number(k.peso) || 1 })),
@@ -128,6 +217,7 @@ async function loadBib(): Promise<Bib> {
     esps: new Map((esps ?? []).map((e: any) => [e.id, e])),
     cats: new Map((cats ?? []).map((c: any) => [c.id, c])),
     memoria: new Map((mem ?? []).map((m: any) => [m.descricao_normalizada, m.artigo_mestre_id])),
+    docFreq,
   };
 }
 
@@ -143,10 +233,108 @@ function fillHierarchy(bib: Bib, artigoMestreId: string) {
   };
 }
 
-function estadoFromScore(score: number): "classificado_auto" | "necessita_revisao" | "sem_classificacao" {
-  if (score >= PESOS_CLASSIFICACAO.LIMIAR_AUTO) return "classificado_auto";
-  if (score >= PESOS_CLASSIFICACAO.LIMIAR_REVER) return "necessita_revisao";
-  return "sem_classificacao";
+// ---- Scoring por candidato ----------------------------------------------
+
+type CandScore = {
+  art: ArtigoBib;
+  score_texto: number;
+  score_final: number;
+  hits: KeywordHit[];
+  negs: KeywordHit[];
+  unidadeCompat: 1 | 0 | -1;
+  tokensPartilhados: string[];
+};
+
+function scoreCandidato(
+  art: ArtigoBib,
+  origemTokenSet: Set<string>,
+  origemNorm: string,
+  unidadeOrigem: string,
+  bib: Bib,
+  totalArtigos: number,
+  artHitsForArt: KeywordHit[],
+  artNegsForArt: KeywordHit[],
+  espHitsCap: number,
+  subespHitsCap: number,
+  espNegs: KeywordHit[],
+  subespNegs: KeywordHit[],
+): CandScore | null {
+  // 1) Similaridade textual
+  const partilhados: string[] = [];
+  for (const t of art.token_set) if (origemTokenSet.has(t)) partilhados.push(t);
+  const cobertura = art.tokens.length > 0 ? partilhados.length / art.tokens.length : 0;
+  const score_texto = Math.round(cobertura * 100);
+
+  // 2) Bónus n-gramas (frase contígua do mestre presente no original)
+  let bonusN = 0;
+  for (const tg of art.trigrams) {
+    if (origemNorm.includes(tg)) { bonusN += PESOS_CLASSIFICACAO.NGRAMA3; if (bonusN >= PESOS_CLASSIFICACAO.NGRAMA_CAP) break; }
+  }
+  if (bonusN < PESOS_CLASSIFICACAO.NGRAMA_CAP) {
+    for (const bg of art.bigrams) {
+      if (origemNorm.includes(bg)) { bonusN += PESOS_CLASSIFICACAO.NGRAMA2; if (bonusN >= PESOS_CLASSIFICACAO.NGRAMA_CAP) break; }
+    }
+  }
+  bonusN = Math.min(bonusN, PESOS_CLASSIFICACAO.NGRAMA_CAP);
+
+  // 3) Bónus tokens raros (< 2% dos artigos)
+  let bonusR = 0;
+  const limiarRaro = Math.max(2, Math.floor(totalArtigos * 0.02));
+  for (const t of partilhados) {
+    const df = bib.docFreq.get(t) ?? 0;
+    if (df > 0 && df <= limiarRaro) {
+      bonusR += PESOS_CLASSIFICACAO.TOKEN_RARO;
+      if (bonusR >= PESOS_CLASSIFICACAO.TOKEN_RARO_CAP) break;
+    }
+  }
+  bonusR = Math.min(bonusR, PESOS_CLASSIFICACAO.TOKEN_RARO_CAP);
+
+  // 4) Unidade
+  const unidadeCompat = compararUnidades(unidadeOrigem, art.unidade_norm);
+  const bonusU = unidadeCompat === 1 ? PESOS_CLASSIFICACAO.UNIDADE_OK
+               : unidadeCompat === -1 ? PESOS_CLASSIFICACAO.UNIDADE_BAD
+               : 0;
+
+  // 5) Keywords positivas/negativas de artigo
+  const bonusArtKw = artHitsForArt.reduce((s, h) => s + h.pontos, 0);
+  const penalArtKw = artNegsForArt.reduce((s, h) => s + h.pontos, 0);
+
+  // 6) Filtro de elegibilidade conservador
+  const temArtKeywordPositiva = artHitsForArt.length > 0;
+  const elegivel =
+    temArtKeywordPositiva ||
+    score_texto >= PESOS_CLASSIFICACAO.MIN_TEXTO ||
+    (score_texto >= PESOS_CLASSIFICACAO.MIN_TEXTO_UNIDADE && unidadeCompat === 1);
+  if (!elegivel) return null;
+
+  const score_final =
+    score_texto + bonusN + bonusR + espHitsCap + subespHitsCap + bonusU + bonusArtKw + penalArtKw +
+    espNegs.reduce((s, h) => s + h.pontos, 0) +
+    subespNegs.reduce((s, h) => s + h.pontos, 0);
+
+  // Hit sintético "similaridade textual" para a sidebar IA Explica
+  const hits: KeywordHit[] = [];
+  if (score_texto > 0) {
+    hits.push({
+      termo: partilhados.length ? `similaridade textual: ${partilhados.join(", ")}` : "similaridade textual",
+      nivel: "artigo",
+      entidade_id: art.id,
+      entidade_nome: art.descricao,
+      peso: 1,
+      pontos: score_texto,
+    });
+  }
+  hits.push(...artHitsForArt);
+
+  return {
+    art,
+    score_texto,
+    score_final,
+    hits,
+    negs: [...artNegsForArt],
+    unidadeCompat,
+    tokensPartilhados: partilhados,
+  };
 }
 
 function classifyArtigo(
@@ -156,6 +344,7 @@ function classifyArtigo(
   const norm = normalizar(artigo.descricao);
   const tokens = tokenize(artigo.descricao);
   const tokenSet = new Set(tokens);
+  const unidadeOrigem = normalizarUnidade(artigo.unidade);
   const base = {
     artigo_origem_id: artigo.id,
     orcamento_id: artigo.orcamento_id,
@@ -209,19 +398,16 @@ function classifyArtigo(
     };
   }
 
-  // 3) Scoring hierárquico por palavras-chave
-
-  // 3a) Hits por especialidade
+  // 3) Hits por nível (recolhe, mas ESP/SUBESP só reforçam; não criam candidatos)
   const espHits = new Map<string, KeywordHit[]>();
   const espNeg = new Map<string, KeywordHit[]>();
   for (const k of bib.espKw) {
     if (!termMatches(norm, tokenSet, k.termo_norm)) continue;
     const esp = bib.esps.get(k.especialidade_id);
-    const pts = (k.tipo === "negativa" ? PESOS_CLASSIFICACAO.NEGATIVA : PESOS_CLASSIFICACAO.ESP) * k.peso;
     const hit: KeywordHit = {
       termo: k.termo, nivel: "especialidade",
       entidade_id: k.especialidade_id, entidade_nome: esp?.nome ?? "—",
-      peso: k.peso, pontos: pts,
+      peso: k.peso, pontos: 0,
     };
     const map = k.tipo === "negativa" ? espNeg : espHits;
     const arr = map.get(k.especialidade_id) ?? [];
@@ -229,17 +415,15 @@ function classifyArtigo(
     map.set(k.especialidade_id, arr);
   }
 
-  // 3b) Hits por subespecialidade
   const subHits = new Map<string, KeywordHit[]>();
   const subNeg = new Map<string, KeywordHit[]>();
   for (const k of bib.subKw) {
     if (!termMatches(norm, tokenSet, k.termo_norm)) continue;
     const sub = bib.subs.get(k.subespecialidade_id);
-    const pts = (k.tipo === "negativa" ? PESOS_CLASSIFICACAO.NEGATIVA : PESOS_CLASSIFICACAO.SUBESP) * k.peso;
     const hit: KeywordHit = {
       termo: k.termo, nivel: "subespecialidade",
       entidade_id: k.subespecialidade_id, entidade_nome: sub?.nome ?? "—",
-      peso: k.peso, pontos: pts,
+      peso: k.peso, pontos: 0,
     };
     const map = k.tipo === "negativa" ? subNeg : subHits;
     const arr = map.get(k.subespecialidade_id) ?? [];
@@ -247,14 +431,13 @@ function classifyArtigo(
     map.set(k.subespecialidade_id, arr);
   }
 
-  // 3c) Hits por artigo
   const artHits = new Map<string, KeywordHit[]>();
   const artNeg = new Map<string, KeywordHit[]>();
   for (const k of bib.artKw) {
     if (!termMatches(norm, tokenSet, k.termo_norm)) continue;
     const a = bib.artigos.find((x) => x.id === k.artigo_id);
     if (!a) continue;
-    const pts = (k.tipo === "negativa" ? PESOS_CLASSIFICACAO.NEGATIVA : PESOS_CLASSIFICACAO.ART) * 1;
+    const pts = k.tipo === "negativa" ? PESOS_CLASSIFICACAO.NEGATIVA : PESOS_CLASSIFICACAO.ART_KEYWORD;
     const hit: KeywordHit = {
       termo: k.termo, nivel: "artigo",
       entidade_id: k.artigo_id, entidade_nome: a.descricao,
@@ -266,87 +449,139 @@ function classifyArtigo(
     map.set(k.artigo_id, arr);
   }
 
-  // 3d) Acumula por candidato (artigos com qualquer hit positivo a algum nível)
-  const candidatos = new Map<string, { score: number; hits: KeywordHit[]; negs: KeywordHit[] }>();
-  const considerArt = (artId: string) => {
-    if (candidatos.has(artId)) return;
-    const a = bib.artigos.find((x) => x.id === artId);
-    if (!a) return;
-    const sub = bib.subs.get(a.subespecialidade_id);
+  // 4) Construir lista de candidatos.
+  //    Universo de candidatos: artigos com keyword positiva de artigo +
+  //    todos os artigos do top de subespecialidades/especialidades com hits,
+  //    mas só passam o filtro se tiverem similaridade textual mínima.
+  const totalArtigos = bib.artigos.length;
+
+  const candidatos: CandScore[] = [];
+  const consideredArt = new Set<string>();
+
+  const considerArtigo = (art: ArtigoBib) => {
+    if (consideredArt.has(art.id)) return;
+    consideredArt.add(art.id);
+
+    const sub = bib.subs.get(art.subespecialidade_id);
     const espId = sub?.especialidade_id ?? null;
-    const hits: KeywordHit[] = [];
-    const negs: KeywordHit[] = [];
-    let score = 0;
-    for (const h of artHits.get(artId) ?? []) { hits.push(h); score += h.pontos; }
-    for (const h of subHits.get(a.subespecialidade_id) ?? []) { hits.push(h); score += h.pontos; }
-    if (espId) for (const h of espHits.get(espId) ?? []) { hits.push(h); score += h.pontos; }
-    for (const h of artNeg.get(artId) ?? []) { negs.push(h); score += h.pontos; }
-    for (const h of subNeg.get(a.subespecialidade_id) ?? []) { negs.push(h); score += h.pontos; }
-    if (espId) for (const h of espNeg.get(espId) ?? []) { negs.push(h); score += h.pontos; }
-    if (hits.length > 0) candidatos.set(artId, { score, hits, negs });
+
+    // Reforços com teto (não acumulam para o infinito)
+    const espArr = espId ? (espHits.get(espId) ?? []) : [];
+    const subArr = subHits.get(art.subespecialidade_id) ?? [];
+    const espCap = espArr.length > 0 ? PESOS_CLASSIFICACAO.ESP_CAP : 0;
+    const subCap = subArr.length > 0 ? PESOS_CLASSIFICACAO.SUBESP_CAP : 0;
+
+    const espNegArr = espId ? (espNeg.get(espId) ?? []).map(h => ({ ...h, pontos: PESOS_CLASSIFICACAO.NEGATIVA })) : [];
+    const subNegArr = (subNeg.get(art.subespecialidade_id) ?? []).map(h => ({ ...h, pontos: PESOS_CLASSIFICACAO.NEGATIVA }));
+
+    const cand = scoreCandidato(
+      art, tokenSet, norm, unidadeOrigem, bib, totalArtigos,
+      artHits.get(art.id) ?? [],
+      artNeg.get(art.id) ?? [],
+      espCap, subCap,
+      espNegArr, subNegArr,
+    );
+    if (!cand) return;
+
+    // Reforços com etiqueta visível (pontos cap, não os pontos brutos)
+    if (espArr.length > 0) {
+      cand.hits.push({ ...espArr[0], pontos: espCap });
+    }
+    if (subArr.length > 0) {
+      cand.hits.push({ ...subArr[0], pontos: subCap });
+    }
+    cand.negs.push(...espNegArr, ...subNegArr);
+    candidatos.push(cand);
   };
 
-  // Artigos com hit direto
-  for (const artId of artHits.keys()) considerArt(artId);
-  // Artigos cuja subesp teve hit (herdam pontos)
-  for (const subId of subHits.keys()) {
-    for (const a of bib.artigos) if (a.subespecialidade_id === subId) considerArt(a.id);
-  }
-  // Artigos cuja esp teve hit (herdam pontos)
-  for (const espId of espHits.keys()) {
-    for (const [subId, sub] of bib.subs) {
-      if (sub.especialidade_id !== espId) continue;
-      for (const a of bib.artigos) if (a.subespecialidade_id === subId) considerArt(a.id);
-    }
+  // 4a) Sempre considerar artigos com keyword positiva de artigo
+  for (const artId of artHits.keys()) {
+    const a = bib.artigos.find((x) => x.id === artId);
+    if (a) considerArtigo(a);
   }
 
-  const ranked = Array.from(candidatos.entries())
-    .map(([id, v]) => ({ id, ...v }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
+  // 4b) Triagem por similaridade textual: percorrer todos os artigos cuja
+  //     subespecialidade ou especialidade teve hit (universo já reduzido).
+  //     Caso não haja hits a nenhum nível, percorrer todos (a similaridade
+  //     filtra na mesma — é apenas O(n) tokens).
+  const subEspComHit = new Set(subHits.keys());
+  const espComHit = new Set(espHits.keys());
+
+  const universo = subEspComHit.size > 0 || espComHit.size > 0
+    ? bib.artigos.filter((a) => {
+        if (subEspComHit.has(a.subespecialidade_id)) return true;
+        const sub = bib.subs.get(a.subespecialidade_id);
+        return sub ? espComHit.has(sub.especialidade_id) : false;
+      })
+    : bib.artigos;
+
+  for (const a of universo) considerArtigo(a);
+
+  // 5) Ranking
+  candidatos.sort((a, b) => b.score_final - a.score_final);
+  const ranked = candidatos.slice(0, 5);
 
   if (ranked.length === 0) {
     return {
       ...base,
       artigo_mestre_id: null, categoria_id: null, subespecialidade_id: null, especialidade_id: null,
       confianca: 0, estado: "sem_classificacao", metodo_match: "nenhum",
-      motivo: "Nenhuma palavra-chave da Biblioteca Mestra encontrada",
+      motivo: "Nenhum artigo mestre com similaridade textual suficiente",
     };
   }
 
-  const candArr: Candidato[] = ranked.slice(0, 3).map((r) => {
-    const a = bib.artigos.find((x) => x.id === r.id)!;
-    const termos = Array.from(new Set(r.hits.map((h) => h.termo)));
+  const candArr: Candidato[] = ranked.slice(0, 3).map((c) => {
+    const partes: string[] = [];
+    if (c.score_texto > 0) partes.push(`similaridade ${c.score_texto}%`);
+    if (c.tokensPartilhados.length) partes.push(`tokens: ${c.tokensPartilhados.slice(0, 6).join(", ")}`);
+    if (c.unidadeCompat === 1) partes.push("unidade compatível");
+    if (c.unidadeCompat === -1) partes.push("unidade incompatível");
     return {
-      artigo_mestre_id: r.id,
-      descricao: a.descricao,
-      score: Math.max(0, Math.min(100, Math.round(r.score))),
-      motivo: termos.length
-        ? `Encontradas keywords: ${termos.join(", ")}`
-        : "Sem keywords positivas",
-      keywords_hit: r.hits,
-      negativas: r.negs,
+      artigo_mestre_id: c.art.id,
+      descricao: c.art.descricao,
+      score: Math.max(0, Math.min(100, Math.round(c.score_final))),
+      motivo: partes.join(" · "),
+      keywords_hit: c.hits,
+      negativas: c.negs,
     };
   });
 
   const top = ranked[0];
-  const topScore = Math.max(0, Math.min(100, Math.round(top.score)));
-  const estado = estadoFromScore(topScore);
-  const termosTop = Array.from(new Set(top.hits.map((h) => h.termo)));
-  const motivo = termosTop.length
-    ? `Classificado por palavras-chave: ${termosTop.join(", ")}`
-    : "Sem palavras-chave positivas";
+  const top2 = ranked[1];
+  const topScore = Math.max(0, Math.min(100, Math.round(top.score_final)));
+  const margem = top2 ? top.score_final - top2.score_final : Infinity;
+
+  // 6) Decisão conservadora
+  const podeAuto =
+    top.score_final >= PESOS_CLASSIFICACAO.LIMIAR_AUTO &&
+    top.score_texto >= PESOS_CLASSIFICACAO.MIN_TEXTO_AUTO &&
+    top.unidadeCompat !== -1 &&
+    margem >= PESOS_CLASSIFICACAO.MARGEM_AUTO &&
+    top.negs.length === 0;
+
+  let estado: "classificado_auto" | "necessita_revisao" | "sem_classificacao";
+  if (podeAuto) estado = "classificado_auto";
+  else if (top.score_final >= PESOS_CLASSIFICACAO.LIMIAR_REVER) estado = "necessita_revisao";
+  else estado = "sem_classificacao";
+
+  const partesMot: string[] = [];
+  partesMot.push(`Similaridade textual ${top.score_texto}%`);
+  if (top.tokensPartilhados.length) partesMot.push(`(tokens: ${top.tokensPartilhados.slice(0, 6).join(", ")})`);
+  if (top.unidadeCompat === 1) partesMot.push("· unidade compatível");
+  if (top.unidadeCompat === -1) partesMot.push("· unidade INCOMPATÍVEL");
+  if (top2 && margem < PESOS_CLASSIFICACAO.MARGEM_AUTO) partesMot.push(`· margem curta sobre 2º (${Math.round(margem)} pts)`);
+  const motivo = partesMot.join(" ");
 
   if (estado === "sem_classificacao") {
     return {
       ...base, candidatos: candArr,
       artigo_mestre_id: null, categoria_id: null, subespecialidade_id: null, especialidade_id: null,
       confianca: topScore, estado, metodo_match: "nenhum",
-      motivo: `${motivo} (score ${topScore} abaixo do limiar)`,
+      motivo: `${motivo} — score ${topScore} abaixo do limiar`,
     };
   }
 
-  const h = fillHierarchy(bib, top.id);
+  const h = fillHierarchy(bib, top.art.id);
   return {
     ...base, ...h, candidatos: candArr,
     confianca: topScore, estado, metodo_match: "keyword_artigo",
@@ -426,7 +661,7 @@ export async function runClassificacao(orcamentoId: string, onProgress?: (snapsh
       motivo: r.motivo,
       candidatos: r.candidatos,
     });
-    if (r.metodo_match === "exato") { stats.auto_exato++; classificadosRun++; }
+    if (r.metodo_match === "exato" && r.estado === "classificado_auto") { stats.auto_exato++; classificadosRun++; }
     else if (r.metodo_match === "aprendido") { stats.auto_aprendido++; classificadosRun++; }
     else if (r.estado === "classificado_auto") { stats.auto_exato++; classificadosRun++; }
     else if (r.estado === "necessita_revisao") { stats.parcial++; pendentesRun++; }
@@ -460,6 +695,8 @@ export async function runClassificacao(orcamentoId: string, onProgress?: (snapsh
 
   return { runId: run.id, stats };
 }
+
+
 
 export async function aprenderClassificacao(descricao: string, artigoMestreId: string) {
   const norm = normalizar(descricao);
