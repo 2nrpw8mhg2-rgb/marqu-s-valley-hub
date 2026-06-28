@@ -96,7 +96,11 @@ function ObrasPage() {
                 </TableRow>
               ) : (
                 filtered.map((o) => (
-                  <TableRow key={o.id} className="border-border">
+                  <TableRow
+                    key={o.id}
+                    className="border-border cursor-pointer hover:bg-muted/40"
+                    onClick={() => navigate({ to: "/obras/$id", params: { id: o.id } })}
+                  >
                     <TableCell className="font-mono text-xs text-muted-foreground">{o.codigo || "—"}</TableCell>
                     <TableCell className="font-medium">{o.nome}</TableCell>
                     <TableCell>{o.cliente || "—"}</TableCell>
