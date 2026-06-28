@@ -1,98 +1,115 @@
-# Reestruturação: Obra como contexto central + MQ como módulo da obra
+# Fase 2.2 — Motor de Classificação por Palavras‑chave
 
-Esta fase 1 implementa a nova arquitetura de navegação centrada na obra, move a importação de MQ para dentro da obra, e torna a classificação automática (sem clique manual). Prepara a base para versionamento futuro sem o implementar agora.
+Estender o motor atual (`src/lib/classificacao/engine.ts`) para uma classificação **hierárquica, ponderada, auditável e reprocessável** a partir das palavras‑chave da Biblioteca Mestra. Sem IA semântica.
 
-## 1. Estrutura de navegação por obra
+## 1. Normalização do texto
 
-Criar layout `src/routes/_app/obras.$id.tsx` com tabs persistentes:
+Nova função `normalizar()` melhorada:
 
-```text
-/obras/$id                  → Resumo
-/obras/$id/documentos       → Documentos
-/obras/$id/mq               → Mapa de Quantidades
-/obras/$id/orcamentacao     → Orçamentação
-/obras/$id/procurement      → Procurement
-/obras/$id/planeamento      → (placeholder "Em desenvolvimento")
-/obras/$id/financeira       → (placeholder)
-/obras/$id/medicoes         → (placeholder)
-/obras/$id/relatorios       → (placeholder)
+- minúsculas + remoção de acentos (já existe)
+- substituição de abreviaturas comuns: `p/ → para`, `c/ → com`, `s/ → sem`, `nº → numero`, `m2 → m2`, `m3 → m3`, `ø → diametro`, `betão → betao`, `arm → armado`
+- remoção de pontuação (`.,;:()[]{}/\|"'`)
+- colapso de espaços
+- remoção de stopwords curtas/irrelevantes (`de, da, do, em, e, para, com, ou, a, o, os, as`)
+
+Aplicada à descrição original e a todos os termos vindos da biblioteca antes de comparar.
+
+## 2. Algoritmo de pontuação
+
+Substituir o ranking atual (apenas keywords de artigo + overlap de tokens) por **scoring hierárquico**:
+
+| Nível | Peso base | Origem |
+|---|---|---|
+| Especialidade | 20 | `biblioteca_especialidade_keywords` |
+| Subespecialidade | 30 | `biblioteca_subespecialidade_keywords` |
+| Categoria | 40 | (das próprias keywords dos artigos da categoria) |
+| Artigo Mestre | 60 | `biblioteca_artigo_keywords` |
+| Negativa | −80 | qualquer nível com `tipo='negativa'` |
+
+Cada match multiplica o peso base pelo `peso` (numeric) da linha de keyword (default 1.0).
+
+Para cada artigo do MQ:
+1. Identifica todas as keywords presentes (match por token exato ou substring de palavra).
+2. Acumula score por **artigo mestre candidato**, herdando os pontos das suas subesp/esp.
+3. Keywords negativas associadas ao candidato (ou à sua hierarquia) subtraem.
+4. Mantém lista das `keywords_hit` com `{termo, nivel, entidade_id, entidade_nome, peso, pontos}`.
+
+Estado final pelo top‑candidato:
+- score ≥ 90 → `classificado_auto`
+- 70–89 → `necessita_revisao`
+- < 70 → `sem_classificacao`
+
+`confianca` = `min(100, round(score))`. `metodo_match` = `keyword_artigo` (mantém o enum existente; `keyword_esp`/`keyword_subesp` ficam para quando só há match a esses níveis).
+
+A regra **aprendido > exato > keywords** mantém‑se.
+
+## 3. Persistência — `classificacao_artigos.candidatos`
+
+Reaproveitar a coluna `candidatos jsonb` (já existe) para guardar até 3 candidatos com:
+```json
+{
+  "artigo_mestre_id": "...",
+  "descricao": "...",
+  "score": 95,
+  "motivo": "Encontradas keywords: cofragem, pilares, betão armado",
+  "keywords_hit": [
+    {"termo":"cofragem","nivel":"subespecialidade","entidade":"Cofragens","peso":1,"pontos":30},
+    {"termo":"pilares","nivel":"categoria","entidade":"Cofragens Verticais","peso":1,"pontos":40},
+    {"termo":"betão armado","nivel":"especialidade","entidade":"Estruturas","peso":1,"pontos":20}
+  ],
+  "negativas": []
+}
 ```
 
-O layout mostra header da obra (nome, código, cliente, estado) + tabs e `<Outlet />`. CRM de Obras (`/obras`) continua a ser a listagem; clicar numa linha leva para `/obras/$id`.
+`motivo` (string) passa a ser auto‑gerado: `"Classificado por palavras-chave: cofragem, pilares, betão armado"`.
 
-## 2. Módulo "Mapa de Quantidades" da obra
+## 4. UI — Centro de Classificação (`src/routes/_app/motor-classificacao.tsx`) e Revisão na Obra
 
-Nova página `/obras/$id/mq` com:
+- **Coluna "Motivo da classificação"**: trocar a célula `Porquê?` (atualmente um Popover curto) por texto resumo (`motivo`) + botão `Detalhes`.
+- **Dialog de detalhe da classificação** (novo `ClassificacaoDetailDialog.tsx`): tabela com palavras encontradas, entidade, nível, peso, pontos; secção separada para negativas aplicadas; total e estado final.
+- **Botão "Reprocessar classificação"** no header da página e na tab MQ da obra: chama `runClassificacao(orcamentoId)` preservando linhas `validado` (já é o comportamento atual).
 
-**Estado "sem MQ":** card centrado com botão **Importar Mapa de Quantidades** (reusa `ImportMQDialog` atual).
+## 5. Aprendizagem supervisionada
 
-**Estado "com MQ":** dashboard com:
-- Última versão (placeholder "v1"), data de importação, total de artigos
-- Barras/contadores: classificados / pendentes / sem classificação / % classificação
-- Estado do MQ (badge): `importado` · `em_classificacao` · `aguardando_validacao` · `validado` · `convertido_pacotes`
-- Ações: **Importar nova versão** (desativado, "em breve"), **Comparar versões** (desativado), **Rever classificação** (→ navega para vista de revisão embutida), **Gerar Pacotes de Consulta** (→ Procurement)
-- Tabela resumo dos artigos classificados (vinda da classificação automática)
+Quando o utilizador valida/corrige uma classificação (`validar`, `atribuir` e `remover` em `motor-classificacao.tsx` e em `RevisaoArtigos`), registar em `classificacao_aprendizagem`:
 
-## 3. Auto-classificação após importação
+```ts
+{
+  user_id,
+  descricao_original,
+  descricao_normalizada,
+  especialidade_sugerida: <nome da esp do top candidato>,
+  especialidade_final: <nome da esp atribuída>,
+  confianca_sugerida: <score do top candidato>,
+  obra_id,
+  acao: 'validar' | 'corrigir' | 'remover',
+}
+```
 
-Modificar `ImportMQDialog` (quando aberto a partir da obra): ao concluir a inserção em `orcamento_artigos`, disparar imediatamente `runClassificacao(orcamentoId)` e mostrar a barra de progresso no próprio diálogo (ou redirecionar para `/obras/$id/mq` com o progresso visível).
+Esta tabela já existe — só é preciso passar a inserir. A `classificacao_memoria` continua a alimentar o método `aprendido`.
 
-O utilizador nunca clica em "Iniciar Classificação". O estado do MQ transita: `importado` → `em_classificacao` → `aguardando_validacao` (se há pendentes) ou `validado` (se 100% confiança).
+## 6. Configuração dos pesos (preparado para futuro)
 
-## 4. Vista de revisão dentro da obra
+Centralizar pesos numa constante exportada em `engine.ts`:
 
-Mover a UI de validação artigo-a-artigo (atualmente em `/motor-classificacao`) para um componente reutilizável e embutir em `/obras/$id/mq` quando o utilizador clica "Rever classificação". Filtra por defeito apenas artigos `necessita_revisao` + `sem_classificacao`.
+```ts
+export const PESOS_CLASSIFICACAO = { ESP: 20, SUBESP: 30, CAT: 40, ART: 60, NEGATIVA: -80, LIMIAR_AUTO: 90, LIMIAR_REVER: 70 };
+```
 
-## 5. Centro de Classificação global (transversal)
+Sem ecrã de configuração nesta fase.
 
-`/motor-classificacao` mantém-se no menu como **painel transversal de supervisão**:
-- Lista artigos pendentes de validação de **todas as obras** (com coluna "Obra")
-- KPIs globais: total pendentes, taxa de acerto, palavras-chave em falta
-- Não tem botão "Iniciar Classificação" — só revisão e aprendizagem
-- Sidebar: continuar a chamar-se "Centro de Classificação"
+## 7. Fora de âmbito (próximas fases)
 
-## 6. Single source of truth
+- IA semântica / embeddings
+- Ecrã de gestão de pesos
+- Regras (`biblioteca_subespecialidade_regras`) — só leitura, não consumidas ainda
+- Dashboard de aprendizagem
 
-Manter o modelo atual: `orcamento_artigos` (origem) + `classificacao_artigos` (classificação). Todos os módulos (Orçamentação, Procurement) consultam estas tabelas, sem cópias.
+## Ficheiros tocados
 
-## 7. Preparar versionamento (sem implementar)
+- `src/lib/classificacao/engine.ts` — nova normalização, scoring hierárquico, motivos auto‑gerados, registo de `classificacao_aprendizagem`
+- `src/routes/_app/motor-classificacao.tsx` — coluna Motivo, botão Reprocessar, integração com novo dialog
+- `src/components/classificacao/ClassificacaoDetailDialog.tsx` *(novo)* — detalhe palavras/pontos
+- `src/components/obras/RevisaoArtigos.tsx` — mesma coluna + dialog + reprocessar (se aplicável)
 
-Adicionar coluna `versao` (text, default `'v1'`) e `versao_ordem` (int, default `1`) à tabela `orcamentos`, e índice `(obra_id, versao)`. UI desta fase mostra apenas v1; futura iteração ativará criação de v2, Rev A, comparação.
-
-## Detalhes técnicos
-
-**Ficheiros novos:**
-- `src/routes/_app/obras.$id.tsx` — layout com tabs
-- `src/routes/_app/obras.$id.index.tsx` — Resumo
-- `src/routes/_app/obras.$id.documentos.tsx` — reusa `documentos.tsx` filtrado por obra
-- `src/routes/_app/obras.$id.mq.tsx` — dashboard MQ + revisão embutida
-- `src/routes/_app/obras.$id.orcamentacao.tsx` — lista de orçamentos da obra (filtra `orcamentos` por `obra_id`)
-- `src/routes/_app/obras.$id.procurement.tsx` — reusa pacotes filtrados por obra
-- `src/routes/_app/obras.$id.planeamento.tsx`, `.financeira.tsx`, `.medicoes.tsx`, `.relatorios.tsx` — placeholders
-- `src/components/obras/ObraTabs.tsx` — barra de tabs
-- `src/components/obras/MQDashboard.tsx` — KPIs e ações do MQ
-- `src/components/classificacao/RevisaoArtigos.tsx` — extrai a tabela/popover de revisão de `motor-classificacao.tsx` para reutilização
-
-**Ficheiros alterados:**
-- `src/routes/_app/obras.tsx` — linha da tabela passa a navegar para `/obras/$id`
-- `src/components/orcamentos/ImportMQDialog.tsx` — após importar, chamar `runClassificacao` automaticamente e mostrar progresso
-- `src/routes/_app/motor-classificacao.tsx` — remover botão "Iniciar Classificação", virar painel global de revisão multi-obra
-- `src/components/AppSidebar.tsx` — manter "Centro de Classificação"; "CRM de Obras" passa a ser ponto de entrada principal
-
-**Migração BD:**
-- `ALTER TABLE orcamentos ADD COLUMN versao text NOT NULL DEFAULT 'v1'`
-- `ALTER TABLE orcamentos ADD COLUMN versao_ordem int NOT NULL DEFAULT 1`
-- `CREATE INDEX ON orcamentos(obra_id, versao_ordem)`
-- Adicionar enum `estado_mq` em `orcamentos.estado_mq` (`importado | em_classificacao | aguardando_validacao | validado | convertido_pacotes`)
-- Trigger: ao concluir `orcamento_classificacao_run`, atualizar `estado_mq` em `orcamentos`
-
-## Fora desta fase (futuro)
-
-- Parser de PDF / Word / outros formatos
-- Criar v2 / Rev A / comparação visual de versões
-- Histórico de alterações artigo-a-artigo entre versões
-- Integração automática com Planeamento, Financeira, Medições, Relatórios
-
-## Resultado
-
-Ao terminar, o utilizador entra em CRM de Obras → escolhe obra → vê tabs → vai a "Mapa de Quantidades" → importa ficheiro → vê a classificação a correr automaticamente → revê apenas o que tem baixa confiança. O Centro de Classificação no menu lateral fica como painel transversal de supervisão.
+Sem migrações novas — todas as tabelas e colunas necessárias já existem.
