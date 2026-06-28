@@ -4,11 +4,15 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle2, Edit3, Plus, Tag, GitBranch, Sparkles, ArrowDown, X } from "lucide-react";
+import { CheckCircle2, Edit3, Sparkles, ArrowDown } from "lucide-react";
 import { normalizar, type Candidato, type KeywordHit, type Metodo } from "@/lib/classificacao/engine";
 import { ResultadoIABadge } from "./ResultadoIABadge";
 import { ConfiancaBar } from "./ConfiancaBar";
 import { AddKeywordQuickDialog } from "./AddKeywordQuickDialog";
+import { BibliotecaAnalisadaSection } from "./BibliotecaAnalisadaSection";
+import { ComoEnsinarIASection, type EnsinarAcao } from "./ComoEnsinarIASection";
+import { useInvalidateBibliotecaStats } from "./useBibliotecaStats";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 type EstadoCls = "classificado_auto" | "necessita_revisao" | "sem_classificacao" | "validado";
@@ -30,11 +34,12 @@ export type PanelRow = {
 };
 
 export function ClassificacaoSidePanel({
-  row, onClose,
+  row, orcamentoId, onClose,
   espMap, subMap, catMap, artMap,
   onAceitar, onCorrigir, onRefresh,
 }: {
   row: PanelRow | null;
+  orcamentoId: string | null;
   onClose: () => void;
   espMap: Map<string, string>;
   subMap: Map<string, any>;
@@ -46,8 +51,29 @@ export function ClassificacaoSidePanel({
 }) {
   const [kwOpen, setKwOpen] = useState(false);
   const navigate = useNavigate();
+  const invalidateStats = useInvalidateBibliotecaStats();
   const open = !!row;
   const norm = useMemo(() => row ? normalizar(row.descricao_original) : "", [row]);
+
+  const handleEnsinar = async (a: EnsinarAcao) => {
+    if (!row) return;
+    if (a === "criar_artigo") {
+      navigate({ to: "/biblioteca-mestra/artigos", search: { novo: 1, desc: row.descricao_original } as any });
+    } else if (a === "adicionar_keyword") {
+      setKwOpen(true);
+    } else if (a === "criar_regra") {
+      toast.info("Motor de regras formal — em breve");
+    } else if (a === "criar_relacao") {
+      navigate({ to: "/biblioteca-mestra/sistemas" });
+    } else if (a === "ignorar") {
+      const motivo = `${row.motivo ?? ""} [ignorado]`.trim();
+      const { error } = await supabase.from("classificacao_artigos").update({ motivo }).eq("id", row.id);
+      if (error) return toast.error(error.message);
+      toast.success("Artigo marcado como ignorado");
+      onRefresh();
+      onClose();
+    }
+  };
   const top = row?.candidatos?.[0];
   const hits: KeywordHit[] = top?.keywords_hit ?? [];
   const negs: KeywordHit[] = top?.negativas ?? [];
@@ -177,7 +203,21 @@ export function ClassificacaoSidePanel({
 
               <Separator />
 
-              {/* Ações */}
+              {/* Biblioteca Analisada */}
+              <BibliotecaAnalisadaSection
+                orcamentoId={orcamentoId}
+                candidatosCount={row.candidatos?.length ?? 0}
+                semClassificacao={row.estado === "sem_classificacao"}
+              />
+
+              {/* Como Ensinar a IA — só para sem classificação ou confiança baixa */}
+              {(row.estado === "sem_classificacao" || row.confianca < 70) && (
+                <ComoEnsinarIASection onAction={handleEnsinar} />
+              )}
+
+              <Separator />
+
+              {/* Ações principais */}
               <Section title="Ações">
                 <div className="grid grid-cols-2 gap-2">
                   <Button
@@ -191,25 +231,6 @@ export function ClassificacaoSidePanel({
                   <Button size="sm" variant="outline" onClick={() => onCorrigir(row)}>
                     <Edit3 className="h-4 w-4 mr-1" /> Corrigir
                   </Button>
-                  <Button
-                    size="sm" variant="outline"
-                    onClick={() => navigate({ to: "/biblioteca-mestra/artigos", search: { novo: 1, desc: row.descricao_original } as any })}
-                  >
-                    <Plus className="h-4 w-4 mr-1" /> Criar Artigo Mestre
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setKwOpen(true)}>
-                    <Tag className="h-4 w-4 mr-1" /> Adicionar Palavra-chave
-                  </Button>
-                  <Button size="sm" variant="outline" disabled onClick={() => toast.info("Motor de regras em breve")}>
-                    <Sparkles className="h-4 w-4 mr-1" /> Criar Regra
-                  </Button>
-                  <Button
-                    size="sm" variant="outline"
-                    disabled={!row.artigo_mestre_id}
-                    onClick={() => navigate({ to: "/biblioteca-mestra/artigos" })}
-                  >
-                    <GitBranch className="h-4 w-4 mr-1" /> Adicionar Relação
-                  </Button>
                 </div>
               </Section>
             </div>
@@ -219,8 +240,9 @@ export function ClassificacaoSidePanel({
               artigoMestreId={row.artigo_mestre_id}
               subespecialidadeId={row.subespecialidade_id}
               especialidadeId={row.especialidade_id}
-              onSaved={onRefresh}
+              onSaved={() => { invalidateStats(); onRefresh(); }}
             />
+
           </>
         )}
       </SheetContent>
