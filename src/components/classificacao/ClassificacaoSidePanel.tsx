@@ -34,11 +34,12 @@ export type PanelRow = {
 };
 
 export function ClassificacaoSidePanel({
-  row, onClose,
+  row, orcamentoId, onClose,
   espMap, subMap, catMap, artMap,
   onAceitar, onCorrigir, onRefresh,
 }: {
   row: PanelRow | null;
+  orcamentoId: string | null;
   onClose: () => void;
   espMap: Map<string, string>;
   subMap: Map<string, any>;
@@ -50,8 +51,29 @@ export function ClassificacaoSidePanel({
 }) {
   const [kwOpen, setKwOpen] = useState(false);
   const navigate = useNavigate();
+  const invalidateStats = useInvalidateBibliotecaStats();
   const open = !!row;
   const norm = useMemo(() => row ? normalizar(row.descricao_original) : "", [row]);
+
+  const handleEnsinar = async (a: EnsinarAcao) => {
+    if (!row) return;
+    if (a === "criar_artigo") {
+      navigate({ to: "/biblioteca-mestra/artigos", search: { novo: 1, desc: row.descricao_original } as any });
+    } else if (a === "adicionar_keyword") {
+      setKwOpen(true);
+    } else if (a === "criar_regra") {
+      toast.info("Motor de regras formal — em breve");
+    } else if (a === "criar_relacao") {
+      navigate({ to: "/biblioteca-mestra/sistemas" });
+    } else if (a === "ignorar") {
+      const motivo = `${row.motivo ?? ""} [ignorado]`.trim();
+      const { error } = await supabase.from("classificacao_artigos").update({ motivo }).eq("id", row.id);
+      if (error) return toast.error(error.message);
+      toast.success("Artigo marcado como ignorado");
+      onRefresh();
+      onClose();
+    }
+  };
   const top = row?.candidatos?.[0];
   const hits: KeywordHit[] = top?.keywords_hit ?? [];
   const negs: KeywordHit[] = top?.negativas ?? [];
