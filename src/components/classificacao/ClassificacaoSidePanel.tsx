@@ -10,6 +10,7 @@ import { ResultadoIABadge } from "./ResultadoIABadge";
 import { ConfiancaBar } from "./ConfiancaBar";
 import { AddKeywordQuickDialog } from "./AddKeywordQuickDialog";
 import { BibliotecaAnalisadaSection } from "./BibliotecaAnalisadaSection";
+import { ArtigoOriginalSection } from "./ArtigoOriginalSection";
 import { ComoEnsinarIASection, type EnsinarAcao } from "./ComoEnsinarIASection";
 import { useInvalidateBibliotecaStats } from "./useBibliotecaStats";
 import { supabase } from "@/integrations/supabase/client";
