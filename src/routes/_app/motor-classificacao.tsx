@@ -238,7 +238,7 @@ function CentroClassificacao() {
         actions={
           run?.estado === "concluido" ? (
             <Button variant="outline" size="sm" onClick={iniciar} disabled={running}>
-              <RotateCw className="h-4 w-4 mr-1" /> Re-correr
+              <RotateCw className="h-4 w-4 mr-1" /> Reprocessar classificação
             </Button>
           ) : null
         }
@@ -453,9 +453,6 @@ function CentroClassificacao() {
         esps={esps} subs={subs} cats={cats} arts={arts}
         suggestion={dialogRow?.descricao_original ?? ""}
       />
-    </>
-  );
-}
       <ClassificacaoDetailDialog row={detailRow} onClose={() => setDetailRow(null)} />
     </>
   );
