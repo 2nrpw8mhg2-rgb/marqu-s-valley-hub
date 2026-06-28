@@ -405,8 +405,17 @@ function CentroClassificacao() {
                             <div className="text-muted-foreground">{subNome ?? ""}{catNome ? ` · ${catNome}` : ""}</div>
                           </TableCell>
                           <TableCell className="text-sm">{art?.descricao ?? <span className="text-muted-foreground">—</span>}</TableCell>
-                          <TableCell>
-                            <WhyPopover row={r} onPickCandidate={(id) => atribuir(r, id)} />
+                          <TableCell className="max-w-[280px]">
+                            <div className="text-xs text-muted-foreground line-clamp-2" title={r.motivo ?? ""}>
+                              {r.motivo ?? "—"}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setDetailRow(r)}
+                              className="mt-1 inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                            >
+                              <Info className="h-3 w-3" /> Detalhes · {METODO_LABEL[r.metodo_match]}
+                            </button>
                           </TableCell>
                           <TableCell><Badge variant="outline">{r.confianca}%</Badge></TableCell>
                           <TableCell><Badge variant="outline" className={ESTADO_META[r.estado].cls}>{ESTADO_META[r.estado].label}</Badge></TableCell>
@@ -447,38 +456,12 @@ function CentroClassificacao() {
     </>
   );
 }
-
-function WhyPopover({ row, onPickCandidate }: { row: ClsRow; onPickCandidate: (id: string) => void }) {
-  const candidatos = row.candidatos ?? [];
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1">
-          <Info className="h-3 w-3" /> {METODO_LABEL[row.metodo_match]}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-96 text-sm">
-        <div className="font-medium mb-1">Porquê esta classificação?</div>
-        <p className="text-muted-foreground text-xs">{row.motivo ?? "—"}</p>
-        {candidatos.length > 0 && (
-          <div className="mt-3 space-y-1">
-            <div className="text-xs font-medium">Alternativas</div>
-            {candidatos.map((c) => (
-              <button key={c.artigo_mestre_id} onClick={() => onPickCandidate(c.artigo_mestre_id)}
-                className="w-full text-left p-2 rounded border border-border hover:bg-muted/40 text-xs">
-                <div className="flex justify-between gap-2">
-                  <span className="font-medium">{c.descricao}</span>
-                  <Badge variant="outline" className="shrink-0">{c.score}</Badge>
-                </div>
-                <div className="text-muted-foreground text-[10px] mt-0.5">{c.motivo}</div>
-              </button>
-            ))}
-          </div>
-        )}
-      </PopoverContent>
-    </Popover>
+      <ClassificacaoDetailDialog row={detailRow} onClose={() => setDetailRow(null)} />
+    </>
   );
 }
+
+
 
 function StatCard({ label, value, tone }: { label: string; value: number; tone?: "green" | "blue" | "yellow" | "muted" }) {
   const cls =
