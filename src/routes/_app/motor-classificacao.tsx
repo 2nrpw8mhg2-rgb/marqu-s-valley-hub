@@ -58,7 +58,7 @@ function CentroClassificacao() {
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [dialogRow, setDialogRow] = useState<ClsRow | null>(null);
-  const [detailRow, setDetailRow] = useState<ClsRow | null>(null);
+  const [panelRow, setPanelRow] = useState<ClsRow | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ total: number; done: number; classificados: number; pendentes: number; porAnalisar: number } | null>(null);
 
