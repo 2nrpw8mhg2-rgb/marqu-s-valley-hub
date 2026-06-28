@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, HardHat } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_app/obras")({
+export const Route = createFileRoute("/_app/obras/")({
   head: () => ({ meta: [{ title: "CRM de Obras — MV OS" }] }),
   component: ObrasPage,
 });
