@@ -1,68 +1,74 @@
 
 ## Objetivo
 
-Adicionar duas novas secções à sidebar `IA Explica` (`ClassificacaoSidePanel.tsx`):
-1. **Como Ensinar a IA** — bloco de aprendizagem com ações rápidas (apenas para artigos sem classificação ou com confiança baixa).
-2. **Biblioteca Analisada** — estatísticas reais do trabalho do motor.
+Enriquecer a secção **Artigo Original** da `ClassificacaoSidePanel` para servir como cartão de identificação completo do artigo dentro do Mapa de Quantidades.
 
-Sem alterações de schema. Sem alterações ao algoritmo de classificação.
+## Dados disponíveis na BD (verificado)
 
----
+| Pretendido | Fonte | Disponível |
+|---|---|---|
+| Nome/versão do MQ | `orcamentos.nome`, `versao_label`, `versao` | ✅ |
+| Capítulo (código + descrição) | `orcamento_capitulos.codigo`, `descricao` (via `orcamento_artigos.capitulo_id`) | ✅ |
+| Subcapítulo | — não modelado | ⚠️ derivado do prefixo do código do artigo (best-effort) |
+| Código do artigo | `orcamento_artigos.codigo` | ✅ |
+| Nº do artigo (ordem) | `orcamento_artigos.ordem` | ✅ |
+| Descrição / qtd / unidade | já presentes em `PanelRow` | ✅ |
+| Preço unitário | `orcamento_artigos.preco_unitario` | ✅ |
+| Preço total | qtd × preço_unitário (calculado) | ✅ |
+| Página / linha de importação | — não modelado | ❌ omitir (não inventar) |
+| Documento de origem (PDF/Excel) | — não modelado | ❌ omitir |
 
-## 1. Secção "Como Ensinar a IA"
+Sem migrações nesta fase. Os campos não existentes ficam ocultos (não mostro "—" para não poluir). Quando forem adicionados ao schema, a secção exibe-os automaticamente.
 
-**Visibilidade:** apenas quando `estado === "sem_classificacao"` OU `confianca < 70`.
+## Implementação
 
-**Conteúdo:**
-- Título + texto introdutório (português, conforme briefing).
-- Grid 2 colunas com 5 botões:
-  - ➕ **Criar Artigo Mestre** → navega para `/biblioteca-mestra/artigos?novo=1&desc=…`
-  - 🏷 **Adicionar Palavra-chave** → abre `AddKeywordQuickDialog` (já existe)
-  - 📋 **Criar Regra** → placeholder ("em breve") com toast
-  - 🔗 **Criar Relação Construtiva** → navega para `/biblioteca-mestra/sistemas` (placeholder funcional)
-  - ⏭ **Ignorar** → marca o registo `classificacao_artigos` com nota `ignorado` (campo `motivo` += `[ignorado]`), fecha sidebar, refresh
+### 1. Novo hook `useArtigoOriginal(artigoOrigemId)`
+- `src/components/classificacao/useArtigoOriginal.ts`
+- React Query, key `["artigo-original", artigoOrigemId]`, staleTime 60s
+- Lê `orcamento_artigos` com join a `orcamento_capitulos(codigo, descricao)` e `orcamentos(id, nome, versao, versao_label, obra_id)`
+- Devolve também `prevArtigo` / `nextArtigo` (pesquisa por `ordem ± 1` no mesmo orçamento) para a acção "Ver contexto"
 
-Nota: a maioria destes botões já existe na grid "Ações" no fundo do painel. Mantemos "Ações" e adicionamos a nova secção pedagógica **antes** das Ações, com texto explicativo + botões "Ignorar" novo. Para evitar duplicação visual, removo a grid "Ações" atual e consolido tudo em "Como Ensinar a IA" quando o artigo for não-classificado/baixa confiança. Para os restantes casos (validado/aceitar/corrigir) mantenho a grid "Ações" simplificada (Aceitar, Corrigir).
+### 2. Novo componente `ArtigoOriginalSection`
+- `src/components/classificacao/ArtigoOriginalSection.tsx`
+- Estrutura visual:
+  - **Breadcrumb** (no topo): `MQ {versao_label} › Capítulo {cap.codigo} › Artigo {codigo}` (segmentos como chips minimais)
+  - **Localização** (grid 2 colunas label/valor):
+    - Mapa de Quantidades · `{orcamento.nome} (v{versao})`
+    - Capítulo · `{cap.codigo} — {cap.descricao}`
+    - Subcapítulo · derivado do prefixo do código (`02.03` a partir de `02.03.014`) — apenas se o código tiver ≥ 2 segmentos
+    - Artigo · `{codigo}` ou `#{ordem}` se sem código
+  - **Informação do artigo** (grid 2 col):
+    - Descrição completa (full text, sem truncar)
+    - Quantidade · `{qtd}` formatado pt-PT
+    - Unidade · `{unidade}`
+    - Preço unitário · `€ {preco_unitario}` (apenas se > 0)
+    - Preço total · `€ {qtd × preco}` (apenas se ambos)
+- Loading state: skeleton compacto
+- Acessibilidade: `dl/dt/dd` semântico
 
-## 2. Secção "Biblioteca Analisada"
+### 3. Acções rápidas (mini-toolbar dentro da secção)
+- 📄 **Abrir no Mapa de Quantidades** → `navigate({ to: "/obras/$id/mq", params: { id: obraId }, search: { focus: artigoId } })` (o destino já existe; o `focus` é apenas hint — fora-do-âmbito implementar o scroll/highlight no destino)
+- 📑 **Ver contexto** → `Popover` inline mostrando 3 linhas (anterior, atual destacado, seguinte) usando os dados já carregados
+- 📂 **Abrir documento original** → botão presente mas **disabled** com tooltip "Documento de origem ainda não associado" (sem campo na BD)
+- 📋 **Copiar referência** → `navigator.clipboard.writeText("MQ {versao_label} → Capítulo {cap.codigo} → Artigo {codigo}")` + toast
 
-**Localização:** antes de "Ações", após o diagnóstico.
-
-**Visibilidade:** sempre (em qualquer estado).
-
-**Métricas reais (calculadas live no momento de abrir o painel):**
-
-| Métrica | Fonte |
-|---|---|
-| Especialidades analisadas | `count(biblioteca_especialidades)` |
-| Subespecialidades analisadas | `count(biblioteca_subespecialidades)` |
-| Categorias analisadas | `count(biblioteca_categorias)` |
-| Artigos Mestre analisados | `count(biblioteca_artigos where ativo)` |
-| Palavras-chave analisadas | soma dos 3 `*_keywords` |
-| Regras avaliadas | `0` por agora (motor formal não existe ainda) — mostrar "—" com tooltip "em breve" |
-| Relações construtivas analisadas | `count(biblioteca_artigo_relacoes)` se a tabela existir, senão `—` |
-| Artigos semelhantes comparados | `candidatos?.length ?? 0` deste artigo |
-| Tempo total de análise | `run.concluido_em - run.iniciado_em` da última run carregada |
-
-Implementação:
-- Novo hook `useBibliotecaStats()` em `src/components/classificacao/useBibliotecaStats.ts` — faz `head: true, count: 'exact'` em paralelo. Cachado em React Query com `staleTime: 60s`, key `["biblioteca-stats"]`.
-- Componente `BibliotecaAnalisadaSection` que renderiza grid 2 colunas com `label / valor` formatado (`toLocaleString("pt-PT")`).
-- Mensagem inferior quando `sem_classificacao`:
-  > "O artigo foi analisado em toda a Biblioteca Mestra. Neste momento ainda não existe conhecimento suficiente para atribuir uma classificação automática com confiança elevada."
-- Após cada ação que enriquece a biblioteca (palavra-chave guardada, etc.), invalida `["biblioteca-stats"]` para refletir o novo conhecimento de imediato.
+### 4. Wire-up em `ClassificacaoSidePanel.tsx`
+- Substituir o bloco actual `Section title="Artigo Original"` (que mostra apenas descrição+qtd+unidade) por `<ArtigoOriginalSection artigoOrigemId={row.id_origem} />`
+- A `PanelRow` já contém `id` mas é o ID do `classificacao_artigos`. Precisamos do `artigo_origem_id`. Adicionar `artigo_origem_id` ao tipo `PanelRow` e ao `select` em `motor-classificacao.tsx` (verificar — pode já estar carregado).
 
 ## Ficheiros
 
 **Novos:**
-- `src/components/classificacao/BibliotecaAnalisadaSection.tsx`
-- `src/components/classificacao/ComoEnsinarIASection.tsx`
-- `src/components/classificacao/useBibliotecaStats.ts`
+- `src/components/classificacao/useArtigoOriginal.ts`
+- `src/components/classificacao/ArtigoOriginalSection.tsx`
 
-**Editado:**
-- `src/components/classificacao/ClassificacaoSidePanel.tsx` — inserir as duas secções; condicionar a grid "Ações" existente.
+**Editados:**
+- `src/components/classificacao/ClassificacaoSidePanel.tsx` — substituir bloco "Artigo Original"; expor `artigo_origem_id` em `PanelRow`
+- `src/routes/_app/motor-classificacao.tsx` — garantir que `artigo_origem_id` é carregado na query `cc-rows` e passado para `panelRow`
 
 ## Fora do âmbito
 
-- Motor de regras formal (mantém placeholder).
-- Tabela `biblioteca_artigo_relacoes` — só lemos se existir; valor `—` caso contrário.
-- Função "Ignorar" como estado persistente formal — usamos flag no `motivo` (mudança mínima, sem migração).
+- Persistir página / linha de importação / documento de origem (precisaria de migração ao parser de MQ).
+- Implementar focus/scroll-to-artigo no destino `/obras/$id/mq` (só passamos o search param).
+- Modelar subcapítulos como entidade real (continua a ser derivado do código).
+- Histórico de versões, ligação a Procurement/Autos de Medição/Histórico de Preços (futuras fases).
