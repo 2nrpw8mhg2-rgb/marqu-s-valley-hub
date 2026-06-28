@@ -26,12 +26,12 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
-  Plus, Sparkles, MoreHorizontal, Trash2, Copy, Pencil, Send, FolderOpen, ShoppingCart, Split,
+  Plus, Sparkles, MoreHorizontal, Trash2, Copy, Pencil, Send, FolderOpen, ShoppingCart,
 } from "lucide-react";
 import { ESPECIALIDADES, inferirEspecialidade, classificarArtigo, CONFIANCA_MINIMA, validarArtigoParaEspecialidade, isBetaoArtigo, type Especialidade } from "@/lib/procurement/especialidades";
 import { pertenceAoPacote } from "@/lib/procurement/classifier";
 import { useServerFn } from "@tanstack/react-start";
-import { splitPacoteMepEmDisciplinas } from "@/lib/procurement/disciplinas-mep.functions";
+
 
 export const BETAO_KEY = "__betao__";
 
@@ -232,19 +232,6 @@ function PacotesListPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const splitFn = useServerFn(splitPacoteMepEmDisciplinas);
-  const dividir = useMutation({
-    mutationFn: async (id: string) => splitFn({ data: { pacoteId: id } }),
-    onSuccess: (res: any) => {
-      if (res.criados.length === 0) {
-        toast.info(`Não foi possível classificar artigos por disciplina (${res.semClassificacao} sem classificação).`);
-      } else {
-        toast.success(`${res.criados.length} pacote(s) por disciplina criados${res.semClassificacao ? ` · ${res.semClassificacao} sem classificação` : ""}`);
-      }
-      qc.invalidateQueries({ queryKey: ["procurement-pacotes"] });
-    },
-    onError: (e: any) => toast.error(e.message ?? "Erro a dividir pacote"),
-  });
 
   return (
     <>
