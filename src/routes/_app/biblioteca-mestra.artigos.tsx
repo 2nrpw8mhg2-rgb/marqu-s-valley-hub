@@ -623,6 +623,12 @@ function ArtigosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ArtigoRelacoesDialog
+        artigoId={relacoesArtId}
+        open={!!relacoesArtId}
+        onOpenChange={(o) => !o && setRelacoesArtId(null)}
+      />
     </>
   );
 }
