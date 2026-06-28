@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, ListChecks, GitBranch, GitCompare, ShoppingCart, CheckCircle2, RotateCw } from "lucide-react";
 import { ImportMQDialog } from "@/components/orcamentos/ImportMQDialog";
 import { runClassificacao, type ClassificacaoProgress } from "@/lib/classificacao/engine";
+import { CoerenciaTecnicaCard } from "@/components/obras/CoerenciaTecnicaCard";
 import { toast } from "sonner";
 import type { ParsedRow } from "@/lib/mq-parser";
 
