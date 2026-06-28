@@ -472,6 +472,7 @@ function CentroClassificacao() {
       />
       <ClassificacaoSidePanel
         row={panelRow as PanelRow | null}
+        orcamentoId={orcamento || null}
         onClose={() => setPanelRow(null)}
         espMap={espMap as Map<string, string>}
         subMap={subMap as Map<string, any>}
