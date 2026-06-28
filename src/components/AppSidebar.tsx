@@ -12,6 +12,7 @@ import {
   LogOut,
   Library,
   History,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
