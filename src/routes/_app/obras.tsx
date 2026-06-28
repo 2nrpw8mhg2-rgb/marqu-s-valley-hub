@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +28,7 @@ const ESTADOS = [
 
 function ObrasPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
 
@@ -96,7 +97,11 @@ function ObrasPage() {
                 </TableRow>
               ) : (
                 filtered.map((o) => (
-                  <TableRow key={o.id} className="border-border">
+                  <TableRow
+                    key={o.id}
+                    className="border-border cursor-pointer hover:bg-muted/40"
+                    onClick={() => navigate({ to: "/obras/$id", params: { id: o.id } })}
+                  >
                     <TableCell className="font-mono text-xs text-muted-foreground">{o.codigo || "—"}</TableCell>
                     <TableCell className="font-medium">{o.nome}</TableCell>
                     <TableCell>{o.cliente || "—"}</TableCell>

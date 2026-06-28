@@ -1,51 +1,98 @@
-## Barra de progresso em tempo real durante a classificação
+# Reestruturação: Obra como contexto central + MQ como módulo da obra
 
-Atualmente, durante o run aparece apenas uma barra fina com "X de Y". Vamos enriquecer para mostrar contadores ao vivo, no formato pedido.
+Esta fase 1 implementa a nova arquitetura de navegação centrada na obra, move a importação de MQ para dentro da obra, e torna a classificação automática (sem clique manual). Prepara a base para versionamento futuro sem o implementar agora.
 
-### Layout durante o run
+## 1. Estrutura de navegação por obra
+
+Criar layout `src/routes/_app/obras.$id.tsx` com tabs persistentes:
 
 ```text
-A classificar artigos…                                  62%
-
-387 artigos
-██████████████░░░░░░░░░░
-
-192 classificados        61 a rever        134 por analisar
+/obras/$id                  → Resumo
+/obras/$id/documentos       → Documentos
+/obras/$id/mq               → Mapa de Quantidades
+/obras/$id/orcamentacao     → Orçamentação
+/obras/$id/procurement      → Procurement
+/obras/$id/planeamento      → (placeholder "Em desenvolvimento")
+/obras/$id/financeira       → (placeholder)
+/obras/$id/medicoes         → (placeholder)
+/obras/$id/relatorios       → (placeholder)
 ```
 
-- **387 artigos** — total do orçamento
-- **192 classificados** — itens já processados com match (exato + aprendido + score alto)
-- **61 a rever** — itens processados com confiança parcial / sem classificação segura
-- **134 por analisar** — ainda não processados (total − done)
+O layout mostra header da obra (nome, código, cliente, estado) + tabs e `<Outlet />`. CRM de Obras (`/obras`) continua a ser a listagem; clicar numa linha leva para `/obras/$id`.
 
-Mapeamento dos rótulos do exemplo do utilizador:
-- "classificados" = `auto_exato + auto_aprendido` (corresponde a "verde/azul")
-- "pendentes" = `parcial + sem_classificacao` já processados (precisam atenção humana)
-- "por analisar" = restantes ainda não passados pelo motor
+## 2. Módulo "Mapa de Quantidades" da obra
 
-### Mudanças
+Nova página `/obras/$id/mq` com:
 
-**1. `src/lib/classificacao/engine.ts` — `runClassificacao`**
+**Estado "sem MQ":** card centrado com botão **Importar Mapa de Quantidades** (reusa `ImportMQDialog` atual).
 
-- Substituir o callback `onProgress(done, total)` por `onProgress(snapshot)` com:
-  ```ts
-  { total, done, classificados, pendentes, porAnalisar }
-  ```
-- Acumular os contadores durante o loop (não só no fim) e emitir o snapshot a cada item (ou cada 10) para feedback fluido. Total continua igual a `lista.length` para o cálculo de progresso, com o `total` exposto a ser `artigos.length` (inclui validados já contados como classificados desde o início).
+**Estado "com MQ":** dashboard com:
+- Última versão (placeholder "v1"), data de importação, total de artigos
+- Barras/contadores: classificados / pendentes / sem classificação / % classificação
+- Estado do MQ (badge): `importado` · `em_classificacao` · `aguardando_validacao` · `validado` · `convertido_pacotes`
+- Ações: **Importar nova versão** (desativado, "em breve"), **Comparar versões** (desativado), **Rever classificação** (→ navega para vista de revisão embutida), **Gerar Pacotes de Consulta** (→ Procurement)
+- Tabela resumo dos artigos classificados (vinda da classificação automática)
 
-**2. `src/routes/_app/motor-classificacao.tsx`**
+## 3. Auto-classificação após importação
 
-- Estado `progress` passa a guardar o snapshot completo.
-- Bloco "Em curso" passa a renderizar:
-  - cabeçalho com percentagem;
-  - linha "N artigos";
-  - barra de progresso maior (`h-3`, com `transition-all`);
-  - três contadores em grid (classificados / a rever / por analisar) com cores semânticas (verde / amarelo / muted), usando os tokens do design system.
-- Pequenos detalhes: número formatado com `toLocaleString('pt-PT')`, animação `animate-pulse` no contador "por analisar" para reforçar o "em tempo real".
+Modificar `ImportMQDialog` (quando aberto a partir da obra): ao concluir a inserção em `orcamento_artigos`, disparar imediatamente `runClassificacao(orcamentoId)` e mostrar a barra de progresso no próprio diálogo (ou redirecionar para `/obras/$id/mq` com o progresso visível).
 
-**3. Nada mais muda** — sem alterações de BD, sem mexer no fluxo "Iniciar Classificação" nem nos resultados finais.
+O utilizador nunca clica em "Iniciar Classificação". O estado do MQ transita: `importado` → `em_classificacao` → `aguardando_validacao` (se há pendentes) ou `validado` (se 100% confiança).
 
-### Notas
+## 4. Vista de revisão dentro da obra
 
-- A barra fica visível enquanto `running === true`. Quando o run termina, a UI já transita para o painel de resultados (sem alteração).
-- Mantém-se o comportamento atual de só correr quando o utilizador clica "Iniciar Classificação".
+Mover a UI de validação artigo-a-artigo (atualmente em `/motor-classificacao`) para um componente reutilizável e embutir em `/obras/$id/mq` quando o utilizador clica "Rever classificação". Filtra por defeito apenas artigos `necessita_revisao` + `sem_classificacao`.
+
+## 5. Centro de Classificação global (transversal)
+
+`/motor-classificacao` mantém-se no menu como **painel transversal de supervisão**:
+- Lista artigos pendentes de validação de **todas as obras** (com coluna "Obra")
+- KPIs globais: total pendentes, taxa de acerto, palavras-chave em falta
+- Não tem botão "Iniciar Classificação" — só revisão e aprendizagem
+- Sidebar: continuar a chamar-se "Centro de Classificação"
+
+## 6. Single source of truth
+
+Manter o modelo atual: `orcamento_artigos` (origem) + `classificacao_artigos` (classificação). Todos os módulos (Orçamentação, Procurement) consultam estas tabelas, sem cópias.
+
+## 7. Preparar versionamento (sem implementar)
+
+Adicionar coluna `versao` (text, default `'v1'`) e `versao_ordem` (int, default `1`) à tabela `orcamentos`, e índice `(obra_id, versao)`. UI desta fase mostra apenas v1; futura iteração ativará criação de v2, Rev A, comparação.
+
+## Detalhes técnicos
+
+**Ficheiros novos:**
+- `src/routes/_app/obras.$id.tsx` — layout com tabs
+- `src/routes/_app/obras.$id.index.tsx` — Resumo
+- `src/routes/_app/obras.$id.documentos.tsx` — reusa `documentos.tsx` filtrado por obra
+- `src/routes/_app/obras.$id.mq.tsx` — dashboard MQ + revisão embutida
+- `src/routes/_app/obras.$id.orcamentacao.tsx` — lista de orçamentos da obra (filtra `orcamentos` por `obra_id`)
+- `src/routes/_app/obras.$id.procurement.tsx` — reusa pacotes filtrados por obra
+- `src/routes/_app/obras.$id.planeamento.tsx`, `.financeira.tsx`, `.medicoes.tsx`, `.relatorios.tsx` — placeholders
+- `src/components/obras/ObraTabs.tsx` — barra de tabs
+- `src/components/obras/MQDashboard.tsx` — KPIs e ações do MQ
+- `src/components/classificacao/RevisaoArtigos.tsx` — extrai a tabela/popover de revisão de `motor-classificacao.tsx` para reutilização
+
+**Ficheiros alterados:**
+- `src/routes/_app/obras.tsx` — linha da tabela passa a navegar para `/obras/$id`
+- `src/components/orcamentos/ImportMQDialog.tsx` — após importar, chamar `runClassificacao` automaticamente e mostrar progresso
+- `src/routes/_app/motor-classificacao.tsx` — remover botão "Iniciar Classificação", virar painel global de revisão multi-obra
+- `src/components/AppSidebar.tsx` — manter "Centro de Classificação"; "CRM de Obras" passa a ser ponto de entrada principal
+
+**Migração BD:**
+- `ALTER TABLE orcamentos ADD COLUMN versao text NOT NULL DEFAULT 'v1'`
+- `ALTER TABLE orcamentos ADD COLUMN versao_ordem int NOT NULL DEFAULT 1`
+- `CREATE INDEX ON orcamentos(obra_id, versao_ordem)`
+- Adicionar enum `estado_mq` em `orcamentos.estado_mq` (`importado | em_classificacao | aguardando_validacao | validado | convertido_pacotes`)
+- Trigger: ao concluir `orcamento_classificacao_run`, atualizar `estado_mq` em `orcamentos`
+
+## Fora desta fase (futuro)
+
+- Parser de PDF / Word / outros formatos
+- Criar v2 / Rev A / comparação visual de versões
+- Histórico de alterações artigo-a-artigo entre versões
+- Integração automática com Planeamento, Financeira, Medições, Relatórios
+
+## Resultado
+
+Ao terminar, o utilizador entra em CRM de Obras → escolhe obra → vê tabs → vai a "Mapa de Quantidades" → importa ficheiro → vê a classificação a correr automaticamente → revê apenas o que tem baixa confiança. O Centro de Classificação no menu lateral fica como painel transversal de supervisão.
