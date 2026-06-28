@@ -47,6 +47,12 @@ const sections: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
+    title: "Motor de Classificação",
+    items: [
+      { to: "/motor-classificacao", label: "Motor de Classificação", icon: Wand2 },
+    ],
+  },
+  {
     title: "Fase 2 — Orçamentação",
     items: [
       { to: "/orcamentos", label: "Orçamentos", icon: Calculator },
