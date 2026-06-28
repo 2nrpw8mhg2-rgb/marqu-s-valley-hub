@@ -1,181 +1,127 @@
 
-# Fase 3 — Motor de Relações Construtivas
+# Refinamento do Centro de Classificação Inteligente
 
-Constrói a infraestrutura central do Motor de Relações Construtivas, com **Sistemas Construtivos como entidade dedicada** e **relações direcionais com inverso automático** entre artigos mestre. Coloca já o motor ao serviço da **validação técnica do Mapa de Quantidades** da obra, mas mantém o esquema preparado para ser reutilizado por Procurement, Planeamento, Histórico de Preços, Financeira e IA em fases seguintes.
+Transformar a página `motor-classificacao.tsx` num verdadeiro ambiente colaborativo entre utilizador e IA, com explicações claras, ações rápidas e visualização rica.
 
-## 1. Modelo de dados (migração única)
+## 1. Tabela — novas colunas
 
-### 1.1 Sistemas Construtivos
+Substituir a tabela atual por:
 
-```text
-biblioteca_sistemas_construtivos
-  id, codigo, nome, descricao,
-  categoria_sistema   (cobertura | fachada | pavimento | estrutura | impermeabilizacao | redes | acabamentos | outros)
-  observacoes, ativo, created_at, updated_at
+| Artigo Original | Classificação (hierarquia) | Resultado IA | Confiança (barra + %) | Próxima Ação | Ações |
 
-biblioteca_sistema_artigos      -- composição do sistema
-  id, sistema_id, artigo_id,
-  papel              (principal | fixacao | isolamento | impermeabilizacao | acabamento
-                      | acessorio | remate | drenagem | ventilacao | ensaio | outro)
-  obrigatoriedade    (obrigatorio | muito_frequente | frequente | opcional | raro)
-  ordem_execucao     int            -- sequência lógica dentro do sistema
-  observacoes
-  UNIQUE(sistema_id, artigo_id)
+**Coluna "Classificação"** (substitui "Especialidade/Sub" + "Artigo Mestre"):
+- Renderiza breadcrumb vertical compacto:
+  ```
+  070 Estruturas
+   ↓ Cofragens
+   ↓ Cofragem de Pilares
+  ```
+- Quando vazio: badge cinza "Sem destino".
+
+**Coluna "Resultado IA"** (nova) — badge colorida derivada de `metodo_match` + `estado`:
+- 🟢 Exata (`exato` com 1 match)
+- 🟣 Aprendida (`aprendido`)
+- 🟡 Por Regras / Keywords (`keyword_*`)
+- 🔵 Por Relações (futuro — placeholder já preparado)
+- ⚪ Sem Correspondência (`nenhum`)
+- 🟠 Manual (`manual`)
+
+**Coluna "Confiança"** — barra horizontal + percentagem:
 ```
-
-Um artigo pode pertencer a vários sistemas. Cada sistema conhece os seus membros, o seu papel, se é obrigatório ou opcional, e a ordem lógica de execução.
-
-### 1.2 Relações entre artigos (grafo)
-
-```text
-biblioteca_artigo_relacoes
-  id,
-  artigo_origem_id,
-  artigo_destino_id,
-  tipo_relacao        (complementa | depende_de | antecede | substitui | incompativel | opcional)
-  obrigatoriedade     (obrigatorio | muito_frequente | frequente | opcional | raro)
-  confianca           numeric(3,2) default 1.00
-  sistema_id          nullable      -- relação derivada de um sistema construtivo
-  origem              (manual | sistema | ia | aprendizagem) default 'manual'
-  observacoes,
-  created_by, created_at, updated_at
-  UNIQUE(artigo_origem_id, artigo_destino_id, tipo_relacao)
-  CHECK(artigo_origem_id <> artigo_destino_id)
+█████████░ 92%
 ```
+Cor: verde ≥90, âmbar 70-89, vermelho <70, cinza =0.
 
-**Inverso automático via trigger**: ao inserir/atualizar/eliminar uma relação manual, o trigger `tg_relacao_inversa` mantém uma linha-espelho com `origem='sistema'` ou `origem='auto_inverso'` e tipo invertido:
+**Coluna "Próxima Ação"** (nova) — chip clicável calculada por regras:
+- `validado` → "✓ Validado" (sem ação)
+- `classificado_auto` + conf ≥90 → "Aceitar"
+- `necessita_revisao` → "Corrigir"
+- `sem_classificacao` com tokens existentes → "Criar Palavra-chave"
+- `sem_classificacao` sem matches → "Criar Artigo Mestre"
+- exatos múltiplos → "Escolher candidato"
 
-```text
-complementa     ↔ complementa
-depende_de      ↔ requerido_por
-antecede        ↔ precede
-substitui       ↔ substituido_por
-incompativel    ↔ incompativel
-opcional        ↔ opcional_em
-```
+Clicar executa diretamente a ação ou abre o painel no separador correspondente.
 
-Adiciona-se ao enum `tipo_relacao` os inversos (`requerido_por`, `precede`, `substituido_por`, `opcional_em`) marcados como auto-gerados. UI só permite editar/criar as direções "canónicas"; as inversas são read-only.
+## 2. Painel Lateral (substitui o modal)
 
-### 1.3 Derivação a partir de Sistemas
+Substituir `ClassificacaoDetailDialog` por novo `ClassificacaoSidePanel` baseado em `Sheet` (shadcn) — abre à direita com largura ~560px, scrollável, ao clicar na linha ou na lupa.
 
-Quando um `biblioteca_sistema_artigos` é criado/alterado, um trigger gera/atualiza relações `complementa` entre o artigo `principal` do sistema e cada outro membro, com `origem='sistema'`, `sistema_id` preenchido e a `obrigatoriedade` herdada do membro. Eliminar o membro remove a relação derivada.
+### Estrutura do painel
 
-Resultado: o utilizador define o **sistema** (ex.: ETICS = EPS + cola + rede + primário + acabamento) e o grafo de relações é alimentado automaticamente, sem perder a possibilidade de criar relações manuais avulsas.
+**Header fixo**
+- Descrição do artigo original (truncável)
+- Badge de Resultado IA + barra de confiança
 
-### 1.4 Alertas técnicos no MQ
+**Secção: Artigo Original**
+- Descrição completa
+- Quantidade · Unidade
 
-```text
-orcamento_alertas_tecnicos
-  id, orcamento_id, artigo_mq_id (orcamento_artigos),
-  artigo_mestre_origem_id, artigo_mestre_esperado_id,
-  sistema_id (nullable), tipo_relacao, obrigatoriedade,
-  severidade        (critico | aviso | info)   -- derivada da obrigatoriedade
-  estado            (aberto | aceite_omissao | justificado | ignorado | resolvido)
-  justificacao text, resolvido_por uuid, resolvido_em timestamptz,
-  created_at, updated_at
-  UNIQUE(orcamento_id, artigo_mq_id, artigo_mestre_esperado_id, tipo_relacao)
-```
+**Secção: Sugestão da IA**
+- Breadcrumb: Especialidade → Subespecialidade → Categoria → Artigo Mestre
+- Mostrar quando vazia: "Nenhuma sugestão disponível"
 
-Severidade: `obrigatorio`→`critico`, `muito_frequente`→`aviso`, restantes→`info` (ou suprimir `raro`/`opcional` da análise por defeito, com toggle).
+**Secção: "IA Explica" (porquê?)**
+Fluxo vertical com passos numerados:
+1. **Normalização** — mostra `descricao_original` → versão normalizada (computar via `normalizar()`)
+2. **Palavras-chave encontradas** — lista de chips (positivas e negativas) com nível e pontos
+3. **Regras aplicadas** — placeholder (vazio nesta fase; arquitetura pronta)
+4. **Relações construtivas** — placeholder (vazio; preparado para Fase 3)
+5. **Artigos semelhantes** — lista dos `candidatos` com score
+6. **Decisão final** — artigo mestre escolhido + confiança final
 
-## 2. Análise de omissões (motor)
+Se `sem_classificacao`, esta secção mostra uma checklist explicativa:
+- ✗ Nenhuma palavra-chave conhecida encontrada
+- ✗ Nenhuma regra corresponde
+- ✗ Nenhum Artigo Mestre semelhante
+- ✗ Nenhuma relação construtiva encontrada
+- Com sugestão concreta de como melhorar a Biblioteca.
 
-Novo módulo `src/lib/relacoes/analise.ts`:
+**Secção: Ações**
+Grid de botões:
+- **Aceitar** (verde) — valida com artigo atual
+- **Corrigir** — abre `SearchBibliotecaDialog` por cima
+- **Criar Artigo Mestre** — navega para `/biblioteca-mestra/artigos?novo=1&desc=…`
+- **Adicionar Palavra-chave** — abre quick-dialog para adicionar termo à subesp/artigo selecionado
+- **Criar Regra** — placeholder com toast "em breve"
+- **Adicionar Relação** — navega para diálogo de relações do artigo
 
-- `analisarOmissoes(orcamentoId)` corre após classificação (ou manualmente):
-  1. Carrega artigos do MQ já com `artigo_mestre_id` (estado `classificado_auto` ou `validado`).
-  2. Para cada artigo presente, expande o conjunto de **artigos esperados** via:
-     - membros obrigatórios/muito_frequentes dos sistemas a que o artigo pertence;
-     - relações `complementa` e `depende_de` com obrigatoriedade ≥ configurável.
-  3. Compara com o conjunto presente; gera/atualiza linhas em `orcamento_alertas_tecnicos`.
-  4. Preserva estado de alertas já fechados (`justificado`, `ignorado`, `aceite_omissao`) — só reabre se voltar a faltar e estado era `resolvido`.
-- Reexecutável: botão "Reanalisar coerência técnica" no separador MQ da obra.
-- Hook automático: chamar no fim de `runClassificacao` (Fase 2.2) quando o orçamento atinge `validado`/`em_classificacao`.
+## 3. Cabeçalho — Botão "Reexecutar Motor IA"
 
-Constantes em `src/lib/relacoes/config.ts`:
+- Renomear "Reprocessar classificação" → **"Reexecutar Motor IA"** com ícone `Sparkles`.
+- Subtítulo do botão (tooltip): "Aplica novas palavras-chave, regras, relações e Artigos Mestre"
 
-```ts
-export const RELACOES_CONFIG = {
-  LIMIAR_ALERTA: ['obrigatorio', 'muito_frequente'], // estados que geram alerta por defeito
-  INCLUIR_FREQUENTE: false,
-  TIPOS_ANALISADOS: ['complementa', 'depende_de'],
-};
-```
+## 4. KPI "Aprendido" — evolução
 
-## 3. UI — Biblioteca Mestra
+`StatCard "Aprendido"` mostra dois valores:
+- Valor grande: `+N nesta classificação` (vem do `run.auto_aprendido`)
+- Sublinha menor: `N total na memória` — query `classificacao_memoria` count.
 
-### 3.1 Separador "Relações Construtivas" no Artigo Mestre
+## 5. Helpers / arquivos
 
-Novo separador no `ArtigoMestreFormDialog` (ou nova página dedicada `biblioteca-mestra.artigos.$id.tsx` se o dialog ficar denso). Conteúdo:
+**Novo**: `src/components/classificacao/ClassificacaoSidePanel.tsx` — Sheet com toda a estrutura acima.
 
-- Lista agrupada por tipo: Complementa / Depende de / Antecede / Substitui / Incompatível / Opcional.
-- Cada linha: artigo destino (com especialidade/subespecialidade), obrigatoriedade, origem (badge: manual/sistema/auto), confiança, observações, ações editar/eliminar (apenas em relações manuais).
-- Botão "Adicionar relação" → dialog com selector de artigo (com search), tipo, obrigatoriedade, observações.
-- Secção separada "Sistemas Construtivos a que pertence" com link para cada sistema.
+**Novo**: `src/components/classificacao/ResultadoIABadge.tsx` — badge colorida por método.
 
-### 3.2 Nova página "Sistemas Construtivos"
+**Novo**: `src/components/classificacao/ConfiancaBar.tsx` — barra horizontal + %.
 
-Rota `src/routes/_app/biblioteca-mestra.sistemas.tsx` (+ entrada no `biblioteca-mestra.tsx` tabs):
+**Novo**: `src/components/classificacao/ProximaAcaoChip.tsx` — calcula e renderiza a próxima ação, recebe callbacks.
 
-- Lista de sistemas com filtro por `categoria_sistema`.
-- CRUD de sistema (nome, código, categoria, descrição, ativo).
-- Editor de composição: tabela de membros (artigo, papel, obrigatoriedade, ordem), reordenável por drag ou input de ordem. Cada alteração regenera relações derivadas via trigger.
-- Botão "Pré-visualizar grafo": dialog simples com lista hierárquica (principal → membros agrupados por papel).
+**Novo**: `src/components/classificacao/AddKeywordQuickDialog.tsx` — diálogo rápido para criar `biblioteca_subespecialidade_keywords` ou `biblioteca_artigo_keywords`.
 
-### 3.3 Indicadores na lista de artigos
+**Editar**: `src/routes/_app/motor-classificacao.tsx`
+- Substituir colunas da tabela.
+- Trocar `ClassificacaoDetailDialog` por `ClassificacaoSidePanel`.
+- Renomear botão.
+- KPI Aprendido com total da memória.
 
-Coluna nova em `biblioteca-mestra.artigos.tsx` com contagem de relações e badge de "pertence a N sistemas".
+**Manter**: `ClassificacaoDetailDialog.tsx` deixa de ser usado mas mantém-se (sem remover) caso seja reaproveitado.
 
-## 4. UI — Obra · separador Mapa de Quantidades
+**Engine**: nenhuma alteração ao `engine.ts` — toda a informação necessária já existe em `candidatos`, `motivo`, `metodo_match`.
 
-- Novo cartão "Coerência técnica" no topo do MQ com contadores: `crítico`, `aviso`, `info` (abertos) + botão "Reanalisar".
-- Painel/drawer "Alertas técnicos" lista cada alerta:
-  - artigo presente no MQ;
-  - artigo esperado em falta (com link para o artigo mestre / sistema);
-  - tipo de relação, obrigatoriedade, motivo gerado (ex.: *"O sistema ETICS inclui Rede de fibra de vidro (obrigatório), em falta."*);
-  - ações: **Aceitar omissão**, **Justificar** (textarea), **Ignorar**, **Marcar resolvido** (após adicionar o artigo ao MQ, fica auto-resolvido na próxima análise).
-- Estados de alertas tornam-se auditáveis (user + timestamp).
+## Out of scope (futuras fases)
+- Motor de Regras formal (passo 3 do "IA Explica" fica como placeholder visível).
+- IA semântica / embeddings.
+- Sincronização visual com Motor de Relações além de placeholders.
 
-Sem alterações a Procurement/Planeamento/IA nesta fase — apenas garantir que os dados ficam disponíveis para consumo futuro.
-
-## 5. Aplicação ao consumo futuro (preparado, não implementado)
-
-- `biblioteca_artigo_relacoes` + `biblioteca_sistema_artigos` ficam disponíveis para queries de Procurement (sugerir artigos no mesmo pacote), Planeamento (dependências `antecede`/`precede`), IA (perguntas sobre completude).
-- A função `analisarOmissoes` é genérica e poderá ser invocada por outros módulos passando a lista de artigos mestre presentes.
-
-## 6. Fora de âmbito desta fase
-
-- Sugestões automáticas em Procurement, Planeamento, Financeira, Histórico de Preços.
-- Agente de IA conversacional sobre relações.
-- Aprendizagem automática de relações a partir de MQs analisados (campo `origem='aprendizagem'` reservado).
-- Visualização gráfica do grafo (apenas lista nesta fase).
-- Importação em massa de sistemas/relações.
-
-## Detalhe técnico
-
-### Ficheiros principais
-
-- **Migração** `supabase/migrations/<ts>_motor_relacoes.sql` — enums (`tipo_relacao`, `obrigatoriedade_relacao`, `papel_sistema`, `categoria_sistema`, `origem_relacao`, `severidade_alerta`, `estado_alerta`), 4 tabelas + GRANTs + RLS + triggers `tg_relacao_inversa`, `tg_sistema_artigo_sync_relacoes`, `set_updated_at`.
-- `src/lib/biblioteca-mestra/types.ts` — novos tipos `SistemaConstrutivo`, `SistemaArtigo`, `ArtigoRelacao`, `TipoRelacao`, `Obrigatoriedade`, `PapelSistema`.
-- `src/lib/relacoes/config.ts` — pesos e limiares.
-- `src/lib/relacoes/analise.ts` — `analisarOmissoes(orcamentoId)`, `marcarAlerta(id, acao, justificacao?)`.
-- `src/lib/classificacao/engine.ts` — chamar `analisarOmissoes` no fim de `runClassificacao`.
-- `src/components/biblioteca-mestra/ArtigoRelacoesTab.tsx` *(novo)* — separador de relações dentro do dialog/edição do artigo.
-- `src/components/biblioteca-mestra/RelacaoFormDialog.tsx` *(novo)* — criar/editar relação manual.
-- `src/components/biblioteca-mestra/SistemaFormDialog.tsx` *(novo)* — CRUD de sistema + composição.
-- `src/routes/_app/biblioteca-mestra.sistemas.tsx` *(novo)* + entrada no menu de tabs `biblioteca-mestra.tsx`.
-- `src/components/obras/CoerenciaTecnicaCard.tsx` *(novo)* e `AlertasTecnicosPanel.tsx` *(novo)* — integrados em `obras.$id.mq.tsx`.
-
-### Diagrama lógico
-
-```text
-SistemaConstrutivo ───< SistemaArtigo >─── ArtigoMestre
-                                              │
-                                              ├──< ArtigoRelacao (manual/auto/sistema) >── ArtigoMestre
-                                              │
-                                              └── analisarOmissoes(orcamento) → orcamento_alertas_tecnicos
-```
-
-### Notas de RLS/permissões
-
-Todas as tabelas: `authenticated` full CRUD nas tabelas de biblioteca; `orcamento_alertas_tecnicos` herdam a regra das obras (mesmo padrão dos `orcamento_artigos`). `service_role` ALL.
+## Resultado esperado
+Tabela mais informativa (Classificação completa + Resultado IA + barra de confiança + Próxima Ação), painel lateral rico em vez de modal apertado, explicação transparente do raciocínio da IA, ações de aprendizagem (aceitar/corrigir/criar keyword/criar artigo mestre) acessíveis num clique a partir do mesmo painel.
