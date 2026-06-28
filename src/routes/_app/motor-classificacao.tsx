@@ -56,7 +56,7 @@ function CentroClassificacao() {
   const [search, setSearch] = useState("");
   const [dialogRow, setDialogRow] = useState<ClsRow | null>(null);
   const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<{ total: number; done: number; classificados: number; pendentes: number; porAnalisar: number } | null>(null);
 
   const { data: orcamentos = [] } = useQuery({
     queryKey: ["cc-orcamentos"],
