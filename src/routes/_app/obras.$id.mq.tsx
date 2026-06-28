@@ -274,6 +274,9 @@ function MQModule() {
         <KPI label="Sem classif." value={orc.sem} tone="muted" />
       </div>
 
+      {/* Coerência técnica — Motor de Relações Construtivas */}
+      <CoerenciaTecnicaCard orcamentoId={orc.orc.id} />
+
       <ImportMQDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
     </div>
   );
