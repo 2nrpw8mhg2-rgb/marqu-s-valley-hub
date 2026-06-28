@@ -56,7 +56,7 @@ function CentroClassificacao() {
   const [search, setSearch] = useState("");
   const [dialogRow, setDialogRow] = useState<ClsRow | null>(null);
   const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<{ total: number; done: number; classificados: number; pendentes: number; porAnalisar: number } | null>(null);
 
   const { data: orcamentos = [] } = useQuery({
     queryKey: ["cc-orcamentos"],
@@ -130,9 +130,9 @@ function CentroClassificacao() {
   const iniciar = async () => {
     if (!orcamento) return;
     setRunning(true);
-    setProgress({ done: 0, total: artigosCount });
+    setProgress({ total: artigosCount, done: 0, classificados: 0, pendentes: 0, porAnalisar: artigosCount });
     try {
-      await runClassificacao(orcamento, (done, total) => setProgress({ done, total }));
+      await runClassificacao(orcamento, (snap) => setProgress(snap));
       toast.success("Classificação concluída");
       qc.invalidateQueries({ queryKey: ["cc-run", orcamento] });
       qc.invalidateQueries({ queryKey: ["cc-rows", orcamento] });
@@ -255,17 +255,49 @@ function CentroClassificacao() {
 
         {/* Em curso */}
         {running && (
-          <Card className="bg-card border-border p-8 space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <h3 className="font-semibold">A classificar artigos…</h3>
+          <Card className="bg-card border-border p-8 space-y-5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <h3 className="font-semibold">A classificar artigos…</h3>
+              </div>
+              {progress && (
+                <span className="text-sm font-mono text-muted-foreground tabular-nums">
+                  {Math.round((progress.done / Math.max(1, progress.total)) * 100)}%
+                </span>
+              )}
             </div>
             {progress && (
               <>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                  <div className="bg-primary h-2 transition-all" style={{ width: `${Math.round((progress.done / Math.max(1, progress.total)) * 100)}%` }} />
+                <p className="text-sm text-muted-foreground">
+                  <span className="text-foreground font-semibold tabular-nums">{progress.total.toLocaleString("pt-PT")}</span> artigos
+                </p>
+                <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                  <div
+                    className="bg-primary h-3 transition-all duration-300 ease-out"
+                    style={{ width: `${Math.round((progress.done / Math.max(1, progress.total)) * 100)}%` }}
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground">{progress.done} de {progress.total}</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-md border border-border bg-background/40 p-3">
+                    <div className="text-xs text-muted-foreground">classificados</div>
+                    <div className="text-2xl font-semibold text-emerald-500 tabular-nums">
+                      {progress.classificados.toLocaleString("pt-PT")}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-border bg-background/40 p-3">
+                    <div className="text-xs text-muted-foreground">a rever</div>
+                    <div className="text-2xl font-semibold text-amber-500 tabular-nums">
+                      {progress.pendentes.toLocaleString("pt-PT")}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-border bg-background/40 p-3">
+                    <div className="text-xs text-muted-foreground">por analisar</div>
+                    <div className="text-2xl font-semibold text-muted-foreground tabular-nums animate-pulse">
+                      {progress.porAnalisar.toLocaleString("pt-PT")}
+                    </div>
+                  </div>
+                </div>
               </>
             )}
           </Card>
