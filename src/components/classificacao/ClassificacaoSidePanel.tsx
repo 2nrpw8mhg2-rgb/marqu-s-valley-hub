@@ -10,6 +10,7 @@ import { ResultadoIABadge } from "./ResultadoIABadge";
 import { ConfiancaBar } from "./ConfiancaBar";
 import { AddKeywordQuickDialog } from "./AddKeywordQuickDialog";
 import { BibliotecaAnalisadaSection } from "./BibliotecaAnalisadaSection";
+import { ArtigoOriginalSection } from "./ArtigoOriginalSection";
 import { ComoEnsinarIASection, type EnsinarAcao } from "./ComoEnsinarIASection";
 import { useInvalidateBibliotecaStats } from "./useBibliotecaStats";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +20,7 @@ type EstadoCls = "classificado_auto" | "necessita_revisao" | "sem_classificacao"
 
 export type PanelRow = {
   id: string;
+  artigo_origem_id: string;
   descricao_original: string;
   unidade_original: string | null;
   quantidade_original: number | null;
@@ -104,12 +106,7 @@ export function ClassificacaoSidePanel({
             <div className="space-y-6 mt-6 text-sm">
               {/* Artigo Original */}
               <Section title="Artigo Original">
-                <div className="text-sm">{row.descricao_original}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Quantidade: <span className="text-foreground tabular-nums">{row.quantidade_original ?? "—"}</span>
-                  {" · "}
-                  Unidade: <span className="text-foreground">{row.unidade_original ?? "—"}</span>
-                </div>
+                <ArtigoOriginalSection artigoOrigemId={row.artigo_origem_id} />
               </Section>
 
               {/* Sugestão da IA */}
