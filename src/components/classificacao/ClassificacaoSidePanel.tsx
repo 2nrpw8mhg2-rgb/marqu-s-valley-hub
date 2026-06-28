@@ -19,6 +19,7 @@ type EstadoCls = "classificado_auto" | "necessita_revisao" | "sem_classificacao"
 
 export type PanelRow = {
   id: string;
+  artigo_origem_id: string;
   descricao_original: string;
   unidade_original: string | null;
   quantidade_original: number | null;
