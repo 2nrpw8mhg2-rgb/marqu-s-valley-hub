@@ -105,12 +105,7 @@ export function ClassificacaoSidePanel({
             <div className="space-y-6 mt-6 text-sm">
               {/* Artigo Original */}
               <Section title="Artigo Original">
-                <div className="text-sm">{row.descricao_original}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Quantidade: <span className="text-foreground tabular-nums">{row.quantidade_original ?? "—"}</span>
-                  {" · "}
-                  Unidade: <span className="text-foreground">{row.unidade_original ?? "—"}</span>
-                </div>
+                <ArtigoOriginalSection artigoOrigemId={row.artigo_origem_id} />
               </Section>
 
               {/* Sugestão da IA */}
