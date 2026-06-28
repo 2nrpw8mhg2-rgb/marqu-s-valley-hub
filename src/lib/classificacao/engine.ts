@@ -237,7 +237,23 @@ export async function runClassificacao(orcamentoId: string, onProgress?: (snapsh
   const lista = (artigos ?? []).filter((a: any) => !validados.has(a.id));
   stats.total = (artigos ?? []).length;
 
+  const totalArtigos = stats.total;
+  const jaValidados = totalArtigos - lista.length; // contam como "classificados" desde o início
+  const emit = (processados: number, cls: number, pend: number) => {
+    if (!onProgress) return;
+    onProgress({
+      total: totalArtigos,
+      done: jaValidados + processados,
+      classificados: jaValidados + cls,
+      pendentes: pend,
+      porAnalisar: lista.length - processados,
+    });
+  };
+  emit(0, 0, 0);
+
   let i = 0;
+  let classificadosRun = 0;
+  let pendentesRun = 0;
   for (const a of lista) {
     const r = classifyArtigo(a as any, bib);
     toInsert.push({
@@ -256,12 +272,12 @@ export async function runClassificacao(orcamentoId: string, onProgress?: (snapsh
       motivo: r.motivo,
       candidatos: r.candidatos,
     });
-    if (r.metodo_match === "exato") stats.auto_exato++;
-    else if (r.metodo_match === "aprendido") stats.auto_aprendido++;
-    else if (r.estado === "necessita_revisao") stats.parcial++;
-    else stats.sem_classificacao++;
+    if (r.metodo_match === "exato") { stats.auto_exato++; classificadosRun++; }
+    else if (r.metodo_match === "aprendido") { stats.auto_aprendido++; classificadosRun++; }
+    else if (r.estado === "necessita_revisao") { stats.parcial++; pendentesRun++; }
+    else { stats.sem_classificacao++; pendentesRun++; }
     i++;
-    if (onProgress && i % 25 === 0) onProgress(i, lista.length);
+    if (i % 10 === 0 || i === lista.length) emit(i, classificadosRun, pendentesRun);
   }
 
   // Batch insert
