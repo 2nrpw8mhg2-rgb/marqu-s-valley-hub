@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,32 +10,25 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, CheckCircle2, X, Edit3, RotateCw } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Search, CheckCircle2, X, Edit3, RotateCw, Sparkles, Info, Play } from "lucide-react";
 import { toast } from "sonner";
+import { runClassificacao, aprenderClassificacao, type Candidato, type Metodo } from "@/lib/classificacao/engine";
 
 export const Route = createFileRoute("/_app/motor-classificacao")({
-  head: () => ({ meta: [{ title: "Motor de Classificação — MV OS" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({
-    orcamento: (s.orcamento as string) || "",
-  }),
-  component: MotorClassificacaoPage,
+  head: () => ({ meta: [{ title: "Centro de Classificação Inteligente — MV OS" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({ orcamento: (s.orcamento as string) || "" }),
+  component: CentroClassificacao,
 });
 
 type EstadoCls = "classificado_auto" | "necessita_revisao" | "sem_classificacao" | "validado";
-
 type ClsRow = {
-  id: string;
-  orcamento_id: string;
-  artigo_origem_id: string;
-  descricao_original: string;
-  unidade_original: string | null;
-  quantidade_original: number | null;
-  especialidade_id: string | null;
-  subespecialidade_id: string | null;
-  categoria_id: string | null;
-  artigo_mestre_id: string | null;
-  confianca: number;
-  estado: EstadoCls;
+  id: string; orcamento_id: string; artigo_origem_id: string;
+  descricao_original: string; unidade_original: string | null; quantidade_original: number | null;
+  especialidade_id: string | null; subespecialidade_id: string | null;
+  categoria_id: string | null; artigo_mestre_id: string | null;
+  confianca: number; estado: EstadoCls;
+  metodo_match: Metodo; motivo: string | null; candidatos: Candidato[] | null;
 };
 
 const ESTADO_META: Record<EstadoCls, { label: string; cls: string }> = {
@@ -45,278 +38,381 @@ const ESTADO_META: Record<EstadoCls, { label: string; cls: string }> = {
   sem_classificacao: { label: "Sem classif.", cls: "bg-muted text-muted-foreground border-border" },
 };
 
-function MotorClassificacaoPage() {
+const METODO_LABEL: Record<Metodo, string> = {
+  exato: "Exato",
+  aprendido: "Aprendido",
+  keyword_artigo: "Keywords",
+  keyword_subesp: "Keywords (subesp.)",
+  keyword_esp: "Keywords (esp.)",
+  manual: "Manual",
+  nenhum: "—",
+};
+
+function CentroClassificacao() {
   const { orcamento } = Route.useSearch();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [dialogRow, setDialogRow] = useState<ClsRow | null>(null);
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   const { data: orcamentos = [] } = useQuery({
-    queryKey: ["mc-orcamentos"],
+    queryKey: ["cc-orcamentos"],
     queryFn: async () => {
       const { data } = await supabase.from("orcamentos").select("id, nome, versao").order("created_at", { ascending: false });
       return (data ?? []) as { id: string; nome: string; versao: number }[];
     },
   });
 
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["classificacao", orcamento, estadoFilter, search],
+  const { data: artigosCount = 0 } = useQuery({
+    queryKey: ["cc-artigos-count", orcamento],
+    enabled: !!orcamento,
     queryFn: async () => {
-      let q = supabase.from("classificacao_artigos").select("*").order("created_at", { ascending: true });
-      if (orcamento) q = q.eq("orcamento_id", orcamento);
+      const { count } = await supabase.from("orcamento_artigos")
+        .select("id", { count: "exact", head: true }).eq("orcamento_id", orcamento);
+      return count ?? 0;
+    },
+  });
+
+  const { data: run } = useQuery({
+    queryKey: ["cc-run", orcamento],
+    enabled: !!orcamento,
+    refetchInterval: running ? 1500 : false,
+    queryFn: async () => {
+      const { data } = await supabase.from("orcamento_classificacao_run")
+        .select("*").eq("orcamento_id", orcamento).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      return data as any;
+    },
+  });
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["cc-rows", orcamento, estadoFilter, search],
+    enabled: !!orcamento && !!run && run.estado === "concluido",
+    queryFn: async () => {
+      let q = supabase.from("classificacao_artigos").select("*")
+        .eq("orcamento_id", orcamento).order("created_at", { ascending: true });
       if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
       if (search.trim()) q = q.ilike("descricao_original", `%${search.trim()}%`);
-      const { data, error } = await q.limit(1000);
+      const { data, error } = await q.limit(2000);
       if (error) throw error;
       return (data ?? []) as ClsRow[];
     },
   });
 
   const { data: esps = [] } = useQuery({
-    queryKey: ["mc-esps"],
-    queryFn: async () => (await supabase.from("biblioteca_especialidades").select("id, nome").order("ordem")).data as { id: string; nome: string }[],
+    queryKey: ["cc-esps"],
+    queryFn: async () => (await supabase.from("biblioteca_especialidades").select("id, nome").order("ordem")).data as any[],
   });
   const { data: subs = [] } = useQuery({
-    queryKey: ["mc-subs"],
-    queryFn: async () => (await supabase.from("biblioteca_subespecialidades").select("id, nome, especialidade_id").order("ordem")).data as { id: string; nome: string; especialidade_id: string }[],
+    queryKey: ["cc-subs"],
+    queryFn: async () => (await supabase.from("biblioteca_subespecialidades").select("id, nome, especialidade_id").order("ordem")).data as any[],
   });
   const { data: cats = [] } = useQuery({
-    queryKey: ["mc-cats"],
-    queryFn: async () => (await supabase.from("biblioteca_categorias").select("id, nome, subespecialidade_id").order("ordem")).data as { id: string; nome: string; subespecialidade_id: string }[],
+    queryKey: ["cc-cats"],
+    queryFn: async () => (await supabase.from("biblioteca_categorias").select("id, nome, subespecialidade_id").order("ordem")).data as any[],
   });
   const { data: arts = [] } = useQuery({
-    queryKey: ["mc-arts"],
-    queryFn: async () => (await supabase.from("biblioteca_artigos").select("id, descricao, unidade, tipo, estado_ia, categoria_id, subespecialidade_id").eq("ativo", true)).data as any[],
+    queryKey: ["cc-arts"],
+    queryFn: async () => (await supabase.from("biblioteca_artigos").select("id, descricao, unidade, tipo, categoria_id, subespecialidade_id").eq("ativo", true)).data as any[],
   });
 
-  const espMap = useMemo(() => new Map(esps.map((e) => [e.id, e.nome])), [esps]);
-  const subMap = useMemo(() => new Map(subs.map((s) => [s.id, s])), [subs]);
-  const catMap = useMemo(() => new Map(cats.map((c) => [c.id, c])), [cats]);
-  const artMap = useMemo(() => new Map(arts.map((a) => [a.id, a])), [arts]);
+  const espMap = useMemo(() => new Map(esps.map((e: any) => [e.id, e.nome])), [esps]);
+  const subMap = useMemo(() => new Map(subs.map((s: any) => [s.id, s])), [subs]);
+  const catMap = useMemo(() => new Map(cats.map((c: any) => [c.id, c])), [cats]);
+  const artMap = useMemo(() => new Map(arts.map((a: any) => [a.id, a])), [arts]);
 
-  const counts = useMemo(() => {
-    const c = { total: rows.length, validado: 0, auto: 0, rever: 0, sem: 0 };
-    for (const r of rows) {
-      if (r.estado === "validado") c.validado++;
-      else if (r.estado === "classificado_auto") c.auto++;
-      else if (r.estado === "necessita_revisao") c.rever++;
-      else c.sem++;
+  const setOrcamentoUrl = (v: string) => {
+    navigate({ to: "/motor-classificacao", search: v ? { orcamento: v } : { orcamento: "" }, replace: true });
+  };
+
+  const iniciar = async () => {
+    if (!orcamento) return;
+    setRunning(true);
+    setProgress({ done: 0, total: artigosCount });
+    try {
+      await runClassificacao(orcamento, (done, total) => setProgress({ done, total }));
+      toast.success("Classificação concluída");
+      qc.invalidateQueries({ queryKey: ["cc-run", orcamento] });
+      qc.invalidateQueries({ queryKey: ["cc-rows", orcamento] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro");
+    } finally {
+      setRunning(false);
+      setProgress(null);
     }
-    return c;
-  }, [rows]);
+  };
 
   const validar = async (row: ClsRow) => {
-    if (!row.artigo_mestre_id) {
-      toast.error("Atribui um Artigo Mestre antes de validar");
-      return;
-    }
+    if (!row.artigo_mestre_id) return toast.error("Atribui um Artigo Mestre antes de validar");
     const { data: u } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from("classificacao_artigos")
-      .update({ estado: "validado", validado_por: u.user?.id ?? null, validado_em: new Date().toISOString() })
-      .eq("id", row.id);
+    const { error } = await supabase.from("classificacao_artigos").update({
+      estado: "validado", validado_por: u.user?.id ?? null, validado_em: new Date().toISOString(),
+    }).eq("id", row.id);
     if (error) return toast.error(error.message);
-    toast.success("Classificação validada");
-    qc.invalidateQueries({ queryKey: ["classificacao"] });
+    await aprenderClassificacao(row.descricao_original, row.artigo_mestre_id);
+    toast.success("Validado e guardado na memória");
+    qc.invalidateQueries({ queryKey: ["cc-rows"] });
   };
 
   const remover = async (row: ClsRow) => {
-    const { error } = await supabase
-      .from("classificacao_artigos")
-      .update({
-        artigo_mestre_id: null, categoria_id: null, subespecialidade_id: null, especialidade_id: null,
-        confianca: 0, estado: "sem_classificacao", validado_por: null, validado_em: null,
-      })
-      .eq("id", row.id);
+    const { error } = await supabase.from("classificacao_artigos").update({
+      artigo_mestre_id: null, categoria_id: null, subespecialidade_id: null, especialidade_id: null,
+      confianca: 0, estado: "sem_classificacao", metodo_match: "nenhum", motivo: "Removido manualmente",
+      validado_por: null, validado_em: null,
+    }).eq("id", row.id);
     if (error) return toast.error(error.message);
     toast.success("Classificação removida");
-    qc.invalidateQueries({ queryKey: ["classificacao"] });
+    qc.invalidateQueries({ queryKey: ["cc-rows"] });
   };
 
   const atribuir = async (row: ClsRow, artigoMestreId: string) => {
-    const art = artMap.get(artigoMestreId);
+    const art: any = artMap.get(artigoMestreId);
     if (!art) return;
-    const cat = catMap.get(art.categoria_id);
-    const sub = subMap.get(art.subespecialidade_id);
-    const { error } = await supabase
-      .from("classificacao_artigos")
-      .update({
-        artigo_mestre_id: artigoMestreId,
-        categoria_id: art.categoria_id,
-        subespecialidade_id: art.subespecialidade_id,
-        especialidade_id: sub?.especialidade_id ?? null,
-        confianca: 100,
-        estado: "classificado_auto",
-      })
-      .eq("id", row.id);
-    if (error) return toast.error(error.message);
-    toast.success("Artigo Mestre atribuído");
-    qc.invalidateQueries({ queryKey: ["classificacao"] });
-    setDialogRow(null);
-  };
-
-  const reclassificarAuto = async () => {
-    const semClass = rows.filter((r) => r.estado === "sem_classificacao");
-    let n = 0;
-    for (const r of semClass) {
-      const match = arts.filter((a) => a.descricao.toLowerCase() === r.descricao_original.toLowerCase());
-      if (match.length === 1) {
-        await atribuirSilent(r, match[0].id);
-        n++;
-      }
-    }
-    toast.success(`${n} artigo(s) reclassificado(s) automaticamente`);
-    qc.invalidateQueries({ queryKey: ["classificacao"] });
-  };
-
-  const atribuirSilent = async (row: ClsRow, artigoMestreId: string) => {
-    const art = artMap.get(artigoMestreId);
-    if (!art) return;
-    const sub = subMap.get(art.subespecialidade_id);
-    await supabase.from("classificacao_artigos").update({
+    const sub: any = subMap.get(art.subespecialidade_id);
+    const { error } = await supabase.from("classificacao_artigos").update({
       artigo_mestre_id: artigoMestreId,
       categoria_id: art.categoria_id,
       subespecialidade_id: art.subespecialidade_id,
       especialidade_id: sub?.especialidade_id ?? null,
-      confianca: 100,
-      estado: "classificado_auto",
+      confianca: 100, estado: "classificado_auto", metodo_match: "manual",
+      motivo: "Atribuído manualmente pelo utilizador",
     }).eq("id", row.id);
+    if (error) return toast.error(error.message);
+    toast.success("Artigo Mestre atribuído");
+    qc.invalidateQueries({ queryKey: ["cc-rows"] });
+    setDialogRow(null);
   };
+
+  const stats = useMemo(() => {
+    if (!run) return null;
+    return {
+      total: run.total_artigos as number,
+      auto: (run.auto_exato + run.auto_aprendido) as number,
+      auto_exato: run.auto_exato as number,
+      auto_aprendido: run.auto_aprendido as number,
+      parcial: run.parcial as number,
+      sem: run.sem_classificacao as number,
+      validados: rows.filter((r) => r.estado === "validado").length,
+    };
+  }, [run, rows]);
 
   return (
     <>
       <PageHeader
-        title="Motor de Classificação"
-        subtitle="Classifica artigos do Mapa de Quantidades contra a Biblioteca Mestra"
+        title="Centro de Classificação Inteligente"
+        subtitle="Analisa, explica e aprende com a classificação dos artigos do MQ"
         actions={
-          <Button variant="outline" size="sm" onClick={reclassificarAuto}>
-            <RotateCw className="h-4 w-4 mr-1" /> Re-correr automática
-          </Button>
+          run?.estado === "concluido" ? (
+            <Button variant="outline" size="sm" onClick={iniciar} disabled={running}>
+              <RotateCw className="h-4 w-4 mr-1" /> Re-correr
+            </Button>
+          ) : null
         }
       />
 
       <div className="p-6 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <StatCard label="Total" value={counts.total} />
-          <StatCard label="Validados" value={counts.validado} tone="green" />
-          <StatCard label="Auto" value={counts.auto} tone="blue" />
-          <StatCard label="A rever" value={counts.rever} tone="yellow" />
-          <StatCard label="Sem classif." value={counts.sem} tone="muted" />
-        </div>
-
+        {/* Selector orçamento */}
         <Card className="bg-card border-border p-4 flex flex-wrap gap-3 items-end">
-          <div className="space-y-1.5 min-w-[240px]">
-            <label className="text-xs text-muted-foreground">Orçamento / MQ</label>
-            <Select
-              value={orcamento || "all"}
-              onValueChange={(v) => {
-                const url = new URL(window.location.href);
-                if (v === "all") url.searchParams.delete("orcamento");
-                else url.searchParams.set("orcamento", v);
-                window.history.replaceState(null, "", url.toString());
-                qc.invalidateQueries({ queryKey: ["classificacao"] });
-              }}
-            >
-              <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+          <div className="space-y-1.5 min-w-[280px] flex-1">
+            <label className="text-xs text-muted-foreground">Orçamento / Mapa de Quantidades</label>
+            <Select value={orcamento || ""} onValueChange={setOrcamentoUrl}>
+              <SelectTrigger><SelectValue placeholder="Selecionar orçamento..." /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os orçamentos</SelectItem>
                 {orcamentos.map((o) => <SelectItem key={o.id} value={o.id}>{o.nome} (v{o.versao})</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5 min-w-[180px]">
-            <label className="text-xs text-muted-foreground">Estado</label>
-            <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="sem_classificacao">Sem classificação</SelectItem>
-                <SelectItem value="necessita_revisao">Necessita revisão</SelectItem>
-                <SelectItem value="classificado_auto">Classificado auto</SelectItem>
-                <SelectItem value="validado">Validado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5 flex-1 min-w-[240px]">
-            <label className="text-xs text-muted-foreground">Pesquisar artigo</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Descrição..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          {orcamento && run && (
+            <div className="text-xs text-muted-foreground">
+              Estado: <Badge variant="outline" className="ml-1">{run.estado}</Badge>
+              {run.concluido_em && <span className="ml-2">Concluído {new Date(run.concluido_em).toLocaleString("pt-PT")}</span>}
             </div>
-          </div>
+          )}
         </Card>
 
-        <Card className="bg-card border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Artigo Original</TableHead>
-                  <TableHead>Especialidade</TableHead>
-                  <TableHead>Subespecialidade</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Artigo Mestre</TableHead>
-                  <TableHead className="w-20">Un.</TableHead>
-                  <TableHead className="w-24">Confiança</TableHead>
-                  <TableHead className="w-32">Estado</TableHead>
-                  <TableHead className="w-48 text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading && <TableRow><TableCell colSpan={9} className="py-10 text-center text-muted-foreground">A carregar...</TableCell></TableRow>}
-                {!isLoading && rows.length === 0 && (
-                  <TableRow><TableCell colSpan={9} className="py-10 text-center text-muted-foreground">Sem artigos para classificar. Importa um MQ para começar.</TableCell></TableRow>
-                )}
-                {rows.map((r) => {
-                  const art = r.artigo_mestre_id ? artMap.get(r.artigo_mestre_id) : null;
-                  return (
-                    <TableRow key={r.id}>
-                      <TableCell className="max-w-[320px]">
-                        <div className="text-sm">{r.descricao_original}</div>
-                        <div className="text-[10px] text-muted-foreground">{r.unidade_original ?? ""} · qtd {r.quantidade_original ?? "—"}</div>
-                      </TableCell>
-                      <TableCell className="text-sm">{r.especialidade_id ? espMap.get(r.especialidade_id) : "—"}</TableCell>
-                      <TableCell className="text-sm">{r.subespecialidade_id ? subMap.get(r.subespecialidade_id)?.nome : "—"}</TableCell>
-                      <TableCell className="text-sm">{r.categoria_id ? catMap.get(r.categoria_id)?.nome : "—"}</TableCell>
-                      <TableCell className="text-sm">{art?.descricao ?? "—"}</TableCell>
-                      <TableCell className="text-sm">{art?.unidade ?? "—"}</TableCell>
-                      <TableCell><Badge variant="outline">{r.confianca}%</Badge></TableCell>
-                      <TableCell><Badge variant="outline" className={ESTADO_META[r.estado].cls}>{ESTADO_META[r.estado].label}</Badge></TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-1 justify-end">
-                          <Button size="sm" variant="ghost" title="Pesquisar Artigo Mestre" onClick={() => setDialogRow(r)}>
-                            {r.artigo_mestre_id ? <Edit3 className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
-                          </Button>
-                          {r.estado !== "validado" && (
-                            <Button size="sm" variant="ghost" title="Validar" onClick={() => validar(r)} disabled={!r.artigo_mestre_id}>
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          {r.artigo_mestre_id && (
-                            <Button size="sm" variant="ghost" title="Remover classificação" onClick={() => remover(r)}>
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
+        {!orcamento && (
+          <Card className="bg-card border-border p-12 text-center text-muted-foreground">
+            Seleciona um orçamento para começar.
+          </Card>
+        )}
+
+        {/* Estado pendente — sem run ainda */}
+        {orcamento && !run && !running && (
+          <Card className="bg-card border-border p-12 text-center space-y-4">
+            <Sparkles className="h-12 w-12 mx-auto text-primary" />
+            <h2 className="text-xl font-semibold">Pronto para classificar</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              O sistema vai analisar os <strong>{artigosCount}</strong> artigos importados e propor classificações
+              com base na Biblioteca Mestra e nas validações anteriores. Vais poder rever, corrigir e validar cada resultado.
+            </p>
+            <Button size="lg" onClick={iniciar} disabled={!artigosCount} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              <Play className="h-4 w-4 mr-2" /> Iniciar Classificação
+            </Button>
+          </Card>
+        )}
+
+        {/* Em curso */}
+        {running && (
+          <Card className="bg-card border-border p-8 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <h3 className="font-semibold">A classificar artigos…</h3>
+            </div>
+            {progress && (
+              <>
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                  <div className="bg-primary h-2 transition-all" style={{ width: `${Math.round((progress.done / Math.max(1, progress.total)) * 100)}%` }} />
+                </div>
+                <p className="text-xs text-muted-foreground">{progress.done} de {progress.total}</p>
+              </>
+            )}
+          </Card>
+        )}
+
+        {/* Concluído — resultados */}
+        {orcamento && run?.estado === "concluido" && !running && stats && (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              <StatCard label="Total" value={stats.total} />
+              <StatCard label="Validados" value={stats.validados} tone="green" />
+              <StatCard label="Exato" value={stats.auto_exato} tone="blue" />
+              <StatCard label="Aprendido" value={stats.auto_aprendido} tone="blue" />
+              <StatCard label="A rever" value={stats.parcial} tone="yellow" />
+              <StatCard label="Sem classif." value={stats.sem} tone="muted" />
+            </div>
+
+            <Card className="bg-card border-border p-4 flex flex-wrap gap-3 items-end">
+              <div className="space-y-1.5 min-w-[180px]">
+                <label className="text-xs text-muted-foreground">Filtrar estado</label>
+                <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="sem_classificacao">Sem classificação</SelectItem>
+                    <SelectItem value="necessita_revisao">Necessita revisão</SelectItem>
+                    <SelectItem value="classificado_auto">Classificado auto</SelectItem>
+                    <SelectItem value="validado">Validado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 flex-1 min-w-[240px]">
+                <label className="text-xs text-muted-foreground">Pesquisar artigo</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input className="pl-9" placeholder="Descrição..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="bg-card border-border overflow-hidden">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Artigo Original</TableHead>
+                      <TableHead>Especialidade / Subespecialidade</TableHead>
+                      <TableHead>Artigo Mestre</TableHead>
+                      <TableHead className="w-32">Porquê?</TableHead>
+                      <TableHead className="w-20">Conf.</TableHead>
+                      <TableHead className="w-28">Estado</TableHead>
+                      <TableHead className="w-44 text-right">Ações</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading && <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">A carregar…</TableCell></TableRow>}
+                    {!isLoading && rows.length === 0 && (
+                      <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">Sem resultados para os filtros.</TableCell></TableRow>
+                    )}
+                    {rows.map((r) => {
+                      const art: any = r.artigo_mestre_id ? artMap.get(r.artigo_mestre_id) : null;
+                      const espNome = r.especialidade_id ? espMap.get(r.especialidade_id) : null;
+                      const subNome = r.subespecialidade_id ? (subMap.get(r.subespecialidade_id) as any)?.nome : null;
+                      const catNome = r.categoria_id ? (catMap.get(r.categoria_id) as any)?.nome : null;
+                      return (
+                        <TableRow key={r.id}>
+                          <TableCell className="max-w-[300px]">
+                            <div className="text-sm">{r.descricao_original}</div>
+                            <div className="text-[10px] text-muted-foreground">{r.unidade_original ?? ""} · qtd {r.quantidade_original ?? "—"}</div>
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            <div>{espNome ?? "—"}</div>
+                            <div className="text-muted-foreground">{subNome ?? ""}{catNome ? ` · ${catNome}` : ""}</div>
+                          </TableCell>
+                          <TableCell className="text-sm">{art?.descricao ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell>
+                            <WhyPopover row={r} onPickCandidate={(id) => atribuir(r, id)} />
+                          </TableCell>
+                          <TableCell><Badge variant="outline">{r.confianca}%</Badge></TableCell>
+                          <TableCell><Badge variant="outline" className={ESTADO_META[r.estado].cls}>{ESTADO_META[r.estado].label}</Badge></TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex gap-1 justify-end">
+                              <Button size="sm" variant="ghost" title="Pesquisar Artigo Mestre" onClick={() => setDialogRow(r)}>
+                                {r.artigo_mestre_id ? <Edit3 className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
+                              </Button>
+                              {r.estado !== "validado" && (
+                                <Button size="sm" variant="ghost" title="Validar" onClick={() => validar(r)} disabled={!r.artigo_mestre_id}>
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {r.artigo_mestre_id && (
+                                <Button size="sm" variant="ghost" title="Remover" onClick={() => remover(r)}>
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          </>
+        )}
       </div>
 
       <SearchBibliotecaDialog
-        open={!!dialogRow}
-        onClose={() => setDialogRow(null)}
+        open={!!dialogRow} onClose={() => setDialogRow(null)}
         onPick={(artId) => dialogRow && atribuir(dialogRow, artId)}
         esps={esps} subs={subs} cats={cats} arts={arts}
         suggestion={dialogRow?.descricao_original ?? ""}
       />
     </>
+  );
+}
+
+function WhyPopover({ row, onPickCandidate }: { row: ClsRow; onPickCandidate: (id: string) => void }) {
+  const candidatos = row.candidatos ?? [];
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1">
+          <Info className="h-3 w-3" /> {METODO_LABEL[row.metodo_match]}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-96 text-sm">
+        <div className="font-medium mb-1">Porquê esta classificação?</div>
+        <p className="text-muted-foreground text-xs">{row.motivo ?? "—"}</p>
+        {candidatos.length > 0 && (
+          <div className="mt-3 space-y-1">
+            <div className="text-xs font-medium">Alternativas</div>
+            {candidatos.map((c) => (
+              <button key={c.artigo_mestre_id} onClick={() => onPickCandidate(c.artigo_mestre_id)}
+                className="w-full text-left p-2 rounded border border-border hover:bg-muted/40 text-xs">
+                <div className="flex justify-between gap-2">
+                  <span className="font-medium">{c.descricao}</span>
+                  <Badge variant="outline" className="shrink-0">{c.score}</Badge>
+                </div>
+                <div className="text-muted-foreground text-[10px] mt-0.5">{c.motivo}</div>
+              </button>
+            ))}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -337,14 +433,8 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone?:
 function SearchBibliotecaDialog({
   open, onClose, onPick, esps, subs, cats, arts, suggestion,
 }: {
-  open: boolean;
-  onClose: () => void;
-  onPick: (artigoMestreId: string) => void;
-  esps: { id: string; nome: string }[];
-  subs: { id: string; nome: string; especialidade_id: string }[];
-  cats: { id: string; nome: string; subespecialidade_id: string }[];
-  arts: any[];
-  suggestion: string;
+  open: boolean; onClose: () => void; onPick: (id: string) => void;
+  esps: any[]; subs: any[]; cats: any[]; arts: any[]; suggestion: string;
 }) {
   const [espId, setEspId] = useState<string>("all");
   const [subId, setSubId] = useState<string>("all");
@@ -371,9 +461,7 @@ function SearchBibliotecaDialog({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="bg-card border-border max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Pesquisar na Biblioteca Mestra</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Pesquisar na Biblioteca Mestra</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           <Select value={espId} onValueChange={(v) => { setEspId(v); setSubId("all"); setCatId("all"); }}>
             <SelectTrigger><SelectValue placeholder="Especialidade" /></SelectTrigger>
@@ -400,18 +488,12 @@ function SearchBibliotecaDialog({
         </div>
         <div className="border border-border rounded-md overflow-auto flex-1 mt-2">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Descrição</TableHead>
-                <TableHead className="w-20">Un.</TableHead>
-                <TableHead className="w-24">Tipo</TableHead>
-                <TableHead className="w-20"></TableHead>
-              </TableRow>
-            </TableHeader>
+            <TableHeader><TableRow>
+              <TableHead>Descrição</TableHead><TableHead className="w-20">Un.</TableHead>
+              <TableHead className="w-24">Tipo</TableHead><TableHead className="w-20"></TableHead>
+            </TableRow></TableHeader>
             <TableBody>
-              {filteredArts.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Sem resultados</TableCell></TableRow>
-              )}
+              {filteredArts.length === 0 && <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Sem resultados</TableCell></TableRow>}
               {filteredArts.map((a) => (
                 <TableRow key={a.id} className="cursor-pointer hover:bg-muted/40" onClick={() => onPick(a.id)}>
                   <TableCell className="text-sm">{a.descricao}</TableCell>
