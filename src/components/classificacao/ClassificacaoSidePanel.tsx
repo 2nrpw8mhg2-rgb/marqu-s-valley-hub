@@ -4,11 +4,15 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle2, Edit3, Plus, Tag, GitBranch, Sparkles, ArrowDown, X } from "lucide-react";
+import { CheckCircle2, Edit3, Sparkles, ArrowDown } from "lucide-react";
 import { normalizar, type Candidato, type KeywordHit, type Metodo } from "@/lib/classificacao/engine";
 import { ResultadoIABadge } from "./ResultadoIABadge";
 import { ConfiancaBar } from "./ConfiancaBar";
 import { AddKeywordQuickDialog } from "./AddKeywordQuickDialog";
+import { BibliotecaAnalisadaSection } from "./BibliotecaAnalisadaSection";
+import { ComoEnsinarIASection, type EnsinarAcao } from "./ComoEnsinarIASection";
+import { useInvalidateBibliotecaStats } from "./useBibliotecaStats";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 type EstadoCls = "classificado_auto" | "necessita_revisao" | "sem_classificacao" | "validado";
