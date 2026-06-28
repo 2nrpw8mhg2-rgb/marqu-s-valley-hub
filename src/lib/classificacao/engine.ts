@@ -196,7 +196,15 @@ function classifyArtigo(
   };
 }
 
-export async function runClassificacao(orcamentoId: string, onProgress?: (done: number, total: number) => void) {
+export type ClassificacaoProgress = {
+  total: number;
+  done: number;
+  classificados: number;
+  pendentes: number;
+  porAnalisar: number;
+};
+
+export async function runClassificacao(orcamentoId: string, onProgress?: (snapshot: ClassificacaoProgress) => void) {
   // Cria run
   const { data: u } = await supabase.auth.getUser();
   const { data: run, error: runErr } = await supabase.from("orcamento_classificacao_run").insert({
