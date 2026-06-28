@@ -523,6 +523,7 @@ export type Database = {
         Row: {
           artigo_mestre_id: string | null
           artigo_origem_id: string
+          candidatos: Json
           categoria_id: string | null
           confianca: number
           created_at: string
@@ -530,6 +531,8 @@ export type Database = {
           especialidade_id: string | null
           estado: Database["public"]["Enums"]["classificacao_estado"]
           id: string
+          metodo_match: Database["public"]["Enums"]["classificacao_metodo"]
+          motivo: string | null
           orcamento_id: string
           quantidade_original: number | null
           subespecialidade_id: string | null
@@ -541,6 +544,7 @@ export type Database = {
         Insert: {
           artigo_mestre_id?: string | null
           artigo_origem_id: string
+          candidatos?: Json
           categoria_id?: string | null
           confianca?: number
           created_at?: string
@@ -548,6 +552,8 @@ export type Database = {
           especialidade_id?: string | null
           estado?: Database["public"]["Enums"]["classificacao_estado"]
           id?: string
+          metodo_match?: Database["public"]["Enums"]["classificacao_metodo"]
+          motivo?: string | null
           orcamento_id: string
           quantidade_original?: number | null
           subespecialidade_id?: string | null
@@ -559,6 +565,7 @@ export type Database = {
         Update: {
           artigo_mestre_id?: string | null
           artigo_origem_id?: string
+          candidatos?: Json
           categoria_id?: string | null
           confianca?: number
           created_at?: string
@@ -566,6 +573,8 @@ export type Database = {
           especialidade_id?: string | null
           estado?: Database["public"]["Enums"]["classificacao_estado"]
           id?: string
+          metodo_match?: Database["public"]["Enums"]["classificacao_metodo"]
+          motivo?: string | null
           orcamento_id?: string
           quantidade_original?: number | null
           subespecialidade_id?: string | null
@@ -639,6 +648,44 @@ export type Database = {
           resultado?: Json
         }
         Relationships: []
+      }
+      classificacao_memoria: {
+        Row: {
+          artigo_mestre_id: string
+          created_at: string
+          descricao_normalizada: string
+          id: string
+          ocorrencias: number
+          ultimo_user_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          artigo_mestre_id: string
+          created_at?: string
+          descricao_normalizada: string
+          id?: string
+          ocorrencias?: number
+          ultimo_user_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          artigo_mestre_id?: string
+          created_at?: string
+          descricao_normalizada?: string
+          id?: string
+          ocorrencias?: number
+          ultimo_user_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classificacao_memoria_artigo_mestre_id_fkey"
+            columns: ["artigo_mestre_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       documento_pastas: {
         Row: {
@@ -965,6 +1012,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "orcamento_capitulos_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orcamento_classificacao_run: {
+        Row: {
+          auto_aprendido: number
+          auto_exato: number
+          concluido_em: string | null
+          created_at: string
+          estado: Database["public"]["Enums"]["classificacao_run_estado"]
+          id: string
+          iniciado_em: string | null
+          iniciado_por: string | null
+          orcamento_id: string
+          parcial: number
+          sem_classificacao: number
+          total_artigos: number
+          updated_at: string
+        }
+        Insert: {
+          auto_aprendido?: number
+          auto_exato?: number
+          concluido_em?: string | null
+          created_at?: string
+          estado?: Database["public"]["Enums"]["classificacao_run_estado"]
+          id?: string
+          iniciado_em?: string | null
+          iniciado_por?: string | null
+          orcamento_id: string
+          parcial?: number
+          sem_classificacao?: number
+          total_artigos?: number
+          updated_at?: string
+        }
+        Update: {
+          auto_aprendido?: number
+          auto_exato?: number
+          concluido_em?: string | null
+          created_at?: string
+          estado?: Database["public"]["Enums"]["classificacao_run_estado"]
+          id?: string
+          iniciado_em?: string | null
+          iniciado_por?: string | null
+          orcamento_id?: string
+          parcial?: number
+          sem_classificacao?: number
+          total_artigos?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamento_classificacao_run_orcamento_id_fkey"
             columns: ["orcamento_id"]
             isOneToOne: false
             referencedRelation: "orcamentos"
@@ -1366,6 +1469,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      normalizar_descricao: { Args: { _t: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "orcamentista" | "diretor_obra" | "comprador"
@@ -1386,6 +1490,15 @@ export type Database = {
         | "necessita_revisao"
         | "sem_classificacao"
         | "validado"
+      classificacao_metodo:
+        | "exato"
+        | "aprendido"
+        | "keyword_artigo"
+        | "keyword_subesp"
+        | "keyword_esp"
+        | "manual"
+        | "nenhum"
+      classificacao_run_estado: "pendente" | "em_curso" | "concluido"
       documento_tipo:
         | "projeto"
         | "mq"
@@ -1553,6 +1666,16 @@ export const Constants = {
         "sem_classificacao",
         "validado",
       ],
+      classificacao_metodo: [
+        "exato",
+        "aprendido",
+        "keyword_artigo",
+        "keyword_subesp",
+        "keyword_esp",
+        "manual",
+        "nenhum",
+      ],
+      classificacao_run_estado: ["pendente", "em_curso", "concluido"],
       documento_tipo: [
         "projeto",
         "mq",
