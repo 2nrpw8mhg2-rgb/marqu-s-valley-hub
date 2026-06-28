@@ -1082,6 +1082,7 @@ export type Database = {
           data_decisao: string | null
           data_envio: string | null
           estado: Database["public"]["Enums"]["orcamento_estado"]
+          estado_mq: Database["public"]["Enums"]["estado_mq"]
           id: string
           margem_global_pct: number
           nome: string
@@ -1089,6 +1090,7 @@ export type Database = {
           observacoes: string | null
           updated_at: string
           versao: number
+          versao_label: string
         }
         Insert: {
           created_at?: string
@@ -1096,6 +1098,7 @@ export type Database = {
           data_decisao?: string | null
           data_envio?: string | null
           estado?: Database["public"]["Enums"]["orcamento_estado"]
+          estado_mq?: Database["public"]["Enums"]["estado_mq"]
           id?: string
           margem_global_pct?: number
           nome: string
@@ -1103,6 +1106,7 @@ export type Database = {
           observacoes?: string | null
           updated_at?: string
           versao?: number
+          versao_label?: string
         }
         Update: {
           created_at?: string
@@ -1110,6 +1114,7 @@ export type Database = {
           data_decisao?: string | null
           data_envio?: string | null
           estado?: Database["public"]["Enums"]["orcamento_estado"]
+          estado_mq?: Database["public"]["Enums"]["estado_mq"]
           id?: string
           margem_global_pct?: number
           nome?: string
@@ -1117,6 +1122,7 @@ export type Database = {
           observacoes?: string | null
           updated_at?: string
           versao?: number
+          versao_label?: string
         }
         Relationships: [
           {
@@ -1505,6 +1511,12 @@ export type Database = {
         | "caderno_encargos"
         | "proposta"
         | "outro"
+      estado_mq:
+        | "importado"
+        | "em_classificacao"
+        | "aguardando_validacao"
+        | "validado"
+        | "convertido_pacotes"
       obra_estado: "oportunidade" | "em_curso" | "concluida" | "cancelada"
       orcamento_estado:
         | "rascunho"
@@ -1682,6 +1694,13 @@ export const Constants = {
         "caderno_encargos",
         "proposta",
         "outro",
+      ],
+      estado_mq: [
+        "importado",
+        "em_classificacao",
+        "aguardando_validacao",
+        "validado",
+        "convertido_pacotes",
       ],
       obra_estado: ["oportunidade", "em_curso", "concluida", "cancelada"],
       orcamento_estado: [
