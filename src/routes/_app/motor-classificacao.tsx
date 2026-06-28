@@ -487,7 +487,7 @@ function CentroClassificacao() {
 
 
 
-function StatCard({ label, value, tone }: { label: string; value: number; tone?: "green" | "blue" | "yellow" | "muted" }) {
+function StatCard({ label, value, tone, sub, prefix }: { label: string; value: number; tone?: "green" | "blue" | "yellow" | "muted"; sub?: string; prefix?: string }) {
   const cls =
     tone === "green" ? "text-green-600 dark:text-green-400" :
     tone === "blue" ? "text-blue-600 dark:text-blue-400" :
@@ -496,7 +496,8 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone?:
   return (
     <Card className="bg-card border-border p-3">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={`text-2xl font-semibold tabular-nums ${cls}`}>{value}</div>
+      <div className={`text-2xl font-semibold tabular-nums ${cls}`}>{prefix}{value}</div>
+      {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
     </Card>
   );
 }
