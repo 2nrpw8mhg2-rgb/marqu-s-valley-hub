@@ -14,6 +14,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSubempreiteirosRouteImport } from './routes/_app/subempreiteiros'
 import { Route as AppObrasRouteImport } from './routes/_app/obras'
+import { Route as AppMotorClassificacaoRouteImport } from './routes/_app/motor-classificacao'
 import { Route as AppDocumentosRouteImport } from './routes/_app/documentos'
 import { Route as AppDecomposicaoPrecosRouteImport } from './routes/_app/decomposicao-precos'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
@@ -56,6 +57,11 @@ const AppSubempreiteirosRoute = AppSubempreiteirosRouteImport.update({
 const AppObrasRoute = AppObrasRouteImport.update({
   id: '/obras',
   path: '/obras',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMotorClassificacaoRoute = AppMotorClassificacaoRouteImport.update({
+  id: '/motor-classificacao',
+  path: '/motor-classificacao',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDocumentosRoute = AppDocumentosRouteImport.update({
@@ -172,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AppDashboardRoute
   '/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/documentos': typeof AppDocumentosRoute
+  '/motor-classificacao': typeof AppMotorClassificacaoRoute
   '/obras': typeof AppObrasRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
@@ -196,6 +203,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardRoute
   '/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/documentos': typeof AppDocumentosRoute
+  '/motor-classificacao': typeof AppMotorClassificacaoRoute
   '/obras': typeof AppObrasRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
@@ -223,6 +231,7 @@ export interface FileRoutesById {
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/_app/documentos': typeof AppDocumentosRoute
+  '/_app/motor-classificacao': typeof AppMotorClassificacaoRoute
   '/_app/obras': typeof AppObrasRoute
   '/_app/subempreiteiros': typeof AppSubempreiteirosRoute
   '/_app/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
@@ -250,6 +259,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/decomposicao-precos'
     | '/documentos'
+    | '/motor-classificacao'
     | '/obras'
     | '/subempreiteiros'
     | '/biblioteca-mestra/artigos'
@@ -274,6 +284,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/decomposicao-precos'
     | '/documentos'
+    | '/motor-classificacao'
     | '/obras'
     | '/subempreiteiros'
     | '/biblioteca-mestra/artigos'
@@ -300,6 +311,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/decomposicao-precos'
     | '/_app/documentos'
+    | '/_app/motor-classificacao'
     | '/_app/obras'
     | '/_app/subempreiteiros'
     | '/_app/biblioteca-mestra/artigos'
@@ -359,6 +371,13 @@ declare module '@tanstack/react-router' {
       path: '/obras'
       fullPath: '/obras'
       preLoaderRoute: typeof AppObrasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/motor-classificacao': {
+      id: '/_app/motor-classificacao'
+      path: '/motor-classificacao'
+      fullPath: '/motor-classificacao'
+      preLoaderRoute: typeof AppMotorClassificacaoRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/documentos': {
@@ -543,6 +562,7 @@ interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppDecomposicaoPrecosRoute: typeof AppDecomposicaoPrecosRoute
   AppDocumentosRoute: typeof AppDocumentosRoute
+  AppMotorClassificacaoRoute: typeof AppMotorClassificacaoRoute
   AppObrasRoute: typeof AppObrasRoute
   AppSubempreiteirosRoute: typeof AppSubempreiteirosRoute
   AppOrcamentosDecomposicaoRoute: typeof AppOrcamentosDecomposicaoRoute
@@ -558,6 +578,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppDecomposicaoPrecosRoute: AppDecomposicaoPrecosRoute,
   AppDocumentosRoute: AppDocumentosRoute,
+  AppMotorClassificacaoRoute: AppMotorClassificacaoRoute,
   AppObrasRoute: AppObrasRoute,
   AppSubempreiteirosRoute: AppSubempreiteirosRoute,
   AppOrcamentosDecomposicaoRoute: AppOrcamentosDecomposicaoRoute,

@@ -12,6 +12,7 @@ import {
   LogOut,
   Library,
   History,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -43,6 +44,12 @@ const sections: { title: string; items: NavItem[] }[] = [
       { to: "/biblioteca-mestra/keywords", label: "Palavras-chave", icon: Sparkles },
       { to: "/biblioteca-mestra/unidades", label: "Unidades", icon: Layers },
       { to: "/biblioteca-mestra/templates", label: "Templates de Obra", icon: HardHat },
+    ],
+  },
+  {
+    title: "Motor de Classificação",
+    items: [
+      { to: "/motor-classificacao", label: "Motor de Classificação", icon: Wand2 },
     ],
   },
   {
