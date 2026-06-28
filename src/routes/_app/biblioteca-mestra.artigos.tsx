@@ -52,6 +52,7 @@ function ArtigosPage() {
   const [moveSub, setMoveSub] = useState<string>("all");
   const [suggestingId, setSuggestingId] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<{ artigoId: string; categoriaId: string; confianca: number; nomeCategoria: string } | null>(null);
+  const [relacoesArtId, setRelacoesArtId] = useState<string | null>(null);
 
   const { data: esps = [] } = useQuery({
     queryKey: ["bm-esp"],
