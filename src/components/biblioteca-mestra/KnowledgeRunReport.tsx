@@ -184,6 +184,19 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
         origem: "utilizador" as const,
         ativo: true,
       };
+      // Verifica se já existe outro registo com mesmo (artigo, tipo, lower(termo))
+      const { data: existente, error: dupErr } = await supabase
+        .from("biblioteca_artigo_conhecimento")
+        .select("id")
+        .eq("artigo_mestre_id", e.artigoMestreId)
+        .eq("tipo", e.tipo)
+        .ilike("termo", termo)
+        .maybeSingle();
+      if (dupErr) throw dupErr;
+      if (existente && existente.id !== e.id) {
+        throw new Error(`Já existe um(a) ${e.tipo.replace("_", " ")} com o termo "${termo}" neste artigo.`);
+      }
+
       if (e.id) {
         const { error } = await supabase
           .from("biblioteca_artigo_conhecimento")
@@ -197,7 +210,12 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
         .insert(payload)
         .select("id")
         .single();
-      if (error) throw error;
+      if (error) {
+        if ((error as any).code === "23505") {
+          throw new Error(`Já existe um(a) ${e.tipo.replace("_", " ")} com o termo "${termo}" neste artigo.`);
+        }
+        throw error;
+      }
       return { ...e, id: data.id as string, termo };
     },
     onSuccess: (saved) => {
