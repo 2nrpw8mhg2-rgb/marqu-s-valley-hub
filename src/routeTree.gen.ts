@@ -29,6 +29,7 @@ import { Route as AppBibliotecaMestraUnidadesRouteImport } from './routes/_app/b
 import { Route as AppBibliotecaMestraTemplatesRouteImport } from './routes/_app/biblioteca-mestra.templates'
 import { Route as AppBibliotecaMestraSubespecialidadesRouteImport } from './routes/_app/biblioteca-mestra.subespecialidades'
 import { Route as AppBibliotecaMestraSistemasRouteImport } from './routes/_app/biblioteca-mestra.sistemas'
+import { Route as AppBibliotecaMestraKnowledgeBuilderRouteImport } from './routes/_app/biblioteca-mestra.knowledge-builder'
 import { Route as AppBibliotecaMestraKeywordsRouteImport } from './routes/_app/biblioteca-mestra.keywords'
 import { Route as AppBibliotecaMestraEspecialidadesRouteImport } from './routes/_app/biblioteca-mestra.especialidades'
 import { Route as AppBibliotecaMestraCategoriasRouteImport } from './routes/_app/biblioteca-mestra.categorias'
@@ -151,6 +152,12 @@ const AppBibliotecaMestraSistemasRoute =
     path: '/sistemas',
     getParentRoute: () => AppBibliotecaMestraRoute,
   } as any)
+const AppBibliotecaMestraKnowledgeBuilderRoute =
+  AppBibliotecaMestraKnowledgeBuilderRouteImport.update({
+    id: '/knowledge-builder',
+    path: '/knowledge-builder',
+    getParentRoute: () => AppBibliotecaMestraRoute,
+  } as any)
 const AppBibliotecaMestraKeywordsRoute =
   AppBibliotecaMestraKeywordsRouteImport.update({
     id: '/keywords',
@@ -251,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
   '/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
   '/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
+  '/biblioteca-mestra/knowledge-builder': typeof AppBibliotecaMestraKnowledgeBuilderRoute
   '/biblioteca-mestra/sistemas': typeof AppBibliotecaMestraSistemasRoute
   '/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
   '/biblioteca-mestra/templates': typeof AppBibliotecaMestraTemplatesRoute
@@ -287,6 +295,7 @@ export interface FileRoutesByTo {
   '/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
   '/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
   '/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
+  '/biblioteca-mestra/knowledge-builder': typeof AppBibliotecaMestraKnowledgeBuilderRoute
   '/biblioteca-mestra/sistemas': typeof AppBibliotecaMestraSistemasRoute
   '/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
   '/biblioteca-mestra/templates': typeof AppBibliotecaMestraTemplatesRoute
@@ -325,6 +334,7 @@ export interface FileRoutesById {
   '/_app/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
   '/_app/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
   '/_app/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
+  '/_app/biblioteca-mestra/knowledge-builder': typeof AppBibliotecaMestraKnowledgeBuilderRoute
   '/_app/biblioteca-mestra/sistemas': typeof AppBibliotecaMestraSistemasRoute
   '/_app/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
   '/_app/biblioteca-mestra/templates': typeof AppBibliotecaMestraTemplatesRoute
@@ -364,6 +374,7 @@ export interface FileRouteTypes {
     | '/biblioteca-mestra/categorias'
     | '/biblioteca-mestra/especialidades'
     | '/biblioteca-mestra/keywords'
+    | '/biblioteca-mestra/knowledge-builder'
     | '/biblioteca-mestra/sistemas'
     | '/biblioteca-mestra/subespecialidades'
     | '/biblioteca-mestra/templates'
@@ -400,6 +411,7 @@ export interface FileRouteTypes {
     | '/biblioteca-mestra/categorias'
     | '/biblioteca-mestra/especialidades'
     | '/biblioteca-mestra/keywords'
+    | '/biblioteca-mestra/knowledge-builder'
     | '/biblioteca-mestra/sistemas'
     | '/biblioteca-mestra/subespecialidades'
     | '/biblioteca-mestra/templates'
@@ -437,6 +449,7 @@ export interface FileRouteTypes {
     | '/_app/biblioteca-mestra/categorias'
     | '/_app/biblioteca-mestra/especialidades'
     | '/_app/biblioteca-mestra/keywords'
+    | '/_app/biblioteca-mestra/knowledge-builder'
     | '/_app/biblioteca-mestra/sistemas'
     | '/_app/biblioteca-mestra/subespecialidades'
     | '/_app/biblioteca-mestra/templates'
@@ -609,6 +622,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBibliotecaMestraSistemasRouteImport
       parentRoute: typeof AppBibliotecaMestraRoute
     }
+    '/_app/biblioteca-mestra/knowledge-builder': {
+      id: '/_app/biblioteca-mestra/knowledge-builder'
+      path: '/knowledge-builder'
+      fullPath: '/biblioteca-mestra/knowledge-builder'
+      preLoaderRoute: typeof AppBibliotecaMestraKnowledgeBuilderRouteImport
+      parentRoute: typeof AppBibliotecaMestraRoute
+    }
     '/_app/biblioteca-mestra/keywords': {
       id: '/_app/biblioteca-mestra/keywords'
       path: '/keywords'
@@ -729,6 +749,7 @@ interface AppBibliotecaMestraRouteChildren {
   AppBibliotecaMestraCategoriasRoute: typeof AppBibliotecaMestraCategoriasRoute
   AppBibliotecaMestraEspecialidadesRoute: typeof AppBibliotecaMestraEspecialidadesRoute
   AppBibliotecaMestraKeywordsRoute: typeof AppBibliotecaMestraKeywordsRoute
+  AppBibliotecaMestraKnowledgeBuilderRoute: typeof AppBibliotecaMestraKnowledgeBuilderRoute
   AppBibliotecaMestraSistemasRoute: typeof AppBibliotecaMestraSistemasRoute
   AppBibliotecaMestraSubespecialidadesRoute: typeof AppBibliotecaMestraSubespecialidadesRoute
   AppBibliotecaMestraTemplatesRoute: typeof AppBibliotecaMestraTemplatesRoute
@@ -742,6 +763,8 @@ const AppBibliotecaMestraRouteChildren: AppBibliotecaMestraRouteChildren = {
   AppBibliotecaMestraEspecialidadesRoute:
     AppBibliotecaMestraEspecialidadesRoute,
   AppBibliotecaMestraKeywordsRoute: AppBibliotecaMestraKeywordsRoute,
+  AppBibliotecaMestraKnowledgeBuilderRoute:
+    AppBibliotecaMestraKnowledgeBuilderRoute,
   AppBibliotecaMestraSistemasRoute: AppBibliotecaMestraSistemasRoute,
   AppBibliotecaMestraSubespecialidadesRoute:
     AppBibliotecaMestraSubespecialidadesRoute,
