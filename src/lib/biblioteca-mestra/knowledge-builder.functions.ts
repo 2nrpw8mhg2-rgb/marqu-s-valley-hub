@@ -86,3 +86,28 @@ export const cancelKnowledgeRun = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true };
   });
+
+export const aprovarConhecimentoRun = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { runId: string }) => {
+    if (!data?.runId) throw new Error("runId obrigatório");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const { data: run, error } = await context.supabase
+      .from("biblioteca_knowledge_run")
+      .select("resumo")
+      .eq("id", data.runId)
+      .single();
+    if (error) throw error;
+    const termos = ((run?.resumo as any)?.termos ?? []) as Array<{ id: string; novo: boolean; origem: string }>;
+    const ids = termos.filter((t) => t.novo && t.origem === "ia").map((t) => t.id);
+    if (!ids.length) return { ok: true, aprovados: 0 };
+    const { error: upErr } = await context.supabase
+      .from("biblioteca_artigo_conhecimento")
+      .update({ origem: "utilizador" })
+      .in("id", ids);
+    if (upErr) throw upErr;
+    return { ok: true, aprovados: ids.length };
+  });
+
