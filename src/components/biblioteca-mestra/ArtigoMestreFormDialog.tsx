@@ -148,7 +148,16 @@ export function ArtigoMestreFormDialog({ open, onOpenChange, initial }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
-        <DialogHeader><DialogTitle>{editing?.id ? "Editar" : "Novo"} Artigo Mestre</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>
+            {editing?.id ? "Editar" : "Novo"} Artigo Mestre
+            {editing?.id && (editing.codigo || editing.descricao) && (
+              <span className="ml-2 font-normal text-muted-foreground">
+                — {[editing.codigo, editing.descricao].filter(Boolean).join(" · ")}
+              </span>
+            )}
+          </DialogTitle>
+        </DialogHeader>
         <Tabs value={tab} onValueChange={(v) => setTab(v as "geral" | "conhecimento")} className="w-full">
           <TabsList>
             <TabsTrigger value="geral">Geral</TabsTrigger>
