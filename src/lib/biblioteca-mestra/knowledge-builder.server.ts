@@ -407,7 +407,7 @@ export async function processRun(runId: string) {
         const fontes = await recolherFontes(sb, artigoId);
         const prompt = buildPrompt(fontes, run.modo as Modo);
         const gen = await callAI(prompt);
-        const res = await persistir(sb, artigoId, gen, run.modo as Modo);
+        const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes.mqTop);
 
         for (const k of Object.keys(res.perTipo)) counts[k] = (counts[k] ?? 0) + res.perTipo[k];
         processados++;
@@ -435,9 +435,36 @@ export async function processRun(runId: string) {
       }
     }
 
+    // Calcular resumo final (apenas para scope=artigo, mais útil na ficha)
+    let resumo: any = null;
+    if (scope.tipo === "artigo") {
+      const { data: rows } = await sb
+        .from("biblioteca_artigo_conhecimento")
+        .select("tipo, confianca, peso")
+        .eq("artigo_mestre_id", scope.artigoId)
+        .eq("ativo", true);
+      const perTipo: Record<string, number> = {
+        palavra_chave: 0, sinonimo: 0, expressao: 0, material: 0, termo_negativo: 0,
+      };
+      let somaPeso = 0;
+      let somaPesoConf = 0;
+      for (const r of rows ?? []) {
+        perTipo[r.tipo as string] = (perTipo[r.tipo as string] ?? 0) + 1;
+        const p = Math.abs(Number(r.peso) || 0);
+        somaPeso += p;
+        somaPesoConf += p * (Number(r.confianca) || 0);
+      }
+      resumo = {
+        perTipo,
+        total: (rows ?? []).length,
+        confiancaGlobal: somaPeso > 0 ? Math.round(somaPesoConf / somaPeso) : 0,
+        counts,
+      };
+    }
+
     await sb
       .from("biblioteca_knowledge_run")
-      .update({ estado: "concluido", concluido_em: new Date().toISOString() })
+      .update({ estado: "concluido", concluido_em: new Date().toISOString(), resumo })
       .eq("id", runId);
     await appendLog(sb, runId, `Concluído: ${processados} processados, ${saltados} saltados, ${falhados} falhados`);
   } catch (e: any) {
