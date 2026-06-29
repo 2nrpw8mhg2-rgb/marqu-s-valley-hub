@@ -151,9 +151,9 @@ function KnowledgeBuilderPage() {
     <div className="p-6 max-w-6xl space-y-6">
       <PageHeader
         title="Knowledge Builder"
-        description="Enriquece a Biblioteca Mestra com IA, aprendendo a partir dos mapas de quantidades reais."
-        icon={<Brain className="h-6 w-6" />}
+        subtitle="Enriquece a Biblioteca Mestra com IA, aprendendo a partir dos mapas de quantidades reais."
       />
+
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
