@@ -476,6 +476,8 @@ async function recolherFontes(sb: Sb, artigoId: string): Promise<Fontes> {
       observacoes: aAny?.observacoes ?? "",
     },
     contexto: { especialidade: especialidadeNome, subespecialidade: subespecialidadeNome, categoria: categoriaNome },
+    especialidadeId: (subRel?.especialidade_id as string | null) ?? null,
+
     historico,
     totalHistorico: mqRaw?.length ?? 0,
     historicoValidados,
