@@ -714,6 +714,8 @@ export async function processRun(runId: string) {
       } catch (e: any) {
         falhados++;
         processados++;
+        ultimoErro = String(e?.message ?? e).slice(0, 300);
+
         await sb
           .from("biblioteca_knowledge_run")
           .update({ processados, falhados })
