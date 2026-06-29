@@ -98,6 +98,11 @@ function deltaText(d: number) {
 
 export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Props) {
   const [selected, setSelected] = useState<KnowledgeRunReportTermo | null>(null);
+  const [editor, setEditor] = useState<EditDraft | null>(null);
+  const [removerTermo, setRemoverTermo] = useState<KnowledgeRunReportTermo | null>(null);
+  const [overrides, setOverrides] = useState<Map<string, Partial<KnowledgeRunReportTermo>>>(new Map());
+  const [deleted, setDeleted] = useState<Set<string>>(new Set());
+  const [added, setAdded] = useState<KnowledgeRunReportTermo[]>([]);
   const navigate = useNavigate();
   const aprovarFn = useServerFn(aprovarConhecimentoRun);
 
@@ -110,24 +115,144 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
   const escopoTipo = report.escopo?.tipo ?? (report.artigo ? "artigo" : "especialidade");
   const isArtigoScope = escopoTipo === "artigo";
 
+  const mergedTermos = useMemo<KnowledgeRunReportTermo[]>(() => {
+    const base = (report.termos ?? [])
+      .filter((t) => !deleted.has(t.id))
+      .map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}) }));
+    return [...base, ...added];
+  }, [report.termos, overrides, deleted, added]);
+
   const termosPorTipo = useMemo(() => {
     const acc: Record<string, KnowledgeRunReportTermo[]> = {};
-    for (const t of report.termos ?? []) {
+    for (const t of mergedTermos) {
       (acc[t.tipo] ??= []).push(t);
     }
     return acc;
-  }, [report.termos]);
+  }, [mergedTermos]);
 
   const termosPorArtigo = useMemo(() => {
     const acc = new Map<string, KnowledgeRunReportTermo[]>();
-    for (const t of report.termos ?? []) {
+    for (const t of mergedTermos) {
       const k = t.artigoMestreId ?? "_";
       const arr = acc.get(k) ?? [];
       arr.push(t);
       acc.set(k, arr);
     }
     return acc;
-  }, [report.termos]);
+  }, [mergedTermos]);
+
+  const tipoPesoDefault = (t: ConhecimentoTipo) =>
+    CONHECIMENTO_TIPOS.find((x) => x.value === t)?.pesoDefault ?? 10;
+
+  const openEditor = (t: KnowledgeRunReportTermo) => {
+    setEditor({
+      id: t.id,
+      artigoMestreId: t.artigoMestreId ?? report.artigo?.id ?? "",
+      artigoCodigo: t.artigoCodigo,
+      artigoDescricao: t.artigoDescricao,
+      tipo: t.tipo,
+      termo: t.termo,
+      peso: t.peso,
+      confianca: t.confianca,
+    });
+    setSelected(null);
+  };
+
+  const openCreate = (tipo: ConhecimentoTipo, artigoId: string, art?: { codigo?: string; descricao?: string }) => {
+    setEditor({
+      artigoMestreId: artigoId,
+      artigoCodigo: art?.codigo,
+      artigoDescricao: art?.descricao,
+      tipo,
+      termo: "",
+      peso: tipoPesoDefault(tipo),
+      confianca: 100,
+    });
+  };
+
+  const saveEditor = useMutation({
+    mutationFn: async (e: EditDraft) => {
+      const termo = e.termo.trim();
+      if (!termo) throw new Error("Termo obrigatório");
+      if (!e.artigoMestreId) throw new Error("Sem artigo associado");
+      const payload = {
+        artigo_mestre_id: e.artigoMestreId,
+        tipo: e.tipo,
+        termo,
+        peso: Number(e.peso),
+        confianca: Math.max(0, Math.min(100, Number(e.confianca) || 0)),
+        origem: "utilizador" as const,
+        ativo: true,
+      };
+      if (e.id) {
+        const { error } = await supabase
+          .from("biblioteca_artigo_conhecimento")
+          .update(payload)
+          .eq("id", e.id);
+        if (error) throw error;
+        return { ...e, id: e.id, termo };
+      }
+      const { data, error } = await supabase
+        .from("biblioteca_artigo_conhecimento")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (error) throw error;
+      return { ...e, id: data.id as string, termo };
+    },
+    onSuccess: (saved) => {
+      if (editor?.id) {
+        setOverrides((prev) => {
+          const next = new Map(prev);
+          next.set(saved.id!, { termo: saved.termo, peso: saved.peso, confianca: saved.confianca, tipo: saved.tipo });
+          return next;
+        });
+        toast.success("Termo atualizado");
+      } else {
+        const novo: KnowledgeRunReportTermo = {
+          id: saved.id!,
+          tipo: saved.tipo,
+          termo: saved.termo,
+          peso: saved.peso,
+          confianca: saved.confianca,
+          origem: "utilizador",
+          ocorrencias: 0,
+          exemplos: [],
+          justificacao: null,
+          novo: true,
+          artigoMestreId: saved.artigoMestreId,
+          artigoCodigo: saved.artigoCodigo,
+          artigoDescricao: saved.artigoDescricao,
+        };
+        setAdded((prev) => [...prev, novo]);
+        toast.success("Termo adicionado");
+      }
+      setEditor(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteTermo = useMutation({
+    mutationFn: async (t: KnowledgeRunReportTermo) => {
+      const { error } = await supabase
+        .from("biblioteca_artigo_conhecimento")
+        .delete()
+        .eq("id", t.id);
+      if (error) throw error;
+      return t;
+    },
+    onSuccess: (t) => {
+      // se for um termo adicionado localmente, remove de added
+      setAdded((prev) => prev.filter((x) => x.id !== t.id));
+      setDeleted((prev) => new Set(prev).add(t.id));
+      setRemoverTermo(null);
+      setSelected(null);
+      toast.success("Termo eliminado");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
 
   const handleExport = () => {
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
