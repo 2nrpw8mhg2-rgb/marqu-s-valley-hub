@@ -1,125 +1,103 @@
-## Diagnóstico (confirmado)
+# FASE 1 — Knowledge Base por Artigo Mestre
 
-Investiguei o motor (`src/lib/classificacao/engine.ts`) e o estado real da base de dados para o orçamento atual:
+Objetivo: criar a infraestrutura (tabela + UI de gestão) para guardar conhecimento por artigo. **Não altera o algoritmo de classificação**. A `biblioteca_artigo_keywords` atual mantém-se intacta e o motor continua a usá-la.
 
-- `biblioteca_artigo_keywords`: **0 registos** (não há sinais ao nível do artigo)
-- `biblioteca_subespecialidade_keywords`: 167
-- `biblioteca_especialidade_keywords`: 583
-- `biblioteca_artigos` ativos: 1.673
+## 1. Migração — nova tabela `biblioteca_artigo_conhecimento`
 
-O algoritmo só pontua por keywords de especialidade/subespecialidade e depois **herda essa pontuação para todos os artigos mestres dessa subespecialidade/especialidade**. Com isto, descrições como "betão" tornam ~todos os artigos da especialidade candidatos com o mesmo score; o "vencedor" é arbitrário (ordem de inserção do Map). Daí casos reais observados:
+Dois ENUMs novos (extensíveis com `ALTER TYPE ... ADD VALUE` no futuro):
 
+- `biblioteca_conhecimento_tipo`: `palavra_chave`, `sinonimo`, `expressao`, `material`, `termo_negativo`
+- `biblioteca_conhecimento_origem`: `ia`, `utilizador`, `sistema`, `importacao`
+
+Tabela:
+
+| Coluna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `artigo_mestre_id` | uuid NOT NULL | FK → `biblioteca_artigos(id)` ON DELETE CASCADE |
+| `tipo` | enum acima | NOT NULL |
+| `termo` | text | NOT NULL, trim, não vazio (CHECK) |
+| `peso` | integer | NOT NULL DEFAULT 10 (permite negativo para `termo_negativo`) |
+| `origem` | enum acima | NOT NULL DEFAULT `'utilizador'` |
+| `confianca` | numeric(5,2) | NOT NULL DEFAULT 100, CHECK 0–100 |
+| `ativo` | boolean | NOT NULL DEFAULT true |
+| `created_at` | timestamptz | DEFAULT now() |
+| `updated_at` | timestamptz | DEFAULT now() + trigger `set_updated_at` |
+
+Unicidade: `UNIQUE (artigo_mestre_id, tipo, lower(termo))` para evitar duplicados.
+
+Índices:
+- `(artigo_mestre_id)`
+- `(tipo)`
+- `(ativo)`
+- GIN `gin_trgm_ops` em `lower(termo)` para pesquisa rápida por substring (ativa `pg_trgm` se ainda não estiver).
+- Composto `(artigo_mestre_id, tipo, ativo)` para a query mais comum (carregar conhecimento ativo de um artigo).
+
+Permissões + RLS (padrão do projeto):
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.biblioteca_artigo_conhecimento TO authenticated;
+GRANT ALL ON public.biblioteca_artigo_conhecimento TO service_role;
+ALTER TABLE ... ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "biblioteca_conhecimento_auth_all" ... TO authenticated USING (true) WITH CHECK (true);
 ```
-"Demolição de laje de betão…"       → "Separação de betão"        (50%)
-"Aterro para base…"                 → "Ensaio Proctor"             (50%)
-"Vedação provisória de terreno…"    → "Vedação em betão"           (50%)
-"Betão armado C25/30…"              → "Cofragem de pilares"        (50%)
-```
+(mesmo padrão das outras tabelas `biblioteca_*`)
 
-A descrição do artigo mestre **nunca é comparada** com a do artigo original, e a unidade é ignorada.
+Trigger `BEFORE UPDATE` a chamar `public.set_updated_at()` (já existe).
 
-## Princípio orientador (conservador)
+## 2. Tipos TypeScript
 
-> Em caso de dúvida, o artigo vai para **`necessita_revisao`** ou **`sem_classificacao`** — nunca para `classificado_auto`.
->
-> Keywords de especialidade/subespecialidade **nunca** classificam automaticamente por si só. Só servem para reforçar / desambiguar uma forte semelhança textual ao nível do artigo mestre.
+Após a migração, `src/integrations/supabase/types.ts` é regenerado automaticamente. Adicionar em `src/lib/biblioteca-mestra/types.ts`:
 
-## Alterações (apenas em `src/lib/classificacao/engine.ts`)
+- `ConhecimentoTipo`, `ConhecimentoOrigem` (com labels PT)
+- `ArtigoConhecimento` (espelha a row)
+- Constantes `CONHECIMENTO_TIPOS` e `CONHECIMENTO_ORIGENS` para selects.
 
-Sem alterações de schema, sem migrações, sem mexer na biblioteca.
+## 3. UI — aba "Conhecimento IA" na ficha do Artigo Mestre
 
-### 1. Similaridade textual artigo↔artigo mestre passa a ser o sinal **obrigatório**
+Refatorar `src/components/biblioteca-mestra/ArtigoMestreFormDialog.tsx`:
 
-Para cada artigo mestre calcular tokens normalizados (reuso de `tokenize`) e:
+- Envolver o conteúdo do dialog num `Tabs` com duas abas:
+  - **Geral** — formulário atual (campos + keywords positivas/negativas existentes, sem mudanças).
+  - **Conhecimento IA** — novo painel (ver abaixo).
+- A aba "Conhecimento IA" só fica ativa quando o artigo já foi guardado (precisa de `editing.id`). Para artigos novos mostra mensagem: "Guarde o artigo primeiro para adicionar conhecimento."
 
-```
-overlap     = nº de tokens significativos partilhados
-cobertura   = overlap / max(tokens_mestre, 1)
-score_texto = round(cobertura * 100)            // 0–100
-```
+Novo componente `src/components/biblioteca-mestra/ArtigoConhecimentoTab.tsx`:
 
-Bónus textuais (apenas relevantes se já há similaridade):
-- bigrama/trigrama do mestre contido na descrição original: +15 / +25, máx **+40**
-- token raro partilhado (presente em < 2 % dos mestres): +10 cada, máx **+20**
+- Query `["bm-conhecimento", artigoId]` que carrega todos os registos do artigo ordenados por `tipo`, depois `termo`.
+- Tabela com colunas: **Tipo** (badge colorido por tipo), **Termo**, **Peso** (input inline editável), **Origem** (badge), **Confiança** (%), **Ativo** (Switch), **Ações** (editar / remover).
+- Barra superior:
+  - Filtros: select por `tipo`, toggle "mostrar inativos", campo de pesquisa por termo.
+  - Botão **"Adicionar conhecimento"** → abre dialog secundário com: tipo (select), termo (input), peso (number, default conforme tipo: 30 palavra-chave, 10 sinónimo, 40 expressão, 8 material, −30 termo negativo), confiança (slider 0–100, default 100).
+- Mutations:
+  - `insert` → `origem = 'utilizador'`.
+  - `update` (peso, ativo, confiança, termo, tipo).
+  - `delete` (com confirmação).
+- Empty state quando o artigo ainda não tem conhecimento, com CTA para adicionar o primeiro.
+- Contador "X registos · Y ativos" no topo.
 
-### 2. Candidato só existe se houver evidência textual ao nível do artigo
+Acessos a dados via cliente Supabase existente (`@/integrations/supabase/client`), igual ao resto do módulo Biblioteca Mestra. Sem server functions novas.
 
-Um artigo mestre só entra na lista de candidatos se cumprir **uma** das condições:
+## 4. Listagem de Artigos Mestre — coluna "Conhecimento"
 
-- `score_texto ≥ 40`
-- `score_texto ≥ 30` **E** unidade compatível
-- tem **keyword de artigo** positiva que casa (caminho preservado para o futuro, quando `biblioteca_artigo_keywords` for povoada)
+Em `src/routes/_app/biblioteca-mestra.artigos.tsx` (ajuste mínimo, opcional mas útil):
 
-Keywords de especialidade/subespecialidade **deixam de criar candidatos por si só**. Acaba a herança de pontos para os 1.673 artigos da especialidade.
+- Adicionar contagem agregada de registos ativos de conhecimento por artigo (query separada `select artigo_mestre_id, count(*) ... group by` filtrada pela página visível) e mostrar badge "N" ao lado do nome. Permite ver rapidamente que artigos ainda estão "vazios".
 
-### 3. Compatibilidade de unidade
+## 5. Não alterado nesta fase
 
-Normalização: lowercase, remover espaços, `²/³` → `2/3`, mapear sinónimos óbvios (`m³` ↔ `m3`, `un` ↔ `und` ↔ `unid`, `vg` ↔ `vg.`).
+- `src/lib/classificacao/engine.ts` — **sem mudanças**. O motor continua a usar `biblioteca_artigo_keywords` + keywords de especialidade/subespecialidade exatamente como hoje.
+- `biblioteca_artigo_keywords` — mantida. Numa fase futura poderá ser migrada para `biblioteca_artigo_conhecimento` (tipos `palavra_chave` / `termo_negativo`), mas não agora.
+- Sem alterações em RLS de outras tabelas, sem novas edge functions, sem Knowledge Builder ainda.
 
-- Ambas presentes e compatíveis: **+15**
-- Ambas presentes e claramente incompatíveis (`m3` vs `un`, `m2` vs `kg`, `vg` vs `m3`): **−25**
-- Alguma ausente: 0 (neutro)
+## Resumo de ficheiros tocados
 
-### 4. Score final
+- **Migração SQL** (1): cria enums, tabela, índices, RLS, trigger.
+- `src/lib/biblioteca-mestra/types.ts` — novos tipos e constantes.
+- `src/components/biblioteca-mestra/ArtigoMestreFormDialog.tsx` — abas Geral / Conhecimento IA.
+- `src/components/biblioteca-mestra/ArtigoConhecimentoTab.tsx` — **novo**.
+- (Opcional) `src/routes/_app/biblioteca-mestra.artigos.tsx` — badge de contagem.
 
-```
-score_final = score_texto                       // dominante
-            + bónus_ngrama       (≤ 40)
-            + bónus_token_raro   (≤ 20)
-            + esp_hit_cap        (≤ 10)         // só reforço; teto
-            + subesp_hit_cap     (≤ 15)         // só reforço; teto
-            + bónus/penalização_unidade
-            + soma_keywords_negativas           (mantém −80)
-            + 60 por keyword positiva de artigo (mantém)
-```
+## Validação manual após implementação
 
-ESP/SUBESP entram apenas como **reforço pequeno** (teto, não acumulação) e nunca tornam um candidato com `score_texto = 0` elegível.
-
-### 5. Limiares mais conservadores
-
-- `LIMIAR_AUTO` = **85** (era 90)
-- `LIMIAR_REVER` = **60**
-- Adicional para `classificado_auto`, **todas** estas condições têm de ser verdade:
-  - `score_final ≥ 85`
-  - `score_texto ≥ 50`
-  - unidade não incompatível (compatível **ou** ausente — mas se a unidade do original existir e a do mestre existir, têm de bater certo)
-  - margem `top1 − top2 ≥ 15` pontos
-  - sem keywords negativas a disparar no top-1
-
-Se qualquer uma falhar → desce para `necessita_revisao` (mantendo o top-1 como sugestão visível na sidebar) ou, se `score_final < 60`, para `sem_classificacao`.
-
-### 6. Empates / margens curtas
-
-- Se `top1 − top2 < 15` ou existirem ≥ 2 candidatos com score idêntico no top → força `necessita_revisao` mesmo que o score absoluto seja alto. A intenção é nunca decidir automaticamente em ambiguidade.
-
-### 7. "Exato" e "Aprendido" — mais rigorosos
-
-- **Exato** (`descricao_norm` idêntica): mantém `classificado_auto` apenas se houver **um único** match. Se houver vários, vai para `necessita_revisao` com todos como candidatos (já é o comportamento atual — preservar).
-- **Aprendido** (`classificacao_memoria`): mantém-se `100/classificado_auto` porque foi validado pelo utilizador.
-
-### 8. Motivo legível na sidebar "IA Explica"
-
-Atualizar `motivo` e `keywords_hit` para refletir o sinal real:
-
-> "Similaridade textual 78 % (tokens: betão, armado, c25/30) · unidade compatível (m³) · reforço subespecialidade: betão estrutural."
-
-E adicionar aos `keywords_hit` um hit sintético `{ nivel: "artigo", termo: "<similaridade textual>", pontos: score_texto }` para a sidebar já existente mostrar visualmente o sinal dominante.
-
-## Como o utilizador valida
-
-1. Abrir o Centro de Classificação Inteligente do orçamento atual.
-2. Clicar em **"Reclassificar"** (botão já existente, chama `runClassificacao`).
-3. Esperar que:
-   - associações claramente erradas como `"Demolição de laje de betão…" → "Separação de betão"` deixem de existir;
-   - artigos sem mestre adequado fiquem em `sem_classificacao` em vez de associados arbitrariamente com 50 %;
-   - número de `classificado_auto` desça e o de `necessita_revisao` / `sem_classificacao` suba — é o trade-off pretendido.
-
-## Fora do âmbito
-
-- Não vou popular `biblioteca_artigo_keywords` (já existe fluxo "Como Ensinar a IA" + `AddKeywordQuickDialog`).
-- Sem embeddings / LLM scoring nesta fase.
-- Sem alterações de schema, RLS, ou de outros módulos.
-
-## Ficheiros tocados
-
-- `src/lib/classificacao/engine.ts` (único ficheiro)
+1. Abrir um artigo mestre existente → aba "Conhecimento IA" → adicionar registos de cada tipo → confirmar persistência, edição inline, ativar/desativar e remover.
+2. Confirmar via dados que o algoritmo de classificação continua a produzir os mesmos resultados de antes (correr "Reclassificar" num orçamento de teste e comparar contagens `classificado_auto` / `necessita_revisao` / `sem_classificacao`).

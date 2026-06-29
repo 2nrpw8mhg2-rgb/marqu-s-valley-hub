@@ -93,3 +93,45 @@ export const ARTIGO_ESTADOS_IA: { value: ArtigoEstadoIA; label: string; dot: str
   { value: "criado_auto", label: "IA", dot: "bg-blue-500", className: "text-blue-700 dark:text-blue-400 border-blue-500/40" },
   { value: "obsoleto", label: "Obsoleto", dot: "bg-yellow-500", className: "text-yellow-700 dark:text-yellow-400 border-yellow-500/40" },
 ];
+
+export type ConhecimentoTipo =
+  | "palavra_chave"
+  | "sinonimo"
+  | "expressao"
+  | "material"
+  | "termo_negativo";
+
+export type ConhecimentoOrigem = "ia" | "utilizador" | "sistema" | "importacao";
+
+export type ArtigoConhecimento = {
+  id: string;
+  artigo_mestre_id: string;
+  tipo: ConhecimentoTipo;
+  termo: string;
+  peso: number;
+  origem: ConhecimentoOrigem;
+  confianca: number;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export const CONHECIMENTO_TIPOS: {
+  value: ConhecimentoTipo;
+  label: string;
+  pesoDefault: number;
+  className: string;
+}[] = [
+  { value: "palavra_chave", label: "Palavra-chave", pesoDefault: 30, className: "border-blue-500/40 text-blue-700 dark:text-blue-400" },
+  { value: "sinonimo", label: "Sinónimo", pesoDefault: 10, className: "border-violet-500/40 text-violet-700 dark:text-violet-400" },
+  { value: "expressao", label: "Expressão", pesoDefault: 40, className: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" },
+  { value: "material", label: "Material", pesoDefault: 8, className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
+  { value: "termo_negativo", label: "Termo negativo", pesoDefault: -30, className: "border-destructive/40 text-destructive" },
+];
+
+export const CONHECIMENTO_ORIGENS: { value: ConhecimentoOrigem; label: string; className: string }[] = [
+  { value: "utilizador", label: "Utilizador", className: "border-slate-500/40 text-slate-700 dark:text-slate-300" },
+  { value: "ia", label: "IA", className: "border-blue-500/40 text-blue-700 dark:text-blue-400" },
+  { value: "sistema", label: "Sistema", className: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" },
+  { value: "importacao", label: "Importação", className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
+];
