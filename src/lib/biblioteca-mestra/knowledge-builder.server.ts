@@ -581,6 +581,40 @@ export async function processRun(runId: string) {
     let saltados = 0;
     let falhados = 0;
     let ultimaFontes: Fontes | null = null;
+    const novosIdsAll: string[] = [];
+
+    // snapshot "antes" para relatório de artigo
+    let antesSnapshot: {
+      perTipo: Record<string, { count: number; somaPeso: number; somaPesoConf: number }>;
+      confiancaGlobal: number;
+      total: number;
+    } | null = null;
+    if (scope.tipo === "artigo") {
+      const { data: prev } = await sb
+        .from("biblioteca_artigo_conhecimento")
+        .select("tipo, peso, confianca")
+        .eq("artigo_mestre_id", scope.artigoId)
+        .eq("ativo", true);
+      const snap = {
+        perTipo: {} as Record<string, { count: number; somaPeso: number; somaPesoConf: number }>,
+        confiancaGlobal: 0,
+        total: (prev ?? []).length,
+      };
+      let sp = 0, spc = 0;
+      for (const r of prev ?? []) {
+        const t = r.tipo as string;
+        const p = Math.abs(Number(r.peso) || 0);
+        const c = Number(r.confianca) || 0;
+        if (!snap.perTipo[t]) snap.perTipo[t] = { count: 0, somaPeso: 0, somaPesoConf: 0 };
+        snap.perTipo[t].count++;
+        snap.perTipo[t].somaPeso += p;
+        snap.perTipo[t].somaPesoConf += p * c;
+        sp += p;
+        spc += p * c;
+      }
+      snap.confiancaGlobal = sp > 0 ? Math.round(spc / sp) : 0;
+      antesSnapshot = snap;
+    }
 
     for (const artigoId of ids) {
       const { data: chk } = await sb
