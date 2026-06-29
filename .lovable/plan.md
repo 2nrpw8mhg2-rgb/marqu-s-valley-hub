@@ -1,82 +1,69 @@
 ## Problema
 
-A geração de termos negativos está a inserir termos errados ou irrelevantes nos Artigos Mestre, prejudicando o score da classificação. O sistema atual tenta sempre devolver até 12 negativos por artigo, mesmo quando a evidência estatística é fraca, e não cruza os candidatos com os termos efectivamente usados nas classificações reais desse Artigo Mestre.
+A geração de termos negativos está a propor materiais (`cimento`, `areia`, `argamassa`, `bloco`, `betonilha`, `tijolo`, `gesso cartonado`, `pladur`, `lã mineral`, `XPS`, `EPS`, `argila`, `fibra`, `juntas`, etc.). Materiais descrevem **sobre o quê** se trabalha — não o tipo de trabalho — e por isso aparecem legitimamente em descrições de Demolições, Pinturas, Rebocos, etc. Usá-los como negativos baixa o score destes artigos e provoca classificações erradas.
 
-## Objectivo
+A causa está em `src/lib/biblioteca-mestra/knowledge-builder.server.ts`:
 
-Tornar a geração de negativos conservadora e explicável: **zero negativos é um resultado válido**. Só gravar automaticamente quando houver confiança elevada; oferecer confiança média como sugestão para validação; descartar tudo o resto.
+1. Não existe uma lista universal de materiais a excluir dos candidatos a negativo. O único bloqueio (`BLOQUEIO_DEMOLICOES_ESTRUTURA`) só se aplica a artigos da família Demolições/Estrutura — para os restantes, materiais como `betão`, `tijolo`, `cimento` continuam elegíveis.
+2. Em `construirIndiceGlobal` (linhas 240-246), os tokens internos de cada expressão positiva curada são adicionados ao índice. Assim "argamassa de cimento" injecta `cimento` como termo de outra especialidade. Combinado com a falta de bloqueio universal, gera-se exactamente o padrão errado descrito pelo utilizador.
 
-## Alterações (apenas em `src/lib/biblioteca-mestra/knowledge-builder.server.ts`)
+## Solução (apenas em `src/lib/biblioteca-mestra/knowledge-builder.server.ts`)
 
-### 1. Lista de bloqueio estrutural por família
+### 1. Lista universal de materiais — bloqueio transversal
 
-Criar `BLOQUEIO_ESTRUTURAL` por família de especialidade (mapa `familia → Set<string>` em forma canónica). Para **Demolições / Estrutura / Betão Armado** bloquear:
-`betão, laje, viga, pilar, sapata, muro, estrutura, estrutural, metálica, perfil, ferro, aço, corte, desmontagem, demolição` (mais singulares/plurais via `lemaSingular`).
+Criar `MATERIAIS_CONSTRUCAO` (Set de formas canónicas via `canonicalizar` + `lemaSingular`) com os termos que **nunca** podem ser negativos para nenhuma especialidade:
 
-A família é inferida pelo `codigo`/`nome` da especialidade do artigo. Termos nessa lista nunca podem virar negativos para artigos dessa família.
+```
+betão, betao, bloco, tijolo, cimento, cimenticio, argamassa, areia, brita,
+pedra, granito, mármore, ardósia, calcário, madeira, contraplacado, mdf, osb,
+aço, ferro, alumínio, cobre, latão, inox, zinco, chumbo, pvc, ppr, peex,
+multicamada, polietileno, polipropileno, cerâmica, cerâmico, mosaico,
+azulejo, porcelânico, grés, terracota, reboco, estuque, betonilha,
+gesso, gesso cartonado, pladur, lã mineral, lã de rocha, lã de vidro,
+xps, eps, poliuretano, cortiça, argila, fibra, fibras, juntas, junta,
+selante, mástique, vidro, espelho, tela, geotêxtil, membrana, papel,
+tinta, primário, verniz, esmalte, asfalto, betume, gravilha, agregado,
+inerte, calçada, lajeta, lajeado, pavê, cubo, paralelo
+```
 
-### 2. Cruzar candidatos com o histórico real do próprio Artigo Mestre
+A lista é alfabética, agnóstica de família, e sempre canonicalizada (com `lemaSingular` para apanhar singulares/plurais — `tijolo`/`tijolos`, `bloco`/`blocos`, `junta`/`juntas`).
 
-Antes de chamar `derivarNegativos`, construir `vocReaisDoArtigo: Set<string>` a partir de `fontes.historico` (todas as descrições de `classificacao_artigos` validadas/auto deste artigo mestre) — tokenizar + `lemaSingular` + canonicalizar. Passar este conjunto a `derivarNegativos` e rejeitar qualquer candidato cujo termo apareça nele (regra 4: "se aparece frequentemente nos artigos reais classificados nesse Artigo Mestre, remover").
+> Nota: vários destes termos podem (e devem) ser **positivos** num artigo específico. O bloqueio aplica-se apenas à pista de **negativos** automáticos; o pipeline de positivos não é afectado.
 
-### 3. Endurecer `derivarNegativos`
+### 2. Aplicar o bloqueio em `derivarNegativos`
 
-Substituir o gate actual por critérios mais exigentes e explicáveis:
+Em `derivarNegativos` (linha 296+), acrescentar logo após `if (bloqueioFamilia.has(termoCanon)) continue;`:
 
-- Mantém: `tokenGenerico`, `vocPositivoCanonico`, `presencaThis ≤ 1%`, `thisCount ≤ 1`.
-- **Novo**: rejeita se o termo estiver em `BLOQUEIO_ESTRUTURAL` da família do artigo.
-- **Novo**: rejeita se estiver em `vocReaisDoArtigo`.
-- **Mais estrito**:
-  - `bestSize ≥ 6` (era 4) — suporte absoluto na especialidade dominante
-  - `bestDom ≥ 0.65` (era 0.50) — dominância
-  - `exclusividade ≥ 0.80` (era 0.70)
-  - `totalAll ≥ 8` (era 5)
-  - `idx.totalPorEsp(bestEsp) ≥ 6` (era 3)
+```ts
+if (MATERIAIS_CONSTRUCAO.has(termoCanon)) continue;
+```
 
-### 4. Confiança em três níveis
+O `BLOQUEIO_DEMOLICOES_ESTRUTURA` por família continua tal como está (cobre `viga`, `pilar`, `laje`, `armadura`, `cofragem`, `betonagem`, etc., para artigos de Demolições/Estrutura).
 
-Calcular `score = exclusividade * bestDom` e mapear:
+### 3. Não “explodir” expressões positivas em tokens individuais
 
-- `score ≥ 0.70` → **alta** → gravar com `origem='ia'`, `confianca = 80..95`.
-- `0.55 ≤ score < 0.70` → **média** → gravar com `origem='sugestao_ia'` e `confianca = 55..75` (não conta como aprovado para o motor — ver ponto 6).
-- `score < 0.55` → **baixa** → descartar.
+No `construirIndiceGlobal`, remover o bloco que injecta cada token interno de uma expressão curada como termo isolado (linhas 240-246). Razão: foi precisamente esse bloco que fez `cimento` aparecer como “termo discriminante de outra especialidade” por estar dentro de `argamassa de cimento`. As expressões continuam a contar como termo único (ponto `c = canonicalizar(...)` mantém-se).
 
-`maxResultados` desce de 12 para **6** (alta) + **6** (média), no máximo.
+A FONTE 2 (classificações reais — linha 250+) **mantém-se inalterada**: a tokenização aí é legítima porque representa descrições reais inteiras, não expressões curadas.
 
-### 5. Justificação obrigatória e mais informativa
+### 4. Adicionar verbos/operações como reforço positivo (não bloquear nunca)
 
-Cada negativo grava `justificacao` no formato:
+Para reforçar a intenção do utilizador — privilegiar **operações** como negativos legítimos — adicionar uma micro-lista `OPERACOES_ALVO` com palavras canónicas (`fornecimento`, `aplicacao`, `execucao`, `assentamento`, `montagem`, `instalacao`, `colocacao`, `fabrico`, `betonagem`, `pintura`, `impermeabilizacao`, `regularizacao`, `acabamento`, `afagamento`, `polimento`, `envernizamento`). Em `derivarNegativos`, dar bónus `+0.10` ao `score` quando o candidato pertence a este conjunto. Isto não cria novos negativos a partir do nada — apenas favorece os candidatos que já passam os gates estatísticos e que descrevem operações. Sem alteração nos thresholds.
 
-> `"tomada" é específico de Instalações Elétricas (12 de 14 ocorrências; 86% exclusividade, 71% dominância) e nunca aparece no histórico real deste artigo.`
+### 5. Limpeza retroactiva
 
-### 6. Origem "sugestão" para confiança média
+No bloco de limpeza já existente em `processRun` (referência: linha 1114, filtro por `tipo='termo_negativo'`), estender o predicado para também apagar registos cuja forma canónica está em `MATERIAIS_CONSTRUCAO`. Mantém-se a limpeza por `BLOQUEIO_DEMOLICOES_ESTRUTURA` para a família correspondente.
 
-Estender o tipo `origem` aceite na inserção para incluir `'sugestao_ia'` quando o nível for médio. O motor de classificação **ignora** negativos com `origem='sugestao_ia'`; o utilizador valida-os no separador Conhecimento (passa a `origem='utilizador'` ao aprovar — fluxo já existente em `aprovarConhecimentoRun`, que só precisa de tratar este novo valor).
-
-> Nota: se introduzir `'sugestao_ia'` exigir alteração de schema, fica como **opção B**: marcar essa origem como `'ia'` mas com `peso=0` e flag `confianca<70`; o motor já filtra `peso<=0`. A decidir conforme constraint da coluna `origem`.
-
-### 7. Resultado vazio é válido
-
-Remover qualquer fallback que force devolver pelo menos N negativos. Se nada passar nos gates, `gen.termos_negativos = []` e o log mostra:
-
-> `negativos: não foram encontrados termos com confiança suficiente`
-
-### 8. Limpeza retroactiva no início de cada run
-
-Reaproveitar o bloco de limpeza já existente em `processRun` para também apagar negativos previamente gravados que agora violam as regras: pertencem ao `BLOQUEIO_ESTRUTURAL` da família, ou cuja forma canónica está em `vocReaisDoArtigo` do respectivo artigo. Logar contagem.
-
-### 9. `resolverConflitos` (já existe)
-
-Continua a remover negativos que colidam com palavras-chave/sinónimos/expressões/materiais do mesmo artigo (regra 4 primeira alínea). Sem alterações.
+Logar separadamente: `negativos removidos por serem materiais: N`.
 
 ## Fora do âmbito
 
-- UI do Knowledge Builder, motor de classificação, schema de tabelas (excepto o ponto 6 opção A se a coluna `origem` permitir um novo valor — verificar antes de implementar).
-- Geração de positivos (palavras-chave, sinónimos, expressões, materiais).
+- Geração de positivos (palavras-chave, sinónimos, expressões, materiais) — pode continuar a aceitar `cimento`, `bloco`, `argamassa` quando relevante para o artigo.
+- Motor de classificação, UI do Knowledge Builder, schema, edge functions.
 
-## Como validar após deploy
+## Como validar
 
-1. Em **Biblioteca Mestra → Construtor de Conhecimento**, escolher *Demolições Estruturais*.
-2. Correr **"Regenerar tudo (apenas IA)"**.
-3. Verificar 3 artigos mestre: nenhum deve ter `betão`, `laje`, `viga`, `pilar`, `demolição` como negativo; muitos artigos terão **0 negativos** e isso é o comportamento esperado.
-4. Repetir para *Instalações Elétricas* — negativos válidos como `tubagem hidráulica`, `caixilharia` devem manter-se com justificação completa.
+1. **Biblioteca Mestra → Construtor de Conhecimento** → escolher *Pinturas* → **Regenerar tudo (apenas IA)**. Nenhum artigo deve apresentar `betão`, `reboco`, `gesso`, `cimento` como negativo.
+2. Repetir para *Demolições Estruturais*: nenhum artigo deve apresentar `bloco`, `tijolo`, `betonilha`, `argamassa`, `cimento` como negativo; verbos como `betonagem`, `aplicacao`, `assentamento` podem aparecer se passarem nos gates.
+3. Repetir para *Rebocos*: `cimento`, `areia`, `cal` ausentes dos negativos.
+4. Confirmar nos logs da run a linha `negativos removidos por serem materiais: N` na limpeza retroactiva.
