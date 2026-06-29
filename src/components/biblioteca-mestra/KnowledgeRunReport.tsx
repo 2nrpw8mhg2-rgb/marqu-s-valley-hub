@@ -103,16 +103,25 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
   };
 
   const conf = report.confiancaGlobal.depois;
+  const semTermos = (report.totalNovos ?? 0) === 0 && (report.total ?? 0) === 0;
+  const falhou = Boolean(report.erro) || semTermos;
 
   return (
     <>
-      <Card className="border-emerald-500/40">
+      <Card className={falhou ? "border-amber-500/50" : "border-emerald-500/40"}>
         <CardHeader>
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
-              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
-                <CheckCircle2 className="h-4 w-4" /> Conhecimento gerado com sucesso
-              </div>
+              {falhou ? (
+                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm font-medium">
+                  <AlertTriangle className="h-4 w-4" /> Geração sem termos
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
+                  <CheckCircle2 className="h-4 w-4" /> Conhecimento gerado com sucesso
+                </div>
+              )}
+
               <CardTitle className="text-lg">
                 {report.artigo.codigo} — {report.artigo.descricao}
               </CardTitle>
