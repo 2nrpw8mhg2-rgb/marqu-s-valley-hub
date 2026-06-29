@@ -2,9 +2,15 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Accordion,
   AccordionContent,
@@ -18,6 +24,13 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ConfiancaBar } from "@/components/classificacao/ConfiancaBar";
@@ -40,6 +53,8 @@ import {
   AlertTriangle,
   ChevronDown,
   Terminal,
+  Trash2,
+  Plus,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -49,6 +64,17 @@ type Props = {
   report: KnowledgeRunReport;
   onClose: () => void;
   onRegenerar: () => void;
+};
+
+type EditDraft = {
+  id?: string;
+  artigoMestreId: string;
+  artigoCodigo?: string;
+  artigoDescricao?: string;
+  tipo: ConhecimentoTipo;
+  termo: string;
+  peso: number;
+  confianca: number;
 };
 
 const TIPO_BY_VALUE: Record<string, (typeof CONHECIMENTO_TIPOS)[number]> = Object.fromEntries(
