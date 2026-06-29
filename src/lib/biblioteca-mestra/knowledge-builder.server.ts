@@ -32,6 +32,11 @@ type RemocaoNegativo = {
   motivo: string;
 };
 
+type RemocaoTermo = {
+  termo: string;
+  motivo: string;
+};
+
 const TIPO_MAP = {
   palavras_chave: { tipo: "palavra_chave", pesoDefault: 30, sign: 1 },
   sinonimos: { tipo: "sinonimo", pesoDefault: 10, sign: 1 },
@@ -459,6 +464,99 @@ function validarTermosNegativosFinais(
   };
 }
 
+const PALAVRAS_CHAVE_FRACAS = new Set<string>(
+  [
+    "fornecimento", "aplicacao", "execucao", "trabalho", "trabalhos",
+    "servico", "servicos", "obra", "obras", "material", "materiais",
+    "equipamento", "equipamentos", "sistema", "sistemas", "elemento",
+    "elementos", "tipo", "modelo", "marca", "unidade", "incluindo",
+    "necessario", "completo", "existente", "novo", "nova", "diversos",
+    "varios", "geral", "fornecimento e aplicacao", "fornecimento e assentamento",
+    "execucao de", "incluindo todos os trabalhos",
+  ].map((t) => canonicalizar(t)).filter(Boolean)
+);
+
+function textoContemTermo(texto: string, termoCanon: string): boolean {
+  const cTexto = canonicalizar(texto);
+  if (!cTexto || !termoCanon) return false;
+  return canonicosConflituam(termoCanon, cTexto);
+}
+
+function palavraChaveTemEvidencia(termoCanon: string, fontes: Fontes): boolean {
+  if (textoContemTermo(fontes.artigo.descricao, termoCanon)) return true;
+  if (textoContemTermo(fontes.artigo.observacoes, termoCanon)) return true;
+  if (textoContemTermo(fontes.contexto.subespecialidade, termoCanon)) return true;
+  if (textoContemTermo(fontes.contexto.categoria, termoCanon)) return true;
+  for (const h of fontes.historico) {
+    if (textoContemTermo(h.descricao, termoCanon)) return true;
+  }
+  for (const c of fontes.candidatos.slice(0, 20)) {
+    if (c.score >= 0.35 && textoContemTermo(c.descricao, termoCanon)) return true;
+  }
+  return false;
+}
+
+function motivoPalavraChaveFraca(t: GeneratedTermo, fontes: Fontes): string | null {
+  const c = canonicalizar(t.termo);
+  if (!c) return "termo vazio após normalização";
+  const partes = c.split(" ").filter(Boolean);
+  if (partes.length > 3) return "frase longa; deve ser expressão, não palavra-chave";
+  if (PALAVRAS_CHAVE_FRACAS.has(c)) return "termo genérico de obra sem poder classificativo";
+  if (partes.every((p) => tokenGenerico(p) || PALAVRAS_CHAVE_FRACAS.has(p))) {
+    return "todos os componentes são genéricos";
+  }
+  if (Number(t.confianca) < 50) return `confiança ${t.confianca}% demasiado baixa`;
+
+  const temEvidencia = palavraChaveTemEvidencia(c, fontes);
+  if (!temEvidencia && t.fonte === "inferido" && t.confianca < 75) {
+    return "termo inferido sem evidência suficiente nas fontes";
+  }
+  if (fontes.semHistorico && !temEvidencia && t.confianca < 80) {
+    return "artigo sem histórico: termo sem evidência forte nas fontes";
+  }
+  return null;
+}
+
+function melhorarPalavrasChave(gen: Generated, fontes: Fontes): { removidos: RemocaoTermo[]; movidosParaExpressoes: number } {
+  const removidos: RemocaoTermo[] = [];
+  let movidosParaExpressoes = 0;
+  const expressoesExistentes = new Set(gen.expressoes.map((e) => canonicalizar(e.termo)).filter(Boolean));
+  const palavrasBoas: GeneratedTermo[] = [];
+  const vistas = new Set<string>();
+
+  for (const t of gen.palavras_chave) {
+    const c = canonicalizar(t.termo);
+    const partes = c.split(" ").filter(Boolean);
+    const motivo = motivoPalavraChaveFraca(t, fontes);
+    if (motivo) {
+      // Frases técnicas longas podem ser úteis, mas não como palavra-chave.
+      if (c && partes.length >= 4 && partes.length <= 6 && t.confianca >= 60 && !expressoesExistentes.has(c)) {
+        gen.expressoes.push({
+          ...t,
+          termo: t.termo,
+          peso: Math.max(20, Math.min(60, Math.abs(t.peso || 25))),
+          justificacao: t.justificacao ?? "Movida de palavra-chave para expressão por ser frase técnica.",
+        });
+        expressoesExistentes.add(c);
+        movidosParaExpressoes++;
+      }
+      removidos.push({ termo: t.termo, motivo });
+      continue;
+    }
+    if (!c || vistas.has(c)) {
+      removidos.push({ termo: t.termo, motivo: "duplicado após normalização" });
+      continue;
+    }
+    vistas.add(c);
+    palavrasBoas.push({ ...t, termo: c });
+  }
+
+  gen.palavras_chave = palavrasBoas
+    .sort((a, b) => (b.confianca - a.confianca) || (Math.abs(b.peso) - Math.abs(a.peso)))
+    .slice(0, TIPO_LIMIT);
+  return { removidos, movidosParaExpressoes };
+}
+
 // Garante que nenhum termo aparece em duas listas e que não há duplicados
 // dentro da mesma lista (comparados pela forma canónica).
 function resolverConflitos(gen: Generated): { removidosNegativos: number; removidosDup: number } {
@@ -804,6 +902,20 @@ REGRAS DE CONFIANÇA POR FONTE
 - fonte="vizinhos" → 40-60 (usar para discriminar termos próprios deste artigo)
 - fonte="inferido" → 50-70 (terminologia técnica geral relacionada)
 
+REGRAS ESPECÍFICAS PARA PALAVRAS-CHAVE — QUALIDADE ALTA
+- Palavras-chave servem para CLASSIFICAR automaticamente mapas de quantidades. Devem ser poucos termos fortes, técnicos e discriminativos.
+- Cada palavra-chave deve identificar o objecto, técnica, material, sistema ou elemento construtivo central do Artigo Mestre.
+- Preferir termos que apareçam repetidamente na FONTE A ou em candidatos fortes da FONTE B.
+- Uma palavra-chave deve ter 1 a 3 palavras. Se tiver 4+ palavras, coloca-a em "expressoes", não em "palavras_chave".
+- NÃO gerar palavras-chave genéricas: fornecimento, aplicação, execução, trabalhos, serviço, obra, material, materiais, equipamento, sistema, tipo, diversos, incluindo, necessário, completo, existente, novo.
+- NÃO gerar verbos ou frases de medição como palavra-chave: "fornecimento e aplicação", "execução de", "incluindo todos os trabalhos". Isso pertence a "expressoes" apenas se for útil.
+- NÃO repetir palavras óbvias da especialidade se forem demasiado largas e não distinguirem o artigo dentro da subespecialidade.
+- Se não houver evidência suficiente para palavras-chave fortes, gera menos palavras-chave. É preferível devolver 2 boas do que 8 fracas.
+- Peso das palavras-chave:
+  - 40-50: termo central e recorrente no histórico validado;
+  - 25-39: termo técnico forte em candidatos ou histórico automático;
+  - 10-24: termo auxiliar, só se ajudar claramente a classificação.
+
 REGRAS DE IDIOMA — PORTUGUÊS DE PORTUGAL (OBRIGATÓRIO E NÃO NEGOCIÁVEL)
 - Todo o output (termos, sinónimos, expressões, materiais e justificações) DEVE estar em **Português de Portugal (pt-PT)**. Proibido pt-BR, inglês ou mistura.
 - A Biblioteca Mestra é referência de terminologia portuguesa da construção civil (mapas de quantidades, cadernos de encargos, medições). Usa sempre vocabulário praticado em Portugal por engenheiros, arquitetos, medidores e empreiteiros.
@@ -823,6 +935,7 @@ REGRAS DE IDIOMA — PORTUGUÊS DE PORTUGAL (OBRIGATÓRIO E NÃO NEGOCIÁVEL)
 
 REGRAS
 - Termos técnicos, minúsculas, sem pontuação supérflua, exclusivamente pt-PT.
+- Se um candidato for vago, administrativo ou comum a quase todos os artigos de obra, remove-o.
 - Expressões são frases curtas (2-6 palavras) típicas de MQ portugueses, ex: "fornecimento e aplicação de".
 - Nunca repitas o mesmo termo (mesma raiz/singular/plural) em listas diferentes.
 - "fonte" é OBRIGATÓRIO em cada termo.
@@ -1354,6 +1467,20 @@ export async function processRun(runId: string) {
               normStats.rejeitadosTermos.length ? ` (${normStats.rejeitadosTermos.slice(0, 5).join(", ")})` : ""
             }`
           );
+        }
+
+        // Validação de qualidade das palavras-chave: remove termos genéricos,
+        // sem evidência ou longos demais para servirem como sinal de classificação.
+        const qualidadeKw = melhorarPalavrasChave(gen, fontes);
+        if (qualidadeKw.removidos.length || qualidadeKw.movidosParaExpressoes) {
+          await appendLog(
+            sb,
+            runId,
+            `palavras-chave: removidas ${qualidadeKw.removidos.length} fracas, ${qualidadeKw.movidosParaExpressoes} movidas para expressões`
+          );
+          for (const r of qualidadeKw.removidos.slice(0, 10)) {
+            await appendLog(sb, runId, `palavra-chave removida "${r.termo}": ${r.motivo}`);
+          }
         }
 
         // Derivar termos negativos a partir do índice estatístico.
