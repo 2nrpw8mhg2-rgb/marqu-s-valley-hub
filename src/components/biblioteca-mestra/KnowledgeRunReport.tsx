@@ -35,7 +35,9 @@ import {
   X,
   ArrowRight,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react";
+
 import { toast } from "sonner";
 
 type Props = {
@@ -101,16 +103,25 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
   };
 
   const conf = report.confiancaGlobal.depois;
+  const semTermos = (report.totalNovos ?? 0) === 0 && (report.total ?? 0) === 0;
+  const falhou = Boolean(report.erro) || semTermos;
 
   return (
     <>
-      <Card className="border-emerald-500/40">
+      <Card className={falhou ? "border-amber-500/50" : "border-emerald-500/40"}>
         <CardHeader>
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
-              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
-                <CheckCircle2 className="h-4 w-4" /> Conhecimento gerado com sucesso
-              </div>
+              {falhou ? (
+                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm font-medium">
+                  <AlertTriangle className="h-4 w-4" /> Geração sem termos
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
+                  <CheckCircle2 className="h-4 w-4" /> Conhecimento gerado com sucesso
+                </div>
+              )}
+
               <CardTitle className="text-lg">
                 {report.artigo.codigo} — {report.artigo.descricao}
               </CardTitle>
@@ -136,7 +147,25 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {falhou && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20 p-3 text-sm">
+              <div className="font-medium text-amber-700 dark:text-amber-300 mb-1">
+                Não foi possível extrair termos nesta execução.
+              </div>
+              {report.erro && (
+                <div className="text-xs text-muted-foreground break-words">
+                  Detalhe: {report.erro}
+                </div>
+              )}
+              <div className="mt-2">
+                <Button size="sm" variant="outline" onClick={onRegenerar}>
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Tentar novamente
+                </Button>
+              </div>
+            </div>
+          )}
           {/* Antes vs Depois */}
+
           <section>
             <h3 className="text-sm font-medium mb-2">Antes vs Depois</h3>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">

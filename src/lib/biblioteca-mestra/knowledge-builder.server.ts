@@ -377,6 +377,44 @@ REGRAS
 - Devolve APENAS o JSON, sem comentários, sem markdown.`;
 }
 
+function parseJsonLoose(raw: string): any {
+  if (!raw) return {};
+  // Strip markdown fences ```json ... ``` or ``` ... ```
+  let s = raw.trim();
+  const fence = s.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fence) s = fence[1].trim();
+  try {
+    return JSON.parse(s);
+  } catch {
+    /* fallthrough */
+  }
+  // Walk chars, respecting strings/escapes, to find the first balanced JSON object.
+  const start = s.indexOf("{");
+  if (start < 0) return {};
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) {
+      if (esc) { esc = false; continue; }
+      if (ch === "\\") { esc = true; continue; }
+      if (ch === '"') { inStr = false; }
+      continue;
+    }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        const candidate = s.slice(start, i + 1);
+        try { return JSON.parse(candidate); } catch { return {}; }
+      }
+    }
+  }
+  return {};
+}
+
 async function callAI(prompt: string): Promise<Generated> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY em falta");
@@ -389,10 +427,11 @@ async function callAI(prompt: string): Promise<Generated> {
     body: JSON.stringify({
       model: "google/gemini-3-flash-preview",
       messages: [
-        { role: "system", content: "Devolve apenas JSON válido." },
+        { role: "system", content: "Devolve apenas JSON válido. Sem markdown, sem texto antes ou depois do objeto JSON." },
         { role: "user", content: prompt },
       ],
       response_format: { type: "json_object" },
+      max_tokens: 4000,
     }),
   });
   if (!resp.ok) {
@@ -400,14 +439,8 @@ async function callAI(prompt: string): Promise<Generated> {
     throw new Error(`IA ${resp.status}: ${txt.slice(0, 200)}`);
   }
   const json = await resp.json();
-  const content = json?.choices?.[0]?.message?.content ?? "{}";
-  let parsed: any;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    const m = content.match(/\{[\s\S]*\}/);
-    parsed = m ? JSON.parse(m[0]) : {};
-  }
+  const content: string = json?.choices?.[0]?.message?.content ?? "{}";
+  const parsed = parseJsonLoose(content);
   const validFontes: FonteOrigem[] = ["historico", "candidatos", "vizinhos", "inferido"];
   const norm = (arr: any): GeneratedTermo[] =>
     Array.isArray(arr)
@@ -436,6 +469,7 @@ async function callAI(prompt: string): Promise<Generated> {
     termos_negativos: norm(parsed.termos_negativos),
   };
 }
+
 
 type PersistResult = { inseridos: number; perTipo: Record<string, number>; novosIds: string[] };
 
@@ -581,7 +615,9 @@ export async function processRun(runId: string) {
     let saltados = 0;
     let falhados = 0;
     let ultimaFontes: Fontes | null = null;
+    let ultimoErro: string | null = null;
     const novosIdsAll: string[] = [];
+
 
     // snapshot "antes" para relatório de artigo
     let antesSnapshot: {
@@ -678,6 +714,8 @@ export async function processRun(runId: string) {
       } catch (e: any) {
         falhados++;
         processados++;
+        ultimoErro = String(e?.message ?? e).slice(0, 300);
+
         await sb
           .from("biblioteca_knowledge_run")
           .update({ processados, falhados })
@@ -783,7 +821,9 @@ export async function processRun(runId: string) {
         termos,
         counts,
         semHistorico: ultimaFontes?.semHistorico ?? false,
+        erro: (falhados > 0 || novosIdsAll.length === 0) && ultimoErro ? ultimoErro : null,
       };
+
     }
 
     await sb
