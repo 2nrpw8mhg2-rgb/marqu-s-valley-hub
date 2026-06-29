@@ -401,6 +401,7 @@ function derivarNegativos(
   vocReaisDoArtigo: Set<string>,
   bloqueioFamilia: Set<string>,
   idx: IndiceGlobal,
+  apenasOperacoesDemolicao = false,
   maxAlta = 6,
   maxMedia = 6
 ): GeneratedTermo[] {
@@ -412,8 +413,12 @@ function derivarNegativos(
 
   for (const [termoCanon, espMap] of idx.termoEspArtigos.entries()) {
     if (tokenGenerico(termoCanon)) continue;
-    if (vocPositivoCanonico.has(termoCanon)) continue;
-    if (vocReaisDoArtigo.has(termoCanon)) continue;
+    const termoSaneado = apenasOperacoesDemolicao ? sanearNegativoDemolicoes(termoCanon) : termoCanon;
+    if (!termoSaneado) continue;
+    const termoSaneadoCanon = canonicalizar(termoSaneado);
+    if (!termoSaneadoCanon) continue;
+    if (vocPositivoCanonico.has(termoCanon) || vocPositivoCanonico.has(termoSaneadoCanon)) continue;
+    if (vocReaisDoArtigo.has(termoCanon) || vocReaisDoArtigo.has(termoSaneadoCanon)) continue;
     if (bloqueioFamilia.has(termoCanon)) continue;
     if (MATERIAIS_CONSTRUCAO.has(termoCanon)) continue;
 
@@ -444,18 +449,22 @@ function derivarNegativos(
     // exclusividade com suporte absoluto observado; bestDom fica como gate.
     const suporteScore = Math.min(1, Math.log2(bestSize + 1) / 4);
     let score = exclusividade * suporteScore;
-    if (OPERACOES_ALVO.has(termoCanon)) score += 0.10;
+    if (OPERACOES_ALVO.has(termoCanon) || OPERACOES_ALVO.has(termoSaneadoCanon)) score += 0.10;
     if (score < 0.50) continue;
 
 
-    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, score });
+    out.push({ termo: termoSaneado, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, score });
   }
 
   out.sort((a, b) => b.score - a.score);
 
   const altas: GeneratedTermo[] = [];
   const medias: GeneratedTermo[] = [];
+  const vistos = new Set<string>();
   for (const n of out) {
+    const c = canonicalizar(n.termo);
+    if (!c || vistos.has(c)) continue;
+    vistos.add(c);
     const nivel: "alta" | "media" = n.score >= 0.75 ? "alta" : "media";
     const just =
       `"${n.termo}" é específico de ${idx.nomeEsp.get(n.espDom) ?? ""} ` +
