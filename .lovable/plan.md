@@ -1,80 +1,82 @@
 ## Problema
 
-Mesmo com a derivação determinística, termos como "teste" e "integração" estão a aparecer como negativos em todos os artigos. A causa é tripla:
+A geração de termos negativos está a inserir termos errados ou irrelevantes nos Artigos Mestre, prejudicando o score da classificação. O sistema atual tenta sempre devolver até 12 negativos por artigo, mesmo quando a evidência estatística é fraca, e não cruza os candidatos com os termos efectivamente usados nas classificações reais desse Artigo Mestre.
 
-1. **Fonte demasiado permissiva.** O índice global é alimentado pelos tokens das próprias `biblioteca_artigos.descricao` de TODAS as especialidades. Descrições contêm verbos/substantivos genéricos ("teste de estanquidade", "integração de sistemas", "ensaio", "ligação") que aparecem só numa especialidade pequena (ex.: instalações) e ficam "dominantes" — pelo critério atual, viram negativos para todas as outras.
-2. **Falta de suporte absoluto.** Basta `dom ≥ 40 %` numa especialidade com 3 artigos (2 artigos a conter o termo = 66 %) para o termo ser elegível, mesmo aparecendo só duas vezes na base inteira. Não há limiar mínimo de artigos absolutos nem de exclusividade ("aparece sobretudo aqui").
-3. **Lista de termos genéricos curta.** A `STOPWORDS` cobre conectores mas deixa passar dezenas de verbos/substantivos de obra (teste, ensaio, integração, ligação, montagem, fixação, remoção, transporte, limpeza, controlo, verificação, manutenção, etc.) que nunca devem ser negativos de ninguém porque são vocabulário genérico de construção.
+## Objectivo
 
-## Objetivo
+Tornar a geração de negativos conservadora e explicável: **zero negativos é um resultado válido**. Só gravar automaticamente quando houver confiança elevada; oferecer confiança média como sugestão para validação; descartar tudo o resto.
 
-Garantir que **só termos especificamente discriminantes** entre especialidades possam virar negativos, com base estatística forte, e nunca verbos/substantivos genéricos de construção civil.
+## Alterações (apenas em `src/lib/biblioteca-mestra/knowledge-builder.server.ts`)
 
-## O que muda
+### 1. Lista de bloqueio estrutural por família
 
-Tudo concentrado em `src/lib/biblioteca-mestra/knowledge-builder.server.ts`. Sem migrações, sem alterações de UI nem de schema.
+Criar `BLOQUEIO_ESTRUTURAL` por família de especialidade (mapa `familia → Set<string>` em forma canónica). Para **Demolições / Estrutura / Betão Armado** bloquear:
+`betão, laje, viga, pilar, sapata, muro, estrutura, estrutural, metálica, perfil, ferro, aço, corte, desmontagem, demolição` (mais singulares/plurais via `lemaSingular`).
 
-### 1. Fonte do índice mais limpa
+A família é inferida pelo `codigo`/`nome` da especialidade do artigo. Termos nessa lista nunca podem virar negativos para artigos dessa família.
 
-`construirIndiceGlobal` deixa de tokenizar `biblioteca_artigos.descricao`. O índice global passa a ser construído **apenas** a partir de:
-- `biblioteca_artigo_conhecimento` (positivos: palavra_chave, sinonimo, expressao, material) — já curado.
-- `classificacao_artigos.descricao` e `descricao_original` em estado `validado` ou `auto` — tokenizado, mas atribuído à especialidade do `artigo_mestre_id` resolvido.
+### 2. Cruzar candidatos com o histórico real do próprio Artigo Mestre
 
-Resultado: o índice mede o que realmente caracteriza uma especialidade no histórico real, não o vocabulário ruidoso das descrições mestras (que misturam verbos genéricos e técnica).
+Antes de chamar `derivarNegativos`, construir `vocReaisDoArtigo: Set<string>` a partir de `fontes.historico` (todas as descrições de `classificacao_artigos` validadas/auto deste artigo mestre) — tokenizar + `lemaSingular` + canonicalizar. Passar este conjunto a `derivarNegativos` e rejeitar qualquer candidato cujo termo apareça nele (regra 4: "se aparece frequentemente nos artigos reais classificados nesse Artigo Mestre, remover").
 
-### 2. Lista alargada de termos genéricos de obra (`GENERICOS_OBRA`)
+### 3. Endurecer `derivarNegativos`
 
-Novo `Set` carregado em conjunto com `STOPWORDS` e aplicado em `derivarNegativos` (e também em `addToIdx` para nem entrar no índice). Inclui, entre outros:
+Substituir o gate actual por critérios mais exigentes e explicáveis:
 
-```
-fornecimento, aplicacao, execucao, instalacao, montagem, desmontagem,
-remocao, demolicao, transporte, carga, descarga, limpeza, ensaio, teste,
-verificacao, controlo, manutencao, reparacao, substituicao, ligacao,
-integracao, acabamento, preparacao, regularizacao, nivelamento,
-protecao, isolamento, vedacao, fixacao, alinhamento, assentamento,
-implantacao, marcacao, medicao, gestao, coordenacao, supervisao,
-seguranca, qualidade, conformidade, norma, especificacao, projeto,
-desenho, peca, item, artigo, trabalho, servico, obra, estaleiro,
-material, equipamento, ferramenta, mao, obra, dia, hora, unidade,
-metro, metros, quilo, tonelada, conjunto, kit, sistema, componente
-```
+- Mantém: `tokenGenerico`, `vocPositivoCanonico`, `presencaThis ≤ 1%`, `thisCount ≤ 1`.
+- **Novo**: rejeita se o termo estiver em `BLOQUEIO_ESTRUTURAL` da família do artigo.
+- **Novo**: rejeita se estiver em `vocReaisDoArtigo`.
+- **Mais estrito**:
+  - `bestSize ≥ 6` (era 4) — suporte absoluto na especialidade dominante
+  - `bestDom ≥ 0.65` (era 0.50) — dominância
+  - `exclusividade ≥ 0.80` (era 0.70)
+  - `totalAll ≥ 8` (era 5)
+  - `idx.totalPorEsp(bestEsp) ≥ 6` (era 3)
 
-(Já normalizados sem acentos para casar com a forma canónica.)
+### 4. Confiança em três níveis
 
-### 3. Critérios estatísticos mais exigentes em `derivarNegativos`
+Calcular `score = exclusividade * bestDom` e mapear:
 
-Substituir o gate atual (`presencaThis ≤ 2 %` + `dom ≥ 40 %`) por uma combinação simultânea:
+- `score ≥ 0.70` → **alta** → gravar com `origem='ia'`, `confianca = 80..95`.
+- `0.55 ≤ score < 0.70` → **média** → gravar com `origem='sugestao_ia'` e `confianca = 55..75` (não conta como aprovado para o motor — ver ponto 6).
+- `score < 0.55` → **baixa** → descartar.
 
-- **Suporte absoluto mínimo:** termo tem de aparecer em **≥ 4 artigos** da especialidade dominante (não só percentagem).
-- **Exclusividade:** ≥ **70 %** das ocorrências totais do termo em todas as especialidades estão concentradas na dominante (`artigosNaDom / somaArtigosTodasEsp ≥ 0.70`).
-- **Dominância relativa:** mantém `dom ≥ 0.50` (subido de 0.40) na especialidade dominante.
-- **Ausência aqui:** `presencaThis ≤ 1 %` e `thisEspSet.size ≤ 1` em absoluto.
-- **Total mínimo do índice:** termo aparece em ≥ 5 artigos somando todas as especialidades. Abaixo disso é ruído.
-- **Filtros de natureza:** rejeitar se `GENERICOS_OBRA` contém o termo, se contém dígitos, ou se tem menos de 5 caracteres.
+`maxResultados` desce de 12 para **6** (alta) + **6** (média), no máximo.
 
-Limite final mantém-se em 12 negativos por artigo, ordenados por exclusividade × dominância.
+### 5. Justificação obrigatória e mais informativa
 
-### 4. Justificação mais informativa
+Cada negativo grava `justificacao` no formato:
 
-`justificacao` passa a indicar suporte absoluto e exclusividade:
+> `"tomada" é específico de Instalações Elétricas (12 de 14 ocorrências; 86% exclusividade, 71% dominância) e nunca aparece no histórico real deste artigo.`
 
-```
-"Específico de Instalações Elétricas (12 de 14 ocorrências, 86 %) e ausente neste artigo."
-```
+### 6. Origem "sugestão" para confiança média
 
-### 5. Limpeza de negativos antigos contraditórios/genéricos
+Estender o tipo `origem` aceite na inserção para incluir `'sugestao_ia'` quando o nível for médio. O motor de classificação **ignora** negativos com `origem='sugestao_ia'`; o utilizador valida-os no separador Conhecimento (passa a `origem='utilizador'` ao aprovar — fluxo já existente em `aprovarConhecimentoRun`, que só precisa de tratar este novo valor).
 
-Adicionar passo no início de cada `processRun` (independente do modo escolhido): apagar de `biblioteca_artigo_conhecimento` os registos `tipo = 'termo_negativo'` cujo `canonicalizar(termo)` esteja em `GENERICOS_OBRA` ou `STOPWORDS`, registando no log do run quantos foram removidos. Garante limpeza imediata sem o utilizador ter de saber qual modo usar.
+> Nota: se introduzir `'sugestao_ia'` exigir alteração de schema, fica como **opção B**: marcar essa origem como `'ia'` mas com `peso=0` e flag `confianca<70`; o motor já filtra `peso<=0`. A decidir conforme constraint da coluna `origem`.
 
-## Detalhes técnicos
+### 7. Resultado vazio é válido
 
-- A tokenização de `classificacao_artigos.descricao` continua a usar `tokenize`/`lemaSingular`, mas qualquer token cuja forma canónica caia em `STOPWORDS ∪ GENERICOS_OBRA` é descartado em `addToIdx` (atalho antes de criar entradas no `Map`).
-- O cálculo de "soma de ocorrências em todas especialidades" reaproveita o próprio `Map<espId, Set<artigoId>>` somando os `size` — sem custo extra de I/O.
-- A limpeza inicial usa `service_role` (já temos `admin()`), `delete` filtrado por `tipo = 'termo_negativo'` e `termo ilike any(...)`. Lista materializada em JS a partir de `GENERICOS_OBRA`.
-- O prompt da IA não precisa de mudar (já está proibido gerar negativos).
+Remover qualquer fallback que force devolver pelo menos N negativos. Se nada passar nos gates, `gen.termos_negativos = []` e o log mostra:
 
-## Fora de âmbito
+> `negativos: não foram encontrados termos com confiança suficiente`
 
-- Não se altera o engine de classificação.
-- Não se mexe na UI (`ArtigoConhecimentoTab`, `KnowledgeRunReport`).
-- Não se altera schema nem RLS.
+### 8. Limpeza retroactiva no início de cada run
+
+Reaproveitar o bloco de limpeza já existente em `processRun` para também apagar negativos previamente gravados que agora violam as regras: pertencem ao `BLOQUEIO_ESTRUTURAL` da família, ou cuja forma canónica está em `vocReaisDoArtigo` do respectivo artigo. Logar contagem.
+
+### 9. `resolverConflitos` (já existe)
+
+Continua a remover negativos que colidam com palavras-chave/sinónimos/expressões/materiais do mesmo artigo (regra 4 primeira alínea). Sem alterações.
+
+## Fora do âmbito
+
+- UI do Knowledge Builder, motor de classificação, schema de tabelas (excepto o ponto 6 opção A se a coluna `origem` permitir um novo valor — verificar antes de implementar).
+- Geração de positivos (palavras-chave, sinónimos, expressões, materiais).
+
+## Como validar após deploy
+
+1. Em **Biblioteca Mestra → Construtor de Conhecimento**, escolher *Demolições Estruturais*.
+2. Correr **"Regenerar tudo (apenas IA)"**.
+3. Verificar 3 artigos mestre: nenhum deve ter `betão`, `laje`, `viga`, `pilar`, `demolição` como negativo; muitos artigos terão **0 negativos** e isso é o comportamento esperado.
+4. Repetir para *Instalações Elétricas* — negativos válidos como `tubagem hidráulica`, `caixilharia` devem manter-se com justificação completa.
