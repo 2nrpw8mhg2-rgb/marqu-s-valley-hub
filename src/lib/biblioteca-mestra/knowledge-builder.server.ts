@@ -342,6 +342,8 @@ function derivarNegativos(
     if (vocPositivoCanonico.has(termoCanon)) continue;
     if (vocReaisDoArtigo.has(termoCanon)) continue;
     if (bloqueioFamilia.has(termoCanon)) continue;
+    if (MATERIAIS_CONSTRUCAO.has(termoCanon)) continue;
+
 
     const thisEspSet = espMap.get(artigoEspId);
     const thisCount = thisEspSet?.size ?? 0;
