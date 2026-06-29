@@ -149,7 +149,9 @@ export const CONHECIMENTO_ORIGENS: {
 }[] = [
   { value: "utilizador", label: "Utilizador", icon: "👤", className: "border-slate-500/40 text-slate-700 dark:text-slate-300" },
   { value: "ia", label: "IA", icon: "🤖", className: "border-blue-500/40 text-blue-700 dark:text-blue-400" },
-  { value: "mapas_quantidades", label: "Mapas de Quantidades", icon: "📄", className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
+  { value: "mapas_quantidades", label: "Histórico validado", icon: "📄", className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
+  { value: "orcamentos_brutos", label: "Orçamentos brutos", icon: "📥", className: "border-cyan-500/40 text-cyan-700 dark:text-cyan-400" },
+  { value: "artigos_vizinhos", label: "Artigos vizinhos", icon: "🧭", className: "border-fuchsia-500/40 text-fuchsia-700 dark:text-fuchsia-400" },
   { value: "biblioteca_mestra", label: "Biblioteca Mestra", icon: "📚", className: "border-violet-500/40 text-violet-700 dark:text-violet-400" },
   { value: "sistema", label: "Sistema", icon: "⚙️", className: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" },
   { value: "importacao", label: "Importação", icon: "📥", className: "border-cyan-500/40 text-cyan-700 dark:text-cyan-400" },
