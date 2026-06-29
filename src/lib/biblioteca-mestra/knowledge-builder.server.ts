@@ -832,6 +832,16 @@ export async function processRun(runId: string) {
 
         const prompt = buildPrompt(fontes, run.modo as Modo);
         const gen = await callAI(prompt);
+        const normStats = normalizarGenerated(gen);
+        if (normStats.rejeitados > 0 || normStats.convertidos > 0) {
+          await appendLog(
+            sb,
+            runId,
+            `pt-PT: ${normStats.convertidos} convertidos, ${normStats.rejeitados} rejeitados${
+              normStats.rejeitadosTermos.length ? ` (${normStats.rejeitadosTermos.slice(0, 5).join(", ")})` : ""
+            }`
+          );
+        }
         const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes);
 
         // correcoes do utilizador para este artigo
