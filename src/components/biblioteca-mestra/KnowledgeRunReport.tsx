@@ -18,6 +18,8 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ConfiancaBar } from "@/components/classificacao/ConfiancaBar";
 import {
   CONHECIMENTO_TIPOS,
@@ -36,6 +38,8 @@ import {
   ArrowRight,
   Sparkles,
   AlertTriangle,
+  ChevronDown,
+  Terminal,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -77,6 +81,9 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const escopoTipo = report.escopo?.tipo ?? (report.artigo ? "artigo" : "especialidade");
+  const isArtigoScope = escopoTipo === "artigo";
+
   const termosPorTipo = useMemo(() => {
     const acc: Record<string, KnowledgeRunReportTermo[]> = {};
     for (const t of report.termos ?? []) {
@@ -85,17 +92,35 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
     return acc;
   }, [report.termos]);
 
+  const termosPorArtigo = useMemo(() => {
+    const acc = new Map<string, KnowledgeRunReportTermo[]>();
+    for (const t of report.termos ?? []) {
+      const k = t.artigoMestreId ?? "_";
+      const arr = acc.get(k) ?? [];
+      arr.push(t);
+      acc.set(k, arr);
+    }
+    return acc;
+  }, [report.termos]);
+
   const handleExport = () => {
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
+    const nome =
+      report.escopo?.artigo?.codigo ||
+      report.escopo?.subespecialidade ||
+      report.escopo?.especialidade ||
+      report.artigo?.codigo ||
+      "execucao";
     a.href = url;
-    a.download = `conhecimento-${report.artigo.codigo || report.artigo.id}.json`;
+    a.download = `conhecimento-${nome}.json`.replace(/\s+/g, "_");
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const handleEditar = () => {
+    if (!report.artigo) return;
     navigate({
       to: "/biblioteca-mestra/artigos",
       search: { artigoId: report.artigo.id, tab: "conhecimento" } as any,
@@ -106,12 +131,31 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
   const semTermos = (report.totalNovos ?? 0) === 0 && (report.total ?? 0) === 0;
   const falhou = Boolean(report.erro) || semTermos;
 
+  // título e breadcrumb dinâmicos
+  let titulo = "Relatório Final de Conhecimento";
+  let breadcrumb = "";
+  if (isArtigoScope) {
+    const a = report.escopo?.artigo ?? report.artigo;
+    titulo = a ? `${a.codigo} — ${a.descricao}` : titulo;
+    breadcrumb = [report.escopo?.especialidade, report.escopo?.subespecialidade, report.artigo?.categoria]
+      .filter(Boolean)
+      .join(" › ");
+  } else if (escopoTipo === "subespecialidade") {
+    titulo = report.escopo?.subespecialidade || "Subespecialidade";
+    breadcrumb = report.escopo?.especialidade ?? "";
+  } else {
+    titulo = report.escopo?.especialidade || "Especialidade";
+  }
+
+  const execucao = report.execucao;
+  const artigos = report.artigos ?? [];
+
   return (
     <>
       <Card className={falhou ? "border-amber-500/50" : "border-emerald-500/40"}>
         <CardHeader>
           <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               {falhou ? (
                 <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm font-medium">
                   <AlertTriangle className="h-4 w-4" /> Geração sem termos
@@ -122,14 +166,8 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
                 </div>
               )}
 
-              <CardTitle className="text-lg">
-                {report.artigo.codigo} — {report.artigo.descricao}
-              </CardTitle>
-              <div className="text-xs text-muted-foreground">
-                {[report.artigo.especialidade, report.artigo.subespecialidade, report.artigo.categoria]
-                  .filter(Boolean)
-                  .join(" › ")}
-              </div>
+              <CardTitle className="text-lg truncate">{titulo}</CardTitle>
+              {breadcrumb && <div className="text-xs text-muted-foreground">{breadcrumb}</div>}
             </div>
             <div className="text-right min-w-[140px]">
               <div className="text-xs text-muted-foreground">Confiança global</div>
@@ -164,10 +202,24 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
               </div>
             </div>
           )}
-          {/* Antes vs Depois */}
 
+          {/* Resumo da execução */}
+          {execucao && (
+            <section>
+              <h3 className="text-sm font-medium mb-2">Resumo da execução</h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                <StatCard label="Artigos" value={`${execucao.processados} / ${execucao.totalArtigos}`} />
+                <StatCard label="Saltados" value={execucao.saltados} />
+                <StatCard label="Falhados" value={execucao.falhados} tone={execucao.falhados > 0 ? "warn" : undefined} />
+                <StatCard label="Modo" value={execucao.modo} />
+                <StatCard label="Termos gerados" value={report.totalNovos} tone="ok" />
+              </div>
+            </section>
+          )}
+
+          {/* Antes vs Depois */}
           <section>
-            <h3 className="text-sm font-medium mb-2">Antes vs Depois</h3>
+            <h3 className="text-sm font-medium mb-2">Totais gerados (antes vs depois)</h3>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {CONHECIMENTO_TIPOS.map((t) => {
                 const p = report.perTipo[t.value] ?? { antes: 0, depois: 0, delta: 0 };
@@ -198,69 +250,145 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
             </div>
           </section>
 
-          {/* Conhecimento gerado por tipo */}
+          {/* Conhecimento gerado */}
           <section>
             <h3 className="text-sm font-medium mb-2">Conhecimento gerado</h3>
-            <Accordion type="multiple" className="border rounded-md">
-              {CONHECIMENTO_TIPOS.map((t) => {
-                const lista = termosPorTipo[t.value] ?? [];
-                const novos = lista.filter((x) => x.novo).length;
-                return (
-                  <AccordionItem key={t.value} value={t.value}>
-                    <AccordionTrigger className="px-3 py-2 hover:no-underline">
-                      <div className="flex items-center gap-2 flex-1">
-                        <Badge variant="outline" className={t.className}>
-                          {t.labelShort}
-                        </Badge>
-                        <span className="text-sm tabular-nums">({lista.length})</span>
-                        {novos > 0 && (
-                          <Badge className="ml-2 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
-                            <Sparkles className="h-3 w-3 mr-1" /> {novos} novos
-                          </Badge>
-                        )}
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-3 pb-3">
-                      {lista.length === 0 ? (
-                        <div className="text-xs text-muted-foreground">Sem termos.</div>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5">
-                          {lista.map((termo) => (
-                            <button
-                              key={termo.id}
-                              onClick={() => setSelected(termo)}
-                              className={`text-xs px-2 py-1 rounded border transition-colors ${
-                                termo.novo
-                                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-                                  : "border-muted-foreground/20 bg-muted/40 hover:bg-muted"
-                              }`}
-                              title={termo.justificacao ?? undefined}
-                            >
-                              {termo.novo && <span className="mr-1">🟢</span>}
-                              {!termo.novo && <span className="mr-1 text-muted-foreground">⚪</span>}
-                              {termo.termo}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
+            <Tabs defaultValue={isArtigoScope ? "tipo" : "tipo"}>
+              <TabsList>
+                <TabsTrigger value="tipo">Por Tipo</TabsTrigger>
+                <TabsTrigger value="artigo" disabled={artigos.length === 0}>
+                  Por Artigo Mestre {artigos.length > 0 && `(${artigos.length})`}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="tipo" className="mt-3">
+                <Accordion type="multiple" className="border rounded-md">
+                  {CONHECIMENTO_TIPOS.map((t) => {
+                    const lista = termosPorTipo[t.value] ?? [];
+                    const novos = lista.filter((x) => x.novo).length;
+                    return (
+                      <AccordionItem key={t.value} value={t.value}>
+                        <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                          <div className="flex items-center gap-2 flex-1">
+                            <Badge variant="outline" className={t.className}>
+                              {t.labelShort}
+                            </Badge>
+                            <span className="text-sm tabular-nums">({lista.length})</span>
+                            {novos > 0 && (
+                              <Badge className="ml-2 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
+                                <Sparkles className="h-3 w-3 mr-1" /> {novos} novos
+                              </Badge>
+                            )}
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-3 pb-3">
+                          <TermosChips lista={lista} onPick={setSelected} mostraArtigo={!isArtigoScope} />
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
+              </TabsContent>
+
+              <TabsContent value="artigo" className="mt-3">
+                <Accordion type="multiple" className="border rounded-md">
+                  {artigos.map((art) => {
+                    const lista = termosPorArtigo.get(art.id) ?? [];
+                    return (
+                      <AccordionItem key={art.id} value={art.id}>
+                        <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                          <div className="flex items-center gap-2 flex-1 text-left min-w-0">
+                            <span className="font-mono text-xs tabular-nums text-muted-foreground shrink-0">
+                              {art.codigo}
+                            </span>
+                            <span className="text-sm truncate">{art.descricao}</span>
+                            <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                              {art.falhou ? (
+                                <Badge variant="destructive" className="text-[10px]">falhou</Badge>
+                              ) : (
+                                <>
+                                  <Badge variant="outline" className="text-[10px] tabular-nums">
+                                    {art.totalTermos} termos
+                                  </Badge>
+                                  {art.novos > 0 && (
+                                    <Badge className="text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
+                                      +{art.novos} novos
+                                    </Badge>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-3 pb-3 space-y-3">
+                          {art.falhou && art.erro && (
+                            <div className="text-xs text-destructive">Erro: {art.erro}</div>
+                          )}
+                          {CONHECIMENTO_TIPOS.map((t) => {
+                            const sub = lista.filter((x) => x.tipo === t.value);
+                            if (sub.length === 0) return null;
+                            return (
+                              <div key={t.value}>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge variant="outline" className={`text-[10px] ${t.className}`}>
+                                    {t.labelShort}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground tabular-nums">({sub.length})</span>
+                                </div>
+                                <TermosChips lista={sub} onPick={setSelected} mostraArtigo={false} />
+                              </div>
+                            );
+                          })}
+                          {lista.length === 0 && !art.falhou && (
+                            <div className="text-xs text-muted-foreground">Sem termos.</div>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
+              </TabsContent>
+            </Tabs>
+
             <div className="text-[11px] text-muted-foreground mt-2">
               🟢 Novos termos · ⚪ Termos já existentes · clica num chip para ver detalhes
             </div>
           </section>
 
+          {/* Logs técnicos */}
+          {(report.log?.length ?? 0) > 0 && (
+            <Collapsible>
+              <CollapsibleTrigger asChild>
+                <button className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground border rounded px-2 py-1.5 w-full justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Terminal className="h-3.5 w-3.5" /> Logs técnicos ({report.log?.length})
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2">
+                <div className="rounded-md border bg-muted/20 max-h-64 overflow-y-auto p-2 font-mono text-[11px] space-y-0.5">
+                  {(report.log ?? []).slice().reverse().map((l, i) => (
+                    <div key={i}>
+                      <span className="text-muted-foreground">{new Date(l.ts).toLocaleTimeString()}</span>{" "}
+                      {l.msg}
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
           {/* Ações */}
           <div className="flex flex-wrap gap-2 pt-2 border-t">
-            <Button onClick={() => aprovar.mutate()} disabled={aprovar.isPending}>
+            <Button onClick={() => aprovar.mutate()} disabled={aprovar.isPending || report.totalNovos === 0}>
               <CheckCircle2 className="h-4 w-4 mr-2" /> Aprovar conhecimento
             </Button>
-            <Button variant="outline" onClick={handleEditar}>
-              <Pencil className="h-4 w-4 mr-2" /> Editar conhecimento
-            </Button>
+            {isArtigoScope && report.artigo && (
+              <Button variant="outline" onClick={handleEditar}>
+                <Pencil className="h-4 w-4 mr-2" /> Editar conhecimento
+              </Button>
+            )}
             <Button variant="outline" onClick={onRegenerar}>
               <RefreshCw className="h-4 w-4 mr-2" /> Regenerar
             </Button>
@@ -295,6 +423,14 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
               </SheetHeader>
 
               <div className="mt-5 space-y-4 text-sm">
+                {selected.artigoCodigo && (
+                  <Row label="Artigo Mestre">
+                    <span className="text-xs">
+                      <span className="font-mono">{selected.artigoCodigo}</span>{" "}
+                      <span className="text-muted-foreground">{selected.artigoDescricao}</span>
+                    </span>
+                  </Row>
+                )}
                 <Row label="Origem">
                   <Badge variant="outline" className={ORIGEM_BY_VALUE[selected.origem]?.className}>
                     {ORIGEM_BY_VALUE[selected.origem]?.icon ?? "•"}{" "}
@@ -342,6 +478,45 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
   );
 }
 
+function TermosChips({
+  lista,
+  onPick,
+  mostraArtigo,
+}: {
+  lista: KnowledgeRunReportTermo[];
+  onPick: (t: KnowledgeRunReportTermo) => void;
+  mostraArtigo: boolean;
+}) {
+  if (lista.length === 0) {
+    return <div className="text-xs text-muted-foreground">Sem termos.</div>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {lista.map((termo) => (
+        <button
+          key={termo.id}
+          onClick={() => onPick(termo)}
+          className={`text-xs px-2 py-1 rounded border transition-colors ${
+            termo.novo
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+              : "border-muted-foreground/20 bg-muted/40 hover:bg-muted"
+          }`}
+          title={
+            termo.justificacao ??
+            (mostraArtigo && termo.artigoCodigo ? `${termo.artigoCodigo} — ${termo.artigoDescricao}` : undefined)
+          }
+        >
+          {termo.novo ? <span className="mr-1">🟢</span> : <span className="mr-1 text-muted-foreground">⚪</span>}
+          {termo.termo}
+          {mostraArtigo && termo.artigoCodigo && (
+            <span className="ml-1 text-[10px] text-muted-foreground font-mono">· {termo.artigoCodigo}</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function FonteCard({ icon, label, main, sub }: { icon: string; label: string; main: string; sub: string }) {
   return (
     <div className="rounded border p-2">
@@ -354,11 +529,34 @@ function FonteCard({ icon, label, main, sub }: { icon: string; label: string; ma
   );
 }
 
+function StatCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  tone?: "ok" | "warn";
+}) {
+  const cls =
+    tone === "ok"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : tone === "warn"
+      ? "text-amber-600 dark:text-amber-400"
+      : "";
+  return (
+    <div className="rounded border p-2">
+      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
+      <div className={`text-lg font-semibold tabular-nums ${cls}`}>{value}</div>
+    </div>
+  );
+}
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <div>{children}</div>
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+      <div className="text-right">{children}</div>
     </div>
   );
 }

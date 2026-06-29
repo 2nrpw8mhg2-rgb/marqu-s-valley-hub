@@ -588,6 +588,48 @@ async function appendLog(sb: Sb, runId: string, msg: string) {
   await sb.from("biblioteca_knowledge_run").update({ log }).eq("id", runId);
 }
 
+type ArtigoRun = {
+  id: string;
+  codigo: string;
+  descricao: string;
+  especialidade?: string;
+  subespecialidade?: string;
+  categoria?: string;
+  novosIds: string[];
+  falhou: boolean;
+  erro?: string | null;
+  fontes?: Fontes;
+};
+
+type AntesSnap = {
+  perTipo: Record<string, { count: number; somaPeso: number; somaPesoConf: number }>;
+  confiancaGlobal: number;
+  total: number;
+};
+
+async function snapshotArtigo(sb: Sb, artigoId: string): Promise<AntesSnap> {
+  const { data: prev } = await sb
+    .from("biblioteca_artigo_conhecimento")
+    .select("tipo, peso, confianca")
+    .eq("artigo_mestre_id", artigoId)
+    .eq("ativo", true);
+  const snap: AntesSnap = { perTipo: {}, confiancaGlobal: 0, total: (prev ?? []).length };
+  let sp = 0, spc = 0;
+  for (const r of prev ?? []) {
+    const t = r.tipo as string;
+    const p = Math.abs(Number(r.peso) || 0);
+    const c = Number(r.confianca) || 0;
+    if (!snap.perTipo[t]) snap.perTipo[t] = { count: 0, somaPeso: 0, somaPesoConf: 0 };
+    snap.perTipo[t].count++;
+    snap.perTipo[t].somaPeso += p;
+    snap.perTipo[t].somaPesoConf += p * c;
+    sp += p;
+    spc += p * c;
+  }
+  snap.confiancaGlobal = sp > 0 ? Math.round(spc / sp) : 0;
+  return snap;
+}
+
 export async function processRun(runId: string) {
   const sb = admin();
   try {
@@ -617,50 +659,26 @@ export async function processRun(runId: string) {
       palavra_chave: 0, sinonimo: 0, expressao: 0, material: 0, termo_negativo: 0,
     };
     const fontesAgg = {
+      historico_total: 0,
       historico_validado: 0,
       historico_auto: 0,
+      historico_descricoes_unicas: 0,
       candidatos_brutos: 0,
-      vizinhos_analisados: 0,
+      vizinhos_artigos: 0,
+      vizinhos_exemplos: 0,
+      correcoes_total: 0,
     };
     let processados = 0;
     let saltados = 0;
     let falhados = 0;
-    let ultimaFontes: Fontes | null = null;
     let ultimoErro: string | null = null;
-    const novosIdsAll: string[] = [];
+    let semHistoricoGlobal = true;
 
+    const antesPorArtigo = new Map<string, AntesSnap>();
+    const artigosRuns = new Map<string, ArtigoRun>();
 
-    // snapshot "antes" para relatório de artigo
-    let antesSnapshot: {
-      perTipo: Record<string, { count: number; somaPeso: number; somaPesoConf: number }>;
-      confiancaGlobal: number;
-      total: number;
-    } | null = null;
-    if (scope.tipo === "artigo") {
-      const { data: prev } = await sb
-        .from("biblioteca_artigo_conhecimento")
-        .select("tipo, peso, confianca")
-        .eq("artigo_mestre_id", scope.artigoId)
-        .eq("ativo", true);
-      const snap = {
-        perTipo: {} as Record<string, { count: number; somaPeso: number; somaPesoConf: number }>,
-        confiancaGlobal: 0,
-        total: (prev ?? []).length,
-      };
-      let sp = 0, spc = 0;
-      for (const r of prev ?? []) {
-        const t = r.tipo as string;
-        const p = Math.abs(Number(r.peso) || 0);
-        const c = Number(r.confianca) || 0;
-        if (!snap.perTipo[t]) snap.perTipo[t] = { count: 0, somaPeso: 0, somaPesoConf: 0 };
-        snap.perTipo[t].count++;
-        snap.perTipo[t].somaPeso += p;
-        snap.perTipo[t].somaPesoConf += p * c;
-        sp += p;
-        spc += p * c;
-      }
-      snap.confiancaGlobal = sp > 0 ? Math.round(spc / sp) : 0;
-      antesSnapshot = snap;
+    for (const artigoId of ids) {
+      antesPorArtigo.set(artigoId, await snapshotArtigo(sb, artigoId));
     }
 
     for (const artigoId of ids) {
@@ -696,16 +714,39 @@ export async function processRun(runId: string) {
         }
 
         const fontes = await recolherFontes(sb, artigoId);
-        ultimaFontes = fontes;
+        if (!fontes.semHistorico) semHistoricoGlobal = false;
+        fontesAgg.historico_total += fontes.totalHistorico;
         fontesAgg.historico_validado += fontes.historicoValidados;
         fontesAgg.historico_auto += fontes.historicoAuto;
+        fontesAgg.historico_descricoes_unicas += fontes.historico.length;
         fontesAgg.candidatos_brutos += fontes.totalCandidatos;
-        fontesAgg.vizinhos_analisados += fontes.vizinhosArtigos;
+        fontesAgg.vizinhos_artigos += fontes.vizinhosArtigos;
+        fontesAgg.vizinhos_exemplos += fontes.vizinhos.reduce((a, v) => a + v.exemplos.length, 0);
 
         const prompt = buildPrompt(fontes, run.modo as Modo);
         const gen = await callAI(prompt);
         const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes);
-        novosIdsAll.push(...res.novosIds);
+
+        // correcoes do utilizador para este artigo
+        if (fontes.artigo.codigo) {
+          const { count } = await sb
+            .from("classificacao_aprendizagem")
+            .select("id", { count: "exact", head: true })
+            .eq("codigo_artigo", fontes.artigo.codigo);
+          fontesAgg.correcoes_total += count ?? 0;
+        }
+
+        artigosRuns.set(artigoId, {
+          id: artigoId,
+          codigo: fontes.artigo.codigo,
+          descricao: fontes.artigo.descricao,
+          especialidade: fontes.contexto.especialidade,
+          subespecialidade: fontes.contexto.subespecialidade,
+          categoria: fontes.contexto.categoria,
+          novosIds: res.novosIds,
+          falhou: false,
+          fontes,
+        });
 
         for (const k of Object.keys(res.perTipo)) counts[k] = (counts[k] ?? 0) + res.perTipo[k];
         processados++;
@@ -726,7 +767,14 @@ export async function processRun(runId: string) {
         falhados++;
         processados++;
         ultimoErro = String(e?.message ?? e).slice(0, 300);
-
+        artigosRuns.set(artigoId, {
+          id: artigoId,
+          codigo: "",
+          descricao: "",
+          novosIds: [],
+          falhou: true,
+          erro: ultimoErro,
+        });
         await sb
           .from("biblioteca_knowledge_run")
           .update({ processados, falhados })
@@ -735,22 +783,60 @@ export async function processRun(runId: string) {
       }
     }
 
-    let resumo: any = { fontes: fontesAgg, counts };
-    if (scope.tipo === "artigo") {
+    // === Construir resumo rico (todos os âmbitos) ===
+    const idsOk = [...artigosRuns.values()].filter((a) => !a.falhou).map((a) => a.id);
+    const novosIdsAll = [...artigosRuns.values()].flatMap((a) => a.novosIds);
+
+    // Carregar metadados de artigos para casos em que falharam antes de termos `fontes`
+    if (idsOk.length || ids.length) {
+      const { data: artMeta } = await sb
+        .from("biblioteca_artigos")
+        .select("id, codigo, descricao, biblioteca_subespecialidades(nome, biblioteca_especialidades(nome)), biblioteca_categorias(nome)")
+        .in("id", ids);
+      for (const m of artMeta ?? []) {
+        const cur = artigosRuns.get(m.id as string);
+        const mm = m as any;
+        const esp = mm.biblioteca_subespecialidades?.biblioteca_especialidades?.nome ?? "";
+        const sub = mm.biblioteca_subespecialidades?.nome ?? "";
+        const cat = mm.biblioteca_categorias?.nome ?? "";
+        if (cur) {
+          if (!cur.codigo) cur.codigo = (mm.codigo as string) ?? "";
+          if (!cur.descricao) cur.descricao = (mm.descricao as string) ?? "";
+          if (!cur.especialidade) cur.especialidade = esp;
+          if (!cur.subespecialidade) cur.subespecialidade = sub;
+          if (!cur.categoria) cur.categoria = cat;
+        } else {
+          artigosRuns.set(m.id as string, {
+            id: m.id as string,
+            codigo: (mm.codigo as string) ?? "",
+            descricao: (mm.descricao as string) ?? "",
+            especialidade: esp,
+            subespecialidade: sub,
+            categoria: cat,
+            novosIds: [],
+            falhou: false,
+          });
+        }
+      }
+    }
+
+    // Carregar termos actuais para todos os artigos
+    const TIPOS = ["palavra_chave", "sinonimo", "expressao", "material", "termo_negativo"];
+    const perTipoDepois: Record<string, { count: number; somaPeso: number; somaPesoConf: number }> = {};
+    const perOrigem: Record<string, number> = {};
+    let somaPeso = 0, somaPesoConf = 0;
+    const novosSet = new Set(novosIdsAll);
+    const termos: any[] = [];
+    const termosPorArtigo = new Map<string, { total: number; novos: number }>();
+
+    if (idsOk.length) {
       const { data: rows } = await sb
         .from("biblioteca_artigo_conhecimento")
-        .select("id, tipo, termo, peso, confianca, origem, ocorrencias, exemplos, justificacao")
-        .eq("artigo_mestre_id", scope.artigoId)
+        .select("id, artigo_mestre_id, tipo, termo, peso, confianca, origem, ocorrencias, exemplos, justificacao")
+        .in("artigo_mestre_id", idsOk)
         .eq("ativo", true)
         .order("tipo")
         .order("peso", { ascending: false });
-
-      const TIPOS = ["palavra_chave", "sinonimo", "expressao", "material", "termo_negativo"];
-      const perTipoDepois: Record<string, { count: number; somaPeso: number; somaPesoConf: number }> = {};
-      const perOrigem: Record<string, number> = {};
-      let somaPeso = 0, somaPesoConf = 0;
-      const novosSet = new Set(novosIdsAll);
-      const termos: any[] = [];
 
       for (const r of rows ?? []) {
         const t = r.tipo as string;
@@ -763,8 +849,14 @@ export async function processRun(runId: string) {
         perOrigem[r.origem as string] = (perOrigem[r.origem as string] ?? 0) + 1;
         somaPeso += p;
         somaPesoConf += p * c;
+        const amId = r.artigo_mestre_id as string;
+        const aRun = artigosRuns.get(amId);
+        const isNovo = novosSet.has(r.id as string);
         termos.push({
           id: r.id,
+          artigoMestreId: amId,
+          artigoCodigo: aRun?.codigo ?? "",
+          artigoDescricao: aRun?.descricao ?? "",
           tipo: r.tipo,
           termo: r.termo,
           peso: r.peso,
@@ -773,69 +865,138 @@ export async function processRun(runId: string) {
           ocorrencias: r.ocorrencias ?? 0,
           exemplos: r.exemplos ?? [],
           justificacao: r.justificacao ?? null,
-          novo: novosSet.has(r.id as string),
+          novo: isNovo,
         });
+        const cur = termosPorArtigo.get(amId) ?? { total: 0, novos: 0 };
+        cur.total++;
+        if (isNovo) cur.novos++;
+        termosPorArtigo.set(amId, cur);
       }
-
-      const perTipo: Record<string, { antes: number; depois: number; delta: number }> = {};
-      for (const t of TIPOS) {
-        const a = antesSnapshot?.perTipo?.[t]?.count ?? 0;
-        const d = perTipoDepois[t]?.count ?? 0;
-        perTipo[t] = { antes: a, depois: d, delta: d - a };
-      }
-
-      // correcoes do utilizador (best-effort por código de artigo)
-      let correcoesTotal = 0;
-      if (ultimaFontes?.artigo?.codigo) {
-        const { count } = await sb
-          .from("classificacao_aprendizagem")
-          .select("id", { count: "exact", head: true })
-          .eq("codigo_artigo", ultimaFontes.artigo.codigo);
-        correcoesTotal = count ?? 0;
-      }
-
-      const reutilizados = (rows ?? []).length - novosIdsAll.length;
-      const confiancaDepois = somaPeso > 0 ? Math.round(somaPesoConf / somaPeso) : 0;
-
-      resumo = {
-        artigo: {
-          id: scope.artigoId,
-          codigo: ultimaFontes?.artigo?.codigo ?? "",
-          descricao: ultimaFontes?.artigo?.descricao ?? "",
-          especialidade: ultimaFontes?.contexto?.especialidade ?? "",
-          subespecialidade: ultimaFontes?.contexto?.subespecialidade ?? "",
-          categoria: ultimaFontes?.contexto?.categoria ?? "",
-        },
-        confiancaGlobal: {
-          antes: antesSnapshot?.confiancaGlobal ?? 0,
-          depois: confiancaDepois,
-        },
-        perTipo,
-        perOrigem,
-        total: (rows ?? []).length,
-        totalNovos: novosIdsAll.length,
-        fontes: {
-          historico: {
-            total: ultimaFontes?.totalHistorico ?? 0,
-            validados: ultimaFontes?.historicoValidados ?? 0,
-            auto: ultimaFontes?.historicoAuto ?? 0,
-            descricoesUnicas: ultimaFontes?.historico?.length ?? 0,
-          },
-          candidatos: { total: ultimaFontes?.totalCandidatos ?? 0 },
-          vizinhos: {
-            artigos: ultimaFontes?.vizinhosArtigos ?? 0,
-            exemplos: (ultimaFontes?.vizinhos ?? []).reduce((acc, v) => acc + v.exemplos.length, 0),
-          },
-          correcoes: { total: correcoesTotal },
-          reutilizados: { total: Math.max(0, reutilizados) },
-        },
-        termos,
-        counts,
-        semHistorico: ultimaFontes?.semHistorico ?? false,
-        erro: (falhados > 0 || novosIdsAll.length === 0) && ultimoErro ? ultimoErro : null,
-      };
-
     }
+
+    const perTipo: Record<string, { antes: number; depois: number; delta: number }> = {};
+    let antesTotal = 0;
+    for (const t of TIPOS) {
+      let antes = 0;
+      for (const id of idsOk) {
+        antes += antesPorArtigo.get(id)?.perTipo?.[t]?.count ?? 0;
+      }
+      const depois = perTipoDepois[t]?.count ?? 0;
+      perTipo[t] = { antes, depois, delta: depois - antes };
+      antesTotal += antes;
+    }
+
+    const confiancaDepois = somaPeso > 0 ? Math.round(somaPesoConf / somaPeso) : 0;
+    let antesSomaP = 0, antesSomaPC = 0;
+    for (const id of idsOk) {
+      const snap = antesPorArtigo.get(id);
+      if (!snap) continue;
+      for (const t of Object.values(snap.perTipo)) {
+        antesSomaP += t.somaPeso;
+        antesSomaPC += t.somaPesoConf;
+      }
+    }
+    const confiancaAntes = antesSomaP > 0 ? Math.round(antesSomaPC / antesSomaP) : 0;
+
+    // Resolver escopo (nome)
+    let escopoEspecialidade = "", escopoSubespecialidade = "", escopoArtigo: any = undefined;
+    if (scope.tipo === "especialidade") {
+      const { data } = await sb.from("biblioteca_especialidades").select("codigo, nome").eq("id", scope.especialidadeId).maybeSingle();
+      escopoEspecialidade = data ? `${data.codigo ?? ""} — ${data.nome}`.trim() : "";
+    } else if (scope.tipo === "subespecialidade") {
+      const { data } = await sb
+        .from("biblioteca_subespecialidades")
+        .select("codigo, nome, biblioteca_especialidades(codigo, nome)")
+        .eq("id", scope.subespecialidadeId)
+        .maybeSingle();
+      const dd = data as any;
+      escopoSubespecialidade = dd ? `${dd.codigo ?? ""} — ${dd.nome}`.trim() : "";
+      escopoEspecialidade = dd?.biblioteca_especialidades
+        ? `${dd.biblioteca_especialidades.codigo ?? ""} — ${dd.biblioteca_especialidades.nome}`.trim()
+        : "";
+    } else {
+      const a = artigosRuns.get(scope.artigoId);
+      escopoArtigo = a ? { id: a.id, codigo: a.codigo, descricao: a.descricao } : { id: scope.artigoId, codigo: "", descricao: "" };
+      escopoSubespecialidade = a?.subespecialidade ?? "";
+      escopoEspecialidade = a?.especialidade ?? "";
+    }
+
+    const artigosList = [...artigosRuns.values()]
+      .map((a) => {
+        const t = termosPorArtigo.get(a.id) ?? { total: 0, novos: 0 };
+        return {
+          id: a.id,
+          codigo: a.codigo,
+          descricao: a.descricao,
+          especialidade: a.especialidade,
+          subespecialidade: a.subespecialidade,
+          categoria: a.categoria,
+          totalTermos: t.total,
+          novos: t.novos,
+          falhou: a.falhou,
+          erro: a.erro ?? null,
+        };
+      })
+      .sort((a, b) => (a.codigo || "").localeCompare(b.codigo || ""));
+
+    const reutilizadosTotal = Math.max(0, termos.length - novosIdsAll.length);
+
+    // Snapshot dos logs (últimos 100)
+    const { data: runLog } = await sb
+      .from("biblioteca_knowledge_run")
+      .select("log")
+      .eq("id", runId)
+      .single();
+
+    const resumo: any = {
+      escopo: {
+        tipo: scope.tipo,
+        especialidade: escopoEspecialidade || undefined,
+        subespecialidade: escopoSubespecialidade || undefined,
+        artigo: escopoArtigo,
+      },
+      execucao: {
+        totalArtigos: ids.length,
+        processados,
+        saltados,
+        falhados,
+        modo: run.modo,
+      },
+      // mantém `artigo` (single) só para âmbito Artigo (compat)
+      artigo: scope.tipo === "artigo" && escopoArtigo
+        ? {
+            id: escopoArtigo.id,
+            codigo: escopoArtigo.codigo,
+            descricao: escopoArtigo.descricao,
+            especialidade: escopoEspecialidade,
+            subespecialidade: escopoSubespecialidade,
+            categoria: artigosRuns.get(scope.artigoId)?.categoria ?? "",
+          }
+        : undefined,
+      confiancaGlobal: { antes: confiancaAntes, depois: confiancaDepois },
+      perTipo,
+      perOrigem,
+      total: termos.length,
+      totalNovos: novosIdsAll.length,
+      fontes: {
+        historico: {
+          total: fontesAgg.historico_total,
+          validados: fontesAgg.historico_validado,
+          auto: fontesAgg.historico_auto,
+          descricoesUnicas: fontesAgg.historico_descricoes_unicas,
+        },
+        candidatos: { total: fontesAgg.candidatos_brutos },
+        vizinhos: { artigos: fontesAgg.vizinhos_artigos, exemplos: fontesAgg.vizinhos_exemplos },
+        correcoes: { total: fontesAgg.correcoes_total },
+        reutilizados: { total: reutilizadosTotal },
+      },
+      termos,
+      artigos: artigosList,
+      counts,
+      semHistorico: semHistoricoGlobal,
+      erro: (falhados > 0 && processados === falhados + saltados && termos.length === 0) ? ultimoErro : null,
+      log: ((runLog?.log as any[]) ?? []).slice(-100),
+    };
 
     await sb
       .from("biblioteca_knowledge_run")
@@ -853,3 +1014,4 @@ export async function processRun(runId: string) {
       .eq("id", runId);
   }
 }
+

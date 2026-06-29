@@ -1,36 +1,79 @@
-## Norma Global de Idioma — Português de Portugal (pt-PT)
+# Relatório Final do Knowledge Builder — qualquer âmbito
 
-Estabelecer pt-PT como norma transversal do MV OS, com efeito imediato em todo o conteúdo gerado pela IA e em toda a UI futura.
+## Problema
 
-### 1. Memória de projeto (regra permanente)
+Hoje o **Relatório Final de Conhecimento** só é construído quando o âmbito é **Artigo Mestre** (`scope.tipo === "artigo"`). Para Especialidade e Subespecialidade, o `resumo` guardado é apenas `{ fontes, counts }` e a UI cai para o painel "Progresso" com totais e logs técnicos — exactamente o que o utilizador quer eliminar como resultado principal.
 
-Criar duas entradas em `mem://`:
+A solução é estender o mesmo relatório (com agrupamento por tipo **e** por Artigo Mestre) a Especialidade e Subespecialidade, mantendo os logs apenas numa secção colapsável "Logs técnicos".
 
-- **`mem://index.md` — Core** (sempre em contexto, aplicada a TODAS as ações):
-  - "Idioma único: Português de Portugal (pt-PT). Nunca pt-BR, inglês ou mistura. Aplica-se a UI, mensagens, IA, logs, conhecimento gerado."
-  - "Terminologia técnica de construção civil pt-PT: betão (não concreto), cofragem (não forma), tubagem (não tubulação), caixilharia, mapa de quantidades, dono de obra, empreitada, etc."
+## O que vai mudar
 
-- **`mem://constraints/idioma-ptpt.md`** — lista detalhada de termos a usar / a evitar (Utilizar: Guardar, Eliminar, Editar, Gerar, Aprovar, Conhecimento, Ocorrências, Confiança, Peso, Estado, Fontes analisadas, Betão, Cofragem, Armadura, Tubagem, Caixilharia, Laje, Sapata, Viga, Pilar, Caleira, Impermeabilização, Gesso cartonado, etc. / Evitar: Salvar, Deletar, Excluir, Build, Update, Score, Knowledge Base, Concreto, Forma, Concretagem, Tubulação, Contrapiso, Piso cerâmico, etc.) + regra de normalização "Concreto armado → Betão armado".
+### 1. Backend — `src/lib/biblioteca-mestra/knowledge-builder.server.ts`
 
-### 2. Reforço no prompt do Knowledge Builder
+Construir o `resumo` rico para **todos os âmbitos**, não só `artigo`.
 
-Editar `src/lib/biblioteca-mestra/knowledge-builder.server.ts` (função `buildPrompt`):
+Durante o ciclo `for (const artigoId of ids)`:
+- Acumular por artigo: `codigo`, `descricao`, contexto (esp/sub/cat), `novosIds` desse artigo, `fontesPorArtigo` (historico/cand/vizinhos/correcoes), `errado?` flag.
+- Manter `antesSnapshot` por artigo (mini-snapshot count por tipo + confiança ponderada) para calcular `perTipo.antes/depois/delta` agregados.
 
-- Adicionar bloco **REGRAS DE IDIOMA (OBRIGATÓRIO)** no início do prompt:
-  - "Todo o output deve estar em **Português de Portugal (pt-PT)**. Nunca pt-BR, nunca inglês."
-  - Tabela de normalização explícita: `concreto→betão`, `concreto armado→betão armado`, `forma→cofragem`, `concretagem→betonagem`, `tubulação→tubagem`, `contrapiso→camada de regularização`, `piso cerâmico→pavimento cerâmico`, `argamassa colante→cimento-cola`.
-  - "Se um termo aparecer em pt-BR nas FONTES, regista o equivalente pt-PT como termo principal e o pt-BR como **sinónimo** (relação de equivalência para reconhecimento futuro)."
-  - "Justificações também em pt-PT, sem anglicismos."
+No fim, em vez do bloco actual restrito a `scope.tipo==="artigo"`:
+- Carregar `biblioteca_artigo_conhecimento` para **todos os `ids` processados** com sucesso (`.in("artigo_mestre_id", ids)`), incluindo `artigo_mestre_id` no select.
+- Construir:
+  - `escopo`: `{ tipo, especialidade, subespecialidade, artigo? }` resolvido por nome/código (lookup leve nas tabelas `biblioteca_especialidades`/`biblioteca_subespecialidades`/`biblioteca_artigos`).
+  - `execucao`: `{ totalArtigos, processados, saltados, falhados, modo }`.
+  - `perTipo` agregado (antes/depois/delta somado sobre todos os artigos).
+  - `perOrigem` agregado.
+  - `confiancaGlobal` ponderada por peso sobre todos os termos.
+  - `fontes` (agregadas): `historico { total, validados, auto, descricoesUnicas }`, `candidatos { total }`, `vizinhos { artigos, exemplos }`, `correcoes { total }`, `reutilizados { total }`.
+  - `termos`: lista achatada com `{ id, artigoMestreId, artigoCodigo, artigoDescricao, tipo, termo, peso, confianca, origem, ocorrencias, exemplos, justificacao, novo }`.
+  - `artigos`: `[{ id, codigo, descricao, contexto, totalTermos, novos, falhou?, erro? }]` para a vista "por Artigo Mestre".
+  - `counts`, `semHistorico`, `erro`.
 
-### 3. Auditoria leve da UI atual
+Para âmbito = Artigo continua a funcionar (caso degenerado de `ids.length === 1`).
 
-Sem alterar layout, fazer varrimento e substituir ocorrências pontuais em componentes do Knowledge Builder e Biblioteca Mestra que estejam fora da norma:
-- "Salvar" → "Guardar", "Deletar"/"Excluir" → "Eliminar", "Score" → "Confiança", "Update" → "Atualizar", "Knowledge Base" → "Base de Conhecimento".
+### 2. Tipos — `src/lib/biblioteca-mestra/types.ts`
 
-Âmbito desta auditoria nesta iteração: ficheiros em `src/components/biblioteca-mestra/`, `src/routes/_app/biblioteca-mestra*`, `src/lib/biblioteca-mestra/`. Restantes módulos serão tratados à medida que forem tocados (a regra Core garante consistência futura).
+Estender `KnowledgeRunReport`:
+- Adicionar `escopo: { tipo: "especialidade"|"subespecialidade"|"artigo"; especialidade?: string; subespecialidade?: string; artigo?: {id, codigo, descricao} }`.
+- Adicionar `execucao: { totalArtigos, processados, saltados, falhados, modo }`.
+- Adicionar `artigos: KnowledgeRunReportArtigo[]` (novo tipo com totais por artigo).
+- Em `KnowledgeRunReportTermo`, adicionar `artigoMestreId`, `artigoCodigo`, `artigoDescricao` (opcionais para compatibilidade).
+- Tornar `artigo` (single) opcional / mantê-lo só preenchido para âmbito Artigo.
 
-### Fora do âmbito
+### 3. UI — `src/components/biblioteca-mestra/KnowledgeRunReport.tsx`
 
-- Sem alterações de BD, schemas ou nomes de colunas.
-- Sem i18n / sistema de tradução — pt-PT é a única língua suportada.
-- Sem reescrita massiva de toda a plataforma neste turno; a memória Core garante que qualquer trabalho futuro respeita a norma.
+Refactor para suportar âmbito alargado mantendo a estética actual:
+
+- **Cabeçalho**: título dinâmico
+  - Artigo → mantém actual.
+  - Subespecialidade → "030.01 — Demolições Gerais" + breadcrumb da especialidade.
+  - Especialidade → nome da especialidade.
+- **Resumo da execução**: cartões com `Artigos processados X/Y · Saltados · Falhados · Modo · Estado`.
+- **Antes vs Depois** (totais agregados) — já existe, passa a usar `perTipo` agregado.
+- **Fontes analisadas** — já existe, passa a usar fontes agregadas.
+- **Conhecimento gerado** — duas vistas via tabs `Tabs` (shadcn):
+  - **Por Tipo** (vista actual com `Accordion` dos 5 tipos, todos os termos achatados).
+  - **Por Artigo Mestre**: `Accordion` por artigo (código + descrição + badge "X termos / Y novos"); dentro, sub-accordion ou secções compactas por tipo só com os termos desse artigo.
+- **Detalhe do termo** (sheet): adicionar linha "Artigo Mestre: <código — descrição>" quando vier preenchido.
+- **Logs técnicos** (colapsável `Collapsible`, fechado por defeito) no fundo — move o que hoje aparece no painel de progresso (`log[]`, mensagens `A:0 B:0 C:11`).
+- **Ações**: o botão "Aprovar conhecimento" continua a funcionar (a função já lê `resumo.termos` e aprova `novo && origem==='ia'` de qualquer artigo). "Editar conhecimento" só fica disponível para âmbito Artigo.
+
+### 4. Página — `src/routes/_app/biblioteca-mestra.knowledge-builder.tsx`
+
+Substituir a condição actual:
+```
+s.estado === "concluido" && s.scope_tipo === "artigo" && (s.resumo as any)?.termos
+```
+por simplesmente:
+```
+s.estado === "concluido" && (s.resumo as any)?.termos
+```
+
+O painel de Progresso fica visível apenas enquanto `isRunning`/`erro`/`cancelado`. Quando concluído, mostra apenas o `KnowledgeRunReport`.
+
+## Out of scope
+
+- Sem mudanças no motor de geração da IA, prompt, ou tabelas.
+- Sem novas server functions.
+- Sem alterações ao schema do `biblioteca_knowledge_run` (o `resumo jsonb` aceita o payload alargado).
+- Sem export por artigo (o export JSON actual continua a despejar o `report` completo).
