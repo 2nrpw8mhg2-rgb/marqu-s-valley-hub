@@ -134,6 +134,20 @@ const MATERIAIS_CONSTRUCAO = new Set<string>(
     // Elementos construtivos comuns
     "parede", "pavimento", "tecto", "teto", "laje", "viga", "pilar",
     "calcada", "lajeta", "lajeado", "pave", "cubo", "paralelo",
+    // Sistemas / produtos / componentes que descrevem o objecto, não a acção
+    "alvenaria", "revestimento", "isolamento", "produto", "sistema",
+    "componente", "elemento", "material", "materiais",
+  ].map((t) => canonicalizar(t)).filter(Boolean)
+);
+
+const OBJETOS_NEUTROS_DEMOLICOES = new Set<string>(
+  [
+    ...MATERIAIS_CONSTRUCAO,
+    "argamassa", "cimento", "areia", "junta", "tijolo", "ceramico",
+    "fibra", "polipropileno", "betonilha", "alvenaria", "reboco",
+    "revestimento", "revestimentos", "isolamento", "isolamentos",
+    "agregado", "agregados", "betao", "produto", "produtos", "sistema",
+    "sistemas", "componente", "componentes", "elemento", "elementos",
   ].map((t) => canonicalizar(t)).filter(Boolean)
 );
 
@@ -145,9 +159,68 @@ const OPERACOES_ALVO = new Set<string>(
     "fornecimento", "aplicacao", "execucao", "assentamento", "montagem",
     "instalacao", "colocacao", "fabrico", "betonagem", "pintura",
     "impermeabilizacao", "regularizacao", "acabamento", "afagamento",
-    "polimento", "envernizamento",
+    "polimento", "envernizamento", "construcao",
+    "fornecimento e aplicacao", "fornecimento e assentamento",
   ].map((t) => canonicalizar(t)).filter(Boolean)
 );
+
+const OPERACOES_INCOMPATIVEIS_DEMOLICOES: Array<{ re: RegExp; termo: string }> = [
+  { re: /\bfornecimento e aplicacao\b/, termo: "fornecimento e aplicação" },
+  { re: /\bfornecimento e assentamento\b/, termo: "fornecimento e assentamento" },
+  { re: /\bexecucao\b/, termo: "execução" },
+  { re: /\bconstrucao\b/, termo: "construção" },
+  { re: /\bassentamento\b/, termo: "assentamento" },
+  { re: /\bmontagem\b/, termo: "montagem" },
+  { re: /\binstalacao\b/, termo: "instalação" },
+  { re: /\baplicacao\b/, termo: "aplicação" },
+  { re: /\bcolocacao\b/, termo: "colocação" },
+  { re: /\bfabrico\b/, termo: "fabrico" },
+  { re: /\bbetonagem\b/, termo: "betonagem" },
+  { re: /\bregularizacao\b/, termo: "regularização" },
+  { re: /\bacabamento\b/, termo: "acabamento" },
+  { re: /\bpintura\b/, termo: "pintura" },
+  { re: /\bimpermeabilizacao\b/, termo: "impermeabilização" },
+];
+
+function contemTermoCanonico(canon: string, termos: Set<string>): boolean {
+  if (!canon) return false;
+  if (termos.has(canon)) return true;
+  for (const t of canon.split(" ").filter(Boolean)) {
+    if (termos.has(lemaSingular(t))) return true;
+  }
+  for (const termo of termos) {
+    if (termo.includes(" ") && new RegExp(`(^| )${termo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( |$)`).test(canon)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function artigoEhDemolicao(...partes: Array<string | null | undefined>): boolean {
+  return /\bdemoli/.test(normalize(partes.filter(Boolean).join(" ")));
+}
+
+function extrairOperacaoIncompativelDemolicoes(termoCanon: string): string | null {
+  for (const op of OPERACOES_INCOMPATIVEIS_DEMOLICOES) {
+    if (op.re.test(termoCanon)) return op.termo;
+  }
+  return null;
+}
+
+function sanearNegativoDemolicoes(termo: string): string | null {
+  const c = canonicalizar(termo);
+  if (!c) return null;
+
+  const operacao = extrairOperacaoIncompativelDemolicoes(c);
+  if (operacao) return operacao;
+
+  // Em Demolições, materiais/produtos/sistemas/componentes são neutros: podem
+  // ser o objecto demolido, mas nunca o motivo de exclusão.
+  if (contemTermoCanonico(c, OBJETOS_NEUTROS_DEMOLICOES)) return null;
+
+  // Regra conservadora: sem operação incompatível clara, não há negativo seguro.
+  return null;
+}
 
 // Inferir família a partir do nome/código da especialidade.
 function familiaEspecialidade(nomeEsp: string, codigoEsp?: string | null): string | null {
@@ -328,6 +401,7 @@ function derivarNegativos(
   vocReaisDoArtigo: Set<string>,
   bloqueioFamilia: Set<string>,
   idx: IndiceGlobal,
+  apenasOperacoesDemolicao = false,
   maxAlta = 6,
   maxMedia = 6
 ): GeneratedTermo[] {
@@ -338,9 +412,13 @@ function derivarNegativos(
   const out: Cand[] = [];
 
   for (const [termoCanon, espMap] of idx.termoEspArtigos.entries()) {
-    if (tokenGenerico(termoCanon)) continue;
-    if (vocPositivoCanonico.has(termoCanon)) continue;
-    if (vocReaisDoArtigo.has(termoCanon)) continue;
+    if (tokenGenerico(termoCanon) && !(apenasOperacoesDemolicao && extrairOperacaoIncompativelDemolicoes(termoCanon))) continue;
+    const termoSaneado = apenasOperacoesDemolicao ? sanearNegativoDemolicoes(termoCanon) : termoCanon;
+    if (!termoSaneado) continue;
+    const termoSaneadoCanon = canonicalizar(termoSaneado);
+    if (!termoSaneadoCanon) continue;
+    if (vocPositivoCanonico.has(termoCanon) || vocPositivoCanonico.has(termoSaneadoCanon)) continue;
+    if (vocReaisDoArtigo.has(termoCanon) || vocReaisDoArtigo.has(termoSaneadoCanon)) continue;
     if (bloqueioFamilia.has(termoCanon)) continue;
     if (MATERIAIS_CONSTRUCAO.has(termoCanon)) continue;
 
@@ -371,18 +449,22 @@ function derivarNegativos(
     // exclusividade com suporte absoluto observado; bestDom fica como gate.
     const suporteScore = Math.min(1, Math.log2(bestSize + 1) / 4);
     let score = exclusividade * suporteScore;
-    if (OPERACOES_ALVO.has(termoCanon)) score += 0.10;
+    if (OPERACOES_ALVO.has(termoCanon) || OPERACOES_ALVO.has(termoSaneadoCanon)) score += 0.10;
     if (score < 0.50) continue;
 
 
-    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, score });
+    out.push({ termo: termoSaneado, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, score });
   }
 
   out.sort((a, b) => b.score - a.score);
 
   const altas: GeneratedTermo[] = [];
   const medias: GeneratedTermo[] = [];
+  const vistos = new Set<string>();
   for (const n of out) {
+    const c = canonicalizar(n.termo);
+    if (!c || vistos.has(c)) continue;
+    vistos.add(c);
     const nivel: "alta" | "media" = n.score >= 0.75 ? "alta" : "media";
     const just =
       `"${n.termo}" é específico de ${idx.nomeEsp.get(n.espDom) ?? ""} ` +
@@ -1164,18 +1246,24 @@ export async function processRun(runId: string) {
       // Família por artigo mestre, para aplicar bloqueio estrutural.
       const artIds = Array.from(new Set((antigos ?? []).map((r) => r.artigo_mestre_id as string)));
       const familiaPorArtigo = new Map<string, string | null>();
+      const demolicaoPorArtigo = new Map<string, boolean>();
       if (artIds.length) {
         const { data: artsFam } = await sb
           .from("biblioteca_artigos")
-          .select("id, biblioteca_subespecialidades(biblioteca_especialidades(nome))")
+          .select("id, descricao, biblioteca_subespecialidades(nome, biblioteca_especialidades(nome)), biblioteca_categorias(nome)")
           .in("id", artIds);
         for (const r of (artsFam ?? []) as any[]) {
           const nomeEsp = r?.biblioteca_subespecialidades?.biblioteca_especialidades?.nome ?? "";
+          const nomeSub = r?.biblioteca_subespecialidades?.nome ?? "";
+          const nomeCat = r?.biblioteca_categorias?.nome ?? "";
+          const desc = r?.descricao ?? "";
           familiaPorArtigo.set(r.id as string, familiaEspecialidade(nomeEsp, null));
+          demolicaoPorArtigo.set(r.id as string, artigoEhDemolicao(nomeEsp, nomeSub, nomeCat, desc));
         }
       }
 
       let removidosMateriais = 0;
+      let removidosDemolicoes = 0;
       const aRemover = (antigos ?? []).filter((r) => {
         const c = canonicalizar((r.termo as string) ?? "");
         if (!c) return false;
@@ -1183,13 +1271,25 @@ export async function processRun(runId: string) {
         if (MATERIAIS_CONSTRUCAO.has(c)) { removidosMateriais++; return true; }
         const fam = familiaPorArtigo.get(r.artigo_mestre_id as string) ?? null;
         const bloq = bloqueioParaFamilia(fam);
-        return bloq.has(c);
+        if (bloq.has(c)) return true;
+        if (demolicaoPorArtigo.get(r.artigo_mestre_id as string)) {
+          const saneado = sanearNegativoDemolicoes(c);
+          const saneadoCanon = saneado ? canonicalizar(saneado) : "";
+          if (!saneadoCanon || saneadoCanon !== c) {
+            removidosDemolicoes++;
+            return true;
+          }
+        }
+        return false;
       }).map((r) => r.id as string);
       if (aRemover.length) {
         await sb.from("biblioteca_artigo_conhecimento").delete().in("id", aRemover);
         await appendLog(sb, runId, `Limpeza: removidos ${aRemover.length} negativos inválidos antigos (genéricos ou estruturais bloqueados)`);
         if (removidosMateriais > 0) {
           await appendLog(sb, runId, `Limpeza: negativos removidos por serem materiais: ${removidosMateriais}`);
+        }
+        if (removidosDemolicoes > 0) {
+          await appendLog(sb, runId, `Limpeza: negativos removidos em Demolições por não serem operações incompatíveis: ${removidosDemolicoes}`);
         }
       }
 
@@ -1323,12 +1423,19 @@ export async function processRun(runId: string) {
             null
           );
           const bloqueio = bloqueioParaFamilia(familia);
+          const apenasOperacoesDemolicao = artigoEhDemolicao(
+            fontes.contexto.especialidade,
+            fontes.contexto.subespecialidade,
+            fontes.contexto.categoria,
+            fontes.artigo.descricao
+          );
           gen.termos_negativos = derivarNegativos(
             fontes.especialidadeId,
             vocPositivo,
             vocReais,
             bloqueio,
-            indice
+            indice,
+            apenasOperacoesDemolicao
           );
           if (gen.termos_negativos.length === 0) {
             await appendLog(sb, runId, `negativos: não foram encontrados termos com confiança suficiente para ${fontes.artigo.codigo}`);

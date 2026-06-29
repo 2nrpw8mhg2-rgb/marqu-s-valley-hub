@@ -1,69 +1,42 @@
-## Problema
+## Plano
 
-A geração de termos negativos está a propor materiais (`cimento`, `areia`, `argamassa`, `bloco`, `betonilha`, `tijolo`, `gesso cartonado`, `pladur`, `lã mineral`, `XPS`, `EPS`, `argila`, `fibra`, `juntas`, etc.). Materiais descrevem **sobre o quê** se trabalha — não o tipo de trabalho — e por isso aparecem legitimamente em descrições de Demolições, Pinturas, Rebocos, etc. Usá-los como negativos baixa o score destes artigos e provoca classificações erradas.
+1. **Tratar Demolições como regra especial obrigatória**
+   - Detetar artigos da família Demolições/Estrutura como já acontece hoje.
+   - Para estes artigos, aplicar um filtro mais restritivo antes de qualquer termo negativo ser guardado.
 
-A causa está em `src/lib/biblioteca-mestra/knowledge-builder.server.ts`:
+2. **Bloquear materiais, produtos, sistemas e componentes mesmo dentro de frases**
+   - A lista atual só bloqueia quando o termo completo é exatamente igual a um material, por isso deixa passar frases como `argamassa de cimento e areia`.
+   - Vou adicionar uma validação por tokens/expressões para rejeitar negativos que contenham materiais, produtos, elementos ou sistemas construtivos: `argamassa`, `cimento`, `areia`, `junta`, `tijolo`, `cerâmico`, `fibra`, `polipropileno`, `betonilha`, `alvenaria`, `reboco`, `isolamento`, `betão`, etc.
 
-1. Não existe uma lista universal de materiais a excluir dos candidatos a negativo. O único bloqueio (`BLOQUEIO_DEMOLICOES_ESTRUTURA`) só se aplica a artigos da família Demolições/Estrutura — para os restantes, materiais como `betão`, `tijolo`, `cimento` continuam elegíveis.
-2. Em `construirIndiceGlobal` (linhas 240-246), os tokens internos de cada expressão positiva curada são adicionados ao índice. Assim "argamassa de cimento" injecta `cimento` como termo de outra especialidade. Combinado com a falta de bloqueio universal, gera-se exactamente o padrão errado descrito pelo utilizador.
+3. **Extrair só a operação incompatível**
+   - Quando um candidato de Demolições contiver uma ação de construção nova, guardar apenas a ação normalizada:
+     - `fornecimento e assentamento de alvenaria` → `fornecimento e assentamento`
+     - `fornecimento e aplicação de betonilha` → `fornecimento e aplicação`
+     - `execução de reboco` → `execução`
+     - `montagem de ...` → `montagem`
+   - A frase completa com o material deixa de ser persistida.
 
-## Solução (apenas em `src/lib/biblioteca-mestra/knowledge-builder.server.ts`)
+4. **Permitir negativos em Demolições apenas se forem operações novas**
+   - Para Demolições, um negativo só passa se corresponder a uma ação incompatível clara: `fornecimento e aplicação`, `fornecimento e assentamento`, `execução`, `construção`, `assentamento`, `montagem`, `instalação`, `aplicação`, `colocação`, `fabrico`, `betonagem`, `regularização`, `acabamento`, `pintura`, `impermeabilização`.
+   - Se não houver uma ação deste tipo, o termo é rejeitado como neutro, mesmo que tenha suporte estatístico noutra especialidade.
 
-### 1. Lista universal de materiais — bloqueio transversal
+5. **Aplicar o mesmo saneamento na limpeza retroativa**
+   - Além de impedir novos erros, a limpeza inicial da run vai apagar negativos antigos de Demolições que sejam materiais/sistemas/frases completas inválidas.
+   - Também vai substituir, quando possível, expressões antigas por ações limpas apenas se respeitarem as regras e não duplicarem termos existentes.
 
-Criar `MATERIAIS_CONSTRUCAO` (Set de formas canónicas via `canonicalizar` + `lemaSingular`) com os termos que **nunca** podem ser negativos para nenhuma especialidade:
+6. **Manter a geração por IA fora dos negativos**
+   - A IA continuará proibida de gerar `termos_negativos` diretamente.
+   - A correção será feita no algoritmo determinístico que deriva e valida os negativos antes de gravar.
 
-```
-betão, betao, bloco, tijolo, cimento, cimenticio, argamassa, areia, brita,
-pedra, granito, mármore, ardósia, calcário, madeira, contraplacado, mdf, osb,
-aço, ferro, alumínio, cobre, latão, inox, zinco, chumbo, pvc, ppr, peex,
-multicamada, polietileno, polipropileno, cerâmica, cerâmico, mosaico,
-azulejo, porcelânico, grés, terracota, reboco, estuque, betonilha,
-gesso, gesso cartonado, pladur, lã mineral, lã de rocha, lã de vidro,
-xps, eps, poliuretano, cortiça, argila, fibra, fibras, juntas, junta,
-selante, mástique, vidro, espelho, tela, geotêxtil, membrana, papel,
-tinta, primário, verniz, esmalte, asfalto, betume, gravilha, agregado,
-inerte, calçada, lajeta, lajeado, pavê, cubo, paralelo
-```
+## Ficheiro a alterar
 
-A lista é alfabética, agnóstica de família, e sempre canonicalizada (com `lemaSingular` para apanhar singulares/plurais — `tijolo`/`tijolos`, `bloco`/`blocos`, `junta`/`juntas`).
+- `src/lib/biblioteca-mestra/knowledge-builder.server.ts`
 
-> Nota: vários destes termos podem (e devem) ser **positivos** num artigo específico. O bloqueio aplica-se apenas à pista de **negativos** automáticos; o pipeline de positivos não é afectado.
+## Validação esperada
 
-### 2. Aplicar o bloqueio em `derivarNegativos`
+Depois de executar novamente **Regenerar tudo (apenas IA)** em Demolições Gerais:
 
-Em `derivarNegativos` (linha 296+), acrescentar logo após `if (bloqueioFamilia.has(termoCanon)) continue;`:
-
-```ts
-if (MATERIAIS_CONSTRUCAO.has(termoCanon)) continue;
-```
-
-O `BLOQUEIO_DEMOLICOES_ESTRUTURA` por família continua tal como está (cobre `viga`, `pilar`, `laje`, `armadura`, `cofragem`, `betonagem`, etc., para artigos de Demolições/Estrutura).
-
-### 3. Não “explodir” expressões positivas em tokens individuais
-
-No `construirIndiceGlobal`, remover o bloco que injecta cada token interno de uma expressão curada como termo isolado (linhas 240-246). Razão: foi precisamente esse bloco que fez `cimento` aparecer como “termo discriminante de outra especialidade” por estar dentro de `argamassa de cimento`. As expressões continuam a contar como termo único (ponto `c = canonicalizar(...)` mantém-se).
-
-A FONTE 2 (classificações reais — linha 250+) **mantém-se inalterada**: a tokenização aí é legítima porque representa descrições reais inteiras, não expressões curadas.
-
-### 4. Adicionar verbos/operações como reforço positivo (não bloquear nunca)
-
-Para reforçar a intenção do utilizador — privilegiar **operações** como negativos legítimos — adicionar uma micro-lista `OPERACOES_ALVO` com palavras canónicas (`fornecimento`, `aplicacao`, `execucao`, `assentamento`, `montagem`, `instalacao`, `colocacao`, `fabrico`, `betonagem`, `pintura`, `impermeabilizacao`, `regularizacao`, `acabamento`, `afagamento`, `polimento`, `envernizamento`). Em `derivarNegativos`, dar bónus `+0.10` ao `score` quando o candidato pertence a este conjunto. Isto não cria novos negativos a partir do nada — apenas favorece os candidatos que já passam os gates estatísticos e que descrevem operações. Sem alteração nos thresholds.
-
-### 5. Limpeza retroactiva
-
-No bloco de limpeza já existente em `processRun` (referência: linha 1114, filtro por `tipo='termo_negativo'`), estender o predicado para também apagar registos cuja forma canónica está em `MATERIAIS_CONSTRUCAO`. Mantém-se a limpeza por `BLOQUEIO_DEMOLICOES_ESTRUTURA` para a família correspondente.
-
-Logar separadamente: `negativos removidos por serem materiais: N`.
-
-## Fora do âmbito
-
-- Geração de positivos (palavras-chave, sinónimos, expressões, materiais) — pode continuar a aceitar `cimento`, `bloco`, `argamassa` quando relevante para o artigo.
-- Motor de classificação, UI do Knowledge Builder, schema, edge functions.
-
-## Como validar
-
-1. **Biblioteca Mestra → Construtor de Conhecimento** → escolher *Pinturas* → **Regenerar tudo (apenas IA)**. Nenhum artigo deve apresentar `betão`, `reboco`, `gesso`, `cimento` como negativo.
-2. Repetir para *Demolições Estruturais*: nenhum artigo deve apresentar `bloco`, `tijolo`, `betonilha`, `argamassa`, `cimento` como negativo; verbos como `betonagem`, `aplicacao`, `assentamento` podem aparecer se passarem nos gates.
-3. Repetir para *Rebocos*: `cimento`, `areia`, `cal` ausentes dos negativos.
-4. Confirmar nos logs da run a linha `negativos removidos por serem materiais: N` na limpeza retroactiva.
+- Não devem aparecer negativos como `argamassa de cimento e areia`, `junta horizontal e vertical`, `cimento aluminoso`, `tijolo cerâmico`, `fibra de polipropileno`, `betonilha`, `alvenaria`.
+- Expressões como `fornecimento e assentamento de alvenaria` devem passar apenas como `fornecimento e assentamento`.
+- Expressões como `fornecimento e aplicação de betonilha` devem passar apenas como `fornecimento e aplicação`.
+- Se não houver operação incompatível segura, o sistema deve registar que não encontrou negativos com confiança suficiente.
