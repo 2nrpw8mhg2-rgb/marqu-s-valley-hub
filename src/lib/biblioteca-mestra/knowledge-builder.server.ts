@@ -82,6 +82,35 @@ function tokenGenerico(c: string): boolean {
   return STOPWORDS.has(c) || GENERICOS_OBRA.has(c);
 }
 
+// ============================================================
+// Bloqueio estrutural por família de especialidade.
+// Termos canónicos que NUNCA podem virar negativos para artigos cuja
+// especialidade pertença à família. São conceitos estruturais transversais
+// a toda a obra (betão, laje, viga, pilar, sapata, muro, perfil, ferro, aço,
+// estrutura, demolição, corte, desmontagem, metálica) — gerá-los como
+// negativos destruiria o score dos artigos onde são centrais.
+// ============================================================
+const BLOQUEIO_DEMOLICOES_ESTRUTURA = new Set<string>(
+  [
+    "betao", "laje", "viga", "pilar", "sapata", "muro", "estrutura",
+    "estrutural", "metalica", "metalico", "perfil", "ferro", "aco",
+    "corte", "desmontagem", "demolicao", "armadura", "cofragem",
+    "betonagem", "fundacao", "parede", "alvenaria", "tijolo",
+  ].map((t) => canonicalizar(t)).filter(Boolean)
+);
+
+// Inferir família a partir do nome/código da especialidade.
+function familiaEspecialidade(nomeEsp: string, codigoEsp?: string | null): string | null {
+  const n = normalize(`${codigoEsp ?? ""} ${nomeEsp}`);
+  if (/demoli|estrutur|betao|bet[aã]o|fundac|alvenaria/.test(n)) return "demolicoes_estrutura";
+  return null;
+}
+
+function bloqueioParaFamilia(familia: string | null): Set<string> {
+  if (familia === "demolicoes_estrutura") return BLOQUEIO_DEMOLICOES_ESTRUTURA;
+  return new Set();
+}
+
 function admin(): Sb {
   return createClient<Database>(
     process.env.SUPABASE_URL!,
