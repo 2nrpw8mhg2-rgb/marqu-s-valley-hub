@@ -303,18 +303,18 @@ function derivarNegativos(
       totalAll += artSet.size;
       if (espId === artigoEspId) continue;
       const total = idx.totalPorEsp.get(espId) ?? 0;
-      if (total < 6) continue;
+      if (total < 3) continue;
       const dom = artSet.size / total;
       if (dom > bestDom) { bestDom = dom; bestEsp = espId; bestSize = artSet.size; }
     }
-    if (totalAll < 8) continue;
-    if (bestSize < 6) continue;
-    if (bestDom < 0.65 || !bestEsp) continue;
+    if (totalAll < 3) continue;
+    if (bestSize < 3) continue;
+    if (bestDom < 0.40 || !bestEsp) continue;
     const exclusividade = totalAll > 0 ? bestSize / totalAll : 0;
-    if (exclusividade < 0.80) continue;
+    if (exclusividade < 0.65) continue;
 
     const score = exclusividade * bestDom;
-    if (score < 0.55) continue;
+    if (score < 0.30) continue;
 
     out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, score });
   }
@@ -324,7 +324,7 @@ function derivarNegativos(
   const altas: GeneratedTermo[] = [];
   const medias: GeneratedTermo[] = [];
   for (const n of out) {
-    const nivel: "alta" | "media" = n.score >= 0.70 ? "alta" : "media";
+    const nivel: "alta" | "media" = n.score >= 0.55 ? "alta" : "media";
     const just =
       `"${n.termo}" é específico de ${idx.nomeEsp.get(n.espDom) ?? ""} ` +
       `(${n.suporte} de ${n.totalAll} ocorrências; ${Math.round(n.exclusividade * 100)}% exclusividade, ` +
@@ -332,16 +332,16 @@ function derivarNegativos(
     if (nivel === "alta" && altas.length < maxAlta) {
       altas.push({
         termo: n.termo,
-        peso: 30, // será sinalizado negativo em persistir()
-        confianca: Math.round(Math.min(95, 80 + n.score * 15)),
+        peso: 30,
+        confianca: Math.round(Math.min(95, 70 + n.score * 25)),
         fonte: "vizinhos",
         justificacao: just,
       });
     } else if (nivel === "media" && medias.length < maxMedia) {
       medias.push({
         termo: n.termo,
-        peso: 0, // sugestão: motor ignora; utilizador valida e edita o peso
-        confianca: Math.round(Math.min(75, 55 + (n.score - 0.55) * 130)),
+        peso: 0,
+        confianca: Math.round(Math.min(70, 45 + (n.score - 0.30) * 100)),
         fonte: "vizinhos",
         justificacao: `[sugestão] ${just}`,
       });
