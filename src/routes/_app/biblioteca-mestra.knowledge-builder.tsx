@@ -25,6 +25,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Brain, Play, Square, Sparkles, Search } from "lucide-react";
 import { toast } from "sonner";
+import { KnowledgeRunReport } from "@/components/biblioteca-mestra/KnowledgeRunReport";
 
 export const Route = createFileRoute("/_app/biblioteca-mestra/knowledge-builder")({
   head: () => ({ meta: [{ title: "Knowledge Builder — Biblioteca Mestra" }] }),
