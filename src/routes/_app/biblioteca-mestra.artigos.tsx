@@ -22,6 +22,8 @@ import { Plus, Pencil, Trash2, Search, X, Sparkles, FolderInput, Power, GitBranc
 import type { Especialidade, Subespecialidade, Categoria, ArtigoMestre, ArtigoKeyword, Unidade, ArtigoTipo, ArtigoEstadoIA } from "@/lib/biblioteca-mestra/types";
 import { ARTIGO_TIPOS, ARTIGO_ESTADOS_IA } from "@/lib/biblioteca-mestra/types";
 import { ArtigoRelacoesDialog } from "@/components/biblioteca-mestra/ArtigoRelacoesDialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArtigoConhecimentoTab } from "@/components/biblioteca-mestra/ArtigoConhecimentoTab";
 
 export const Route = createFileRoute("/_app/biblioteca-mestra/artigos")({
   head: () => ({ meta: [{ title: "Artigos Mestre — Biblioteca Mestra — MV OS" }] }),
