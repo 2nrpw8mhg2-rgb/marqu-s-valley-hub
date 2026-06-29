@@ -134,6 +134,20 @@ const MATERIAIS_CONSTRUCAO = new Set<string>(
     // Elementos construtivos comuns
     "parede", "pavimento", "tecto", "teto", "laje", "viga", "pilar",
     "calcada", "lajeta", "lajeado", "pave", "cubo", "paralelo",
+    // Sistemas / produtos / componentes que descrevem o objecto, não a acção
+    "alvenaria", "revestimento", "isolamento", "produto", "sistema",
+    "componente", "elemento", "material", "materiais",
+  ].map((t) => canonicalizar(t)).filter(Boolean)
+);
+
+const OBJETOS_NEUTROS_DEMOLICOES = new Set<string>(
+  [
+    ...MATERIAIS_CONSTRUCAO,
+    "argamassa", "cimento", "areia", "junta", "tijolo", "ceramico",
+    "fibra", "polipropileno", "betonilha", "alvenaria", "reboco",
+    "revestimento", "revestimentos", "isolamento", "isolamentos",
+    "agregado", "agregados", "betao", "produto", "produtos", "sistema",
+    "sistemas", "componente", "componentes", "elemento", "elementos",
   ].map((t) => canonicalizar(t)).filter(Boolean)
 );
 
@@ -145,9 +159,68 @@ const OPERACOES_ALVO = new Set<string>(
     "fornecimento", "aplicacao", "execucao", "assentamento", "montagem",
     "instalacao", "colocacao", "fabrico", "betonagem", "pintura",
     "impermeabilizacao", "regularizacao", "acabamento", "afagamento",
-    "polimento", "envernizamento",
+    "polimento", "envernizamento", "construcao",
+    "fornecimento e aplicacao", "fornecimento e assentamento",
   ].map((t) => canonicalizar(t)).filter(Boolean)
 );
+
+const OPERACOES_INCOMPATIVEIS_DEMOLICOES: Array<{ re: RegExp; termo: string }> = [
+  { re: /\bfornecimento e aplicacao\b/, termo: "fornecimento e aplicação" },
+  { re: /\bfornecimento e assentamento\b/, termo: "fornecimento e assentamento" },
+  { re: /\bexecucao\b/, termo: "execução" },
+  { re: /\bconstrucao\b/, termo: "construção" },
+  { re: /\bassentamento\b/, termo: "assentamento" },
+  { re: /\bmontagem\b/, termo: "montagem" },
+  { re: /\binstalacao\b/, termo: "instalação" },
+  { re: /\baplicacao\b/, termo: "aplicação" },
+  { re: /\bcolocacao\b/, termo: "colocação" },
+  { re: /\bfabrico\b/, termo: "fabrico" },
+  { re: /\bbetonagem\b/, termo: "betonagem" },
+  { re: /\bregularizacao\b/, termo: "regularização" },
+  { re: /\bacabamento\b/, termo: "acabamento" },
+  { re: /\bpintura\b/, termo: "pintura" },
+  { re: /\bimpermeabilizacao\b/, termo: "impermeabilização" },
+];
+
+function contemTermoCanonico(canon: string, termos: Set<string>): boolean {
+  if (!canon) return false;
+  if (termos.has(canon)) return true;
+  for (const t of canon.split(" ").filter(Boolean)) {
+    if (termos.has(lemaSingular(t))) return true;
+  }
+  for (const termo of termos) {
+    if (termo.includes(" ") && new RegExp(`(^| )${termo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( |$)`).test(canon)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function artigoEhDemolicao(...partes: Array<string | null | undefined>): boolean {
+  return /\bdemoli/.test(normalize(partes.filter(Boolean).join(" ")));
+}
+
+function extrairOperacaoIncompativelDemolicoes(termoCanon: string): string | null {
+  for (const op of OPERACOES_INCOMPATIVEIS_DEMOLICOES) {
+    if (op.re.test(termoCanon)) return op.termo;
+  }
+  return null;
+}
+
+function sanearNegativoDemolicoes(termo: string): string | null {
+  const c = canonicalizar(termo);
+  if (!c) return null;
+
+  const operacao = extrairOperacaoIncompativelDemolicoes(c);
+  if (operacao) return operacao;
+
+  // Em Demolições, materiais/produtos/sistemas/componentes são neutros: podem
+  // ser o objecto demolido, mas nunca o motivo de exclusão.
+  if (contemTermoCanonico(c, OBJETOS_NEUTROS_DEMOLICOES)) return null;
+
+  // Regra conservadora: sem operação incompatível clara, não há negativo seguro.
+  return null;
+}
 
 // Inferir família a partir do nome/código da especialidade.
 function familiaEspecialidade(nomeEsp: string, codigoEsp?: string | null): string | null {
