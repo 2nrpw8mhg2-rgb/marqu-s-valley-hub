@@ -1057,7 +1057,42 @@ export async function processRun(runId: string) {
             }`
           );
         }
+
+        // Derivar termos negativos a partir do índice estatístico.
+        if (fontes.especialidadeId) {
+          const vocPositivo = new Set<string>();
+          for (const k of ["palavras_chave", "sinonimos", "expressoes", "materiais"] as const) {
+            for (const t of gen[k]) {
+              const c = canonicalizar(t.termo);
+              if (c) vocPositivo.add(c);
+            }
+          }
+          // Termos já gravados (modo "novos") também contam como positivos.
+          for (const e of fontes.existentes) {
+            if (e.tipo !== "termo_negativo") {
+              const c = canonicalizar(e.termo as string);
+              if (c) vocPositivo.add(c);
+            }
+          }
+          // Tokens da descrição do próprio artigo nunca podem virar negativos.
+          for (const tok of tokenize(fontes.artigo.descricao)) {
+            vocPositivo.add(lemaSingular(tok));
+          }
+          gen.termos_negativos = derivarNegativos(fontes.especialidadeId, vocPositivo, indice);
+        }
+
+        // Validação cruzada: elimina conflitos positivo/negativo e duplicados.
+        const conflitos = resolverConflitos(gen);
+        if (conflitos.removidosNegativos || conflitos.removidosDup) {
+          await appendLog(
+            sb,
+            runId,
+            `validação: -${conflitos.removidosNegativos} negativos em conflito, -${conflitos.removidosDup} duplicados`
+          );
+        }
+
         const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes);
+
 
         // correcoes do utilizador para este artigo
         if (fontes.artigo.codigo) {
