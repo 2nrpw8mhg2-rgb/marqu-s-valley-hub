@@ -1272,9 +1272,13 @@ export async function processRun(runId: string) {
         const fam = familiaPorArtigo.get(r.artigo_mestre_id as string) ?? null;
         const bloq = bloqueioParaFamilia(fam);
         if (bloq.has(c)) return true;
-        if (demolicaoPorArtigo.get(r.artigo_mestre_id as string) && !sanearNegativoDemolicoes(c)) {
-          removidosDemolicoes++;
-          return true;
+        if (demolicaoPorArtigo.get(r.artigo_mestre_id as string)) {
+          const saneado = sanearNegativoDemolicoes(c);
+          const saneadoCanon = saneado ? canonicalizar(saneado) : "";
+          if (!saneadoCanon || saneadoCanon !== c) {
+            removidosDemolicoes++;
+            return true;
+          }
         }
         return false;
       }).map((r) => r.id as string);
