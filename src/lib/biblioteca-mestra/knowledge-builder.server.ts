@@ -73,6 +73,201 @@ function tokenize(s: string): string[] {
     .filter((t) => t.length >= 4 && !STOPWORDS.has(t));
 }
 
+// Reduz um token pt-PT a uma forma singular aproximada.
+// Heurística suficiente para deduplicar "betão"/"betões", "viga"/"vigas",
+// "muro"/"muros", "pilar"/"pilares" sem necessitar de dicionário externo.
+function lemaSingular(token: string): string {
+  if (!token || token.length < 4) return token;
+  if (/ões$/.test(token)) return token.replace(/ões$/, "ao");
+  if (/ães$/.test(token)) return token.replace(/ães$/, "ao");
+  if (/oes$/.test(token)) return token.replace(/oes$/, "ao");
+  if (/aes$/.test(token)) return token.replace(/aes$/, "ao");
+  if (/eis$/.test(token)) return token.replace(/eis$/, "el");
+  if (/ais$/.test(token)) return token.replace(/ais$/, "al");
+  if (/ois$/.test(token)) return token.replace(/ois$/, "ol");
+  if (/uis$/.test(token)) return token.replace(/uis$/, "ul");
+  if (/ns$/.test(token)) return token.replace(/ns$/, "m");
+  if (/res$/.test(token)) return token.replace(/res$/, "r");
+  if (/zes$/.test(token)) return token.replace(/zes$/, "z");
+  if (/ses$/.test(token) && token.length >= 5) return token.replace(/ses$/, "s");
+  if (/s$/.test(token) && !/[êéó]s$/.test(token) && !/às$/.test(token)) {
+    return token.replace(/s$/, "");
+  }
+  return token;
+}
+
+// Forma canónica usada para comparar/deduplicar termos.
+// minúsculas + sem acentos + sem pontuação + espaços únicos + lema singular
+// por palavra. Nunca usar para mostrar — só para comparar.
+function canonicalizar(s: string): string {
+  const n = normalize(s).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  if (!n) return "";
+  return n.split(" ").filter(Boolean).map(lemaSingular).join(" ");
+}
+
+// ============================================================
+// Índice estatístico inter-especialidades
+// Construído UMA VEZ no início da run; usado para derivar
+// termos_negativos de forma determinística (não inventados pela IA).
+// ============================================================
+
+type IndiceGlobal = {
+  // termoCanonico -> espId -> conjunto de artigos onde aparece
+  termoEspArtigos: Map<string, Map<string, Set<string>>>;
+  // espId -> nº de artigos ativos
+  totalPorEsp: Map<string, number>;
+  // espId -> nome legível
+  nomeEsp: Map<string, string>;
+  // artigoId -> espId
+  artigoEsp: Map<string, string>;
+};
+
+function addToIdx(idx: IndiceGlobal, termoCanon: string, espId: string, artigoId: string) {
+  if (!termoCanon || termoCanon.length < 4) return;
+  let m = idx.termoEspArtigos.get(termoCanon);
+  if (!m) { m = new Map(); idx.termoEspArtigos.set(termoCanon, m); }
+  let s = m.get(espId);
+  if (!s) { s = new Set(); m.set(espId, s); }
+  s.add(artigoId);
+}
+
+async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
+  const idx: IndiceGlobal = {
+    termoEspArtigos: new Map(),
+    totalPorEsp: new Map(),
+    nomeEsp: new Map(),
+    artigoEsp: new Map(),
+  };
+
+  const { data: esps } = await sb.from("biblioteca_especialidades").select("id, nome");
+  for (const e of esps ?? []) idx.nomeEsp.set(e.id as string, (e.nome as string) ?? "");
+
+  const { data: subs } = await sb
+    .from("biblioteca_subespecialidades")
+    .select("id, especialidade_id");
+  const subEsp = new Map<string, string>();
+  for (const s of subs ?? []) subEsp.set(s.id as string, s.especialidade_id as string);
+
+  const { data: arts } = await sb
+    .from("biblioteca_artigos")
+    .select("id, subespecialidade_id, descricao")
+    .eq("ativo", true);
+
+  for (const a of arts ?? []) {
+    const espId = subEsp.get(a.subespecialidade_id as string);
+    if (!espId) continue;
+    const aid = a.id as string;
+    idx.artigoEsp.set(aid, espId);
+    idx.totalPorEsp.set(espId, (idx.totalPorEsp.get(espId) ?? 0) + 1);
+    for (const tok of tokenize((a.descricao as string) ?? "")) {
+      addToIdx(idx, lemaSingular(tok), espId, aid);
+    }
+  }
+
+  // Termos positivos já gravados reforçam o índice
+  const { data: conhec } = await sb
+    .from("biblioteca_artigo_conhecimento")
+    .select("artigo_mestre_id, tipo, termo")
+    .eq("ativo", true)
+    .in("tipo", ["palavra_chave", "sinonimo", "expressao", "material"]);
+  for (const r of conhec ?? []) {
+    const espId = idx.artigoEsp.get(r.artigo_mestre_id as string);
+    if (!espId) continue;
+    const c = canonicalizar(r.termo as string);
+    if (c) addToIdx(idx, c, espId, r.artigo_mestre_id as string);
+  }
+
+  return idx;
+}
+
+// Calcula termos negativos para um artigo a partir do índice global.
+// Critério: termo praticamente ausente nesta especialidade e
+// dominante (≥40% dos artigos) noutra especialidade.
+function derivarNegativos(
+  artigoEspId: string,
+  vocPositivoCanonico: Set<string>,
+  idx: IndiceGlobal,
+  maxResultados = 12
+): GeneratedTermo[] {
+  const totalThisEsp = idx.totalPorEsp.get(artigoEspId) ?? 0;
+  type Cand = { termo: string; espDom: string; domPct: number };
+  const out: Cand[] = [];
+
+  for (const [termoCanon, espMap] of idx.termoEspArtigos.entries()) {
+    if (termoCanon.length < 4) continue;
+    if (STOPWORDS.has(termoCanon)) continue;
+    if (vocPositivoCanonico.has(termoCanon)) continue;
+    // Termo já presente neste artigo via outro vocabulário
+    const thisEspSet = espMap.get(artigoEspId);
+    const presencaThis = totalThisEsp > 0 ? (thisEspSet?.size ?? 0) / totalThisEsp : 0;
+    if (presencaThis > 0.02) continue;
+
+    let bestEsp = "", bestDom = 0;
+    for (const [espId, artSet] of espMap.entries()) {
+      if (espId === artigoEspId) continue;
+      const total = idx.totalPorEsp.get(espId) ?? 0;
+      if (total < 3) continue;
+      const dom = artSet.size / total;
+      if (dom > bestDom) { bestDom = dom; bestEsp = espId; }
+    }
+    if (bestDom < 0.40 || !bestEsp) continue;
+    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom });
+  }
+
+  out.sort((a, b) => b.domPct - a.domPct);
+  return out.slice(0, maxResultados).map((n) => ({
+    termo: n.termo,
+    peso: 30,
+    confianca: Math.round(Math.min(95, 55 + n.domPct * 40)),
+    fonte: "vizinhos",
+    justificacao: `Predominante em ${idx.nomeEsp.get(n.espDom) ?? ""} (${Math.round(n.domPct * 100)}%) e ausente neste artigo.`,
+  }));
+}
+
+// Garante que nenhum termo aparece em duas listas e que não há duplicados
+// dentro da mesma lista (comparados pela forma canónica).
+function resolverConflitos(gen: Generated): { removidosNegativos: number; removidosDup: number } {
+  let removidosNegativos = 0;
+  let removidosDup = 0;
+
+  const positivos = new Set<string>();
+  for (const k of ["palavras_chave", "sinonimos", "expressoes", "materiais"] as const) {
+    for (const t of gen[k]) {
+      const c = canonicalizar(t.termo);
+      if (c) positivos.add(c);
+    }
+  }
+
+  const dedup = (arr: GeneratedTermo[]): GeneratedTermo[] => {
+    const seen = new Set<string>();
+    const out: GeneratedTermo[] = [];
+    for (const t of arr) {
+      const c = canonicalizar(t.termo);
+      if (!c) continue;
+      if (seen.has(c)) { removidosDup++; continue; }
+      seen.add(c);
+      out.push(t);
+    }
+    return out;
+  };
+
+  gen.palavras_chave = dedup(gen.palavras_chave);
+  gen.sinonimos = dedup(gen.sinonimos);
+  gen.expressoes = dedup(gen.expressoes);
+  gen.materiais = dedup(gen.materiais);
+
+  const filteredNeg: GeneratedTermo[] = [];
+  for (const t of gen.termos_negativos) {
+    const c = canonicalizar(t.termo);
+    if (!c) { continue; }
+    if (positivos.has(c)) { removidosNegativos++; continue; }
+    filteredNeg.push(t);
+  }
+  gen.termos_negativos = dedup(filteredNeg);
+  return { removidosNegativos, removidosDup };
+}
+
+
 export type Scope =
   | { tipo: "especialidade"; especialidadeId: string }
   | { tipo: "subespecialidade"; subespecialidadeId: string }
