@@ -45,6 +45,7 @@ const sections: { title: string; items: NavItem[] }[] = [
       { to: "/biblioteca-mestra/sistemas", label: "Sistemas Construtivos", icon: Layers },
       { to: "/biblioteca-mestra/unidades", label: "Unidades", icon: Layers },
       { to: "/biblioteca-mestra/templates", label: "Templates de Obra", icon: HardHat },
+      { to: "/biblioteca-mestra/knowledge-builder", label: "Knowledge Builder", icon: Wand2 },
     ],
   },
   {
