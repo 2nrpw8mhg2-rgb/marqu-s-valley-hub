@@ -99,6 +99,56 @@ const BLOQUEIO_DEMOLICOES_ESTRUTURA = new Set<string>(
   ].map((t) => canonicalizar(t)).filter(Boolean)
 );
 
+// ============================================================
+// Materiais / produtos / elementos construtivos — NUNCA podem virar
+// termo negativo em nenhuma especialidade. Identificam o objecto sobre
+// o qual o trabalho é executado, não o tipo de trabalho. Tratá-los como
+// negativos destruiria o score de artigos legítimos (ex.: "demolição de
+// parede em bloco de betão" pertence a Demolições, mas contém "bloco",
+// "betão", "parede").
+// ============================================================
+const MATERIAIS_CONSTRUCAO = new Set<string>(
+  [
+    // Massas e ligantes
+    "betao", "bloco", "tijolo", "cimento", "cimenticio", "argamassa",
+    "areia", "brita", "gravilha", "agregado", "inerte", "cal",
+    // Pedra e madeira
+    "pedra", "granito", "marmore", "ardosia", "calcario",
+    "madeira", "contraplacado", "mdf", "osb",
+    // Metais
+    "aco", "ferro", "aluminio", "cobre", "latao", "inox", "zinco", "chumbo",
+    // Plásticos / tubagens
+    "pvc", "ppr", "peex", "multicamada", "polietileno", "polipropileno",
+    // Cerâmicos e revestimentos
+    "ceramica", "ceramico", "mosaico", "azulejo", "porcelanico", "gres",
+    "terracota",
+    // Acabamentos e bases
+    "reboco", "estuque", "betonilha", "gesso", "pladur",
+    // Isolamentos
+    "la mineral", "la de rocha", "la de vidro", "xps", "eps", "poliuretano",
+    "cortica",
+    // Outros materiais
+    "argila", "fibra", "junta", "selante", "mastique", "vidro", "espelho",
+    "tela", "geotextil", "membrana", "papel", "tinta", "primario", "verniz",
+    "esmalte", "asfalto", "betume",
+    // Elementos construtivos comuns
+    "parede", "pavimento", "tecto", "teto", "laje", "viga", "pilar",
+    "calcada", "lajeta", "lajeado", "pave", "cubo", "paralelo",
+  ].map((t) => canonicalizar(t)).filter(Boolean)
+);
+
+// Operações / acções / verbos que identificam trabalho. Quando um candidato
+// a negativo pertence a este conjunto, recebe bónus de score (ainda tem de
+// passar os gates estatísticos — não é injectado do nada).
+const OPERACOES_ALVO = new Set<string>(
+  [
+    "fornecimento", "aplicacao", "execucao", "assentamento", "montagem",
+    "instalacao", "colocacao", "fabrico", "betonagem", "pintura",
+    "impermeabilizacao", "regularizacao", "acabamento", "afagamento",
+    "polimento", "envernizamento",
+  ].map((t) => canonicalizar(t)).filter(Boolean)
+);
+
 // Inferir família a partir do nome/código da especialidade.
 function familiaEspecialidade(nomeEsp: string, codigoEsp?: string | null): string | null {
   const n = normalize(`${codigoEsp ?? ""} ${nomeEsp}`);
@@ -110,6 +160,7 @@ function bloqueioParaFamilia(familia: string | null): Set<string> {
   if (familia === "demolicoes_estrutura") return BLOQUEIO_DEMOLICOES_ESTRUTURA;
   return new Set();
 }
+
 
 function admin(): Sb {
   return createClient<Database>(
