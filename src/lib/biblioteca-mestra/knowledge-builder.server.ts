@@ -1032,6 +1032,25 @@ export async function processRun(runId: string) {
       .eq("id", runId);
     await appendLog(sb, runId, `Início: ${ids.length} artigos no âmbito`);
 
+    // Limpeza inicial: apaga negativos antigos que sejam stopwords ou
+    // vocabulário genérico de obra (resíduos de versões anteriores).
+    try {
+      const { data: antigos } = await sb
+        .from("biblioteca_artigo_conhecimento")
+        .select("id, termo")
+        .eq("tipo", "termo_negativo");
+      const aRemover = (antigos ?? []).filter((r) => {
+        const c = canonicalizar((r.termo as string) ?? "");
+        return c && tokenGenerico(c);
+      }).map((r) => r.id as string);
+      if (aRemover.length) {
+        await sb.from("biblioteca_artigo_conhecimento").delete().in("id", aRemover);
+        await appendLog(sb, runId, `Limpeza: removidos ${aRemover.length} negativos genéricos antigos`);
+      }
+    } catch (e: any) {
+      await appendLog(sb, runId, `Limpeza falhou (ignorado): ${e?.message ?? e}`);
+    }
+
     // Índice estatístico inter-especialidades (calculado UMA vez por run).
     await appendLog(sb, runId, "A construir índice estatístico inter-especialidades…");
     const indice = await construirIndiceGlobal(sb);
