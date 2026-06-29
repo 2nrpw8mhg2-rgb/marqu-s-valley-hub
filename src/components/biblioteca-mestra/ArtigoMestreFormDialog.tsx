@@ -41,12 +41,33 @@ export function ArtigoMestreFormDialog({ open, onOpenChange, initial }: Props) {
   const [editing, setEditing] = useState<ArtigoFormState | null>(initial);
   const [kwPos, setKwPos] = useState("");
   const [kwNeg, setKwNeg] = useState("");
+  const [tab, setTab] = useState<"geral" | "conhecimento">("geral");
+
+  const { data: countConhecimento = 0 } = useQuery({
+    queryKey: ["bm-conhecimento-count", editing?.id],
+    queryFn: async () => {
+      if (!editing?.id) return 0;
+      const { count } = await supabase
+        .from("biblioteca_artigo_conhecimento")
+        .select("id", { count: "exact", head: true })
+        .eq("artigo_mestre_id", editing.id)
+        .eq("ativo", true);
+      return count ?? 0;
+    },
+    enabled: !!editing?.id && open,
+  });
 
   useEffect(() => {
     setEditing(initial);
     setKwPos("");
     setKwNeg("");
   }, [initial, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    setTab(countConhecimento > 0 ? "conhecimento" : "geral");
+  }, [countConhecimento, editing?.id, open]);
+
 
   const { data: esps = [] } = useQuery({
     queryKey: ["bm-esp"],
@@ -128,11 +149,19 @@ export function ArtigoMestreFormDialog({ open, onOpenChange, initial }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle>{editing?.id ? "Editar" : "Novo"} Artigo Mestre</DialogTitle></DialogHeader>
-        <Tabs defaultValue="geral" className="w-full">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "geral" | "conhecimento")} className="w-full">
           <TabsList>
             <TabsTrigger value="geral">Geral</TabsTrigger>
-            <TabsTrigger value="conhecimento">Conhecimento IA</TabsTrigger>
+            <TabsTrigger value="conhecimento" className="gap-1.5">
+              Conhecimento IA
+              {countConhecimento > 0 && (
+                <Badge variant="secondary" className="h-5 px-1.5 text-[10px] tabular-nums">
+                  {countConhecimento}
+                </Badge>
+              )}
+            </TabsTrigger>
           </TabsList>
+
           <TabsContent value="geral" className="space-y-3 max-h-[70vh] overflow-y-auto mt-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -210,8 +239,15 @@ export function ArtigoMestreFormDialog({ open, onOpenChange, initial }: Props) {
           <div><Label>Observações</Label><Textarea value={editing?.observacoes ?? ""} onChange={(e) => setEditing({ ...editing, observacoes: e.target.value })} /></div>
           <div className="flex items-center gap-2"><Switch checked={editing?.ativo ?? true} onCheckedChange={(v) => setEditing({ ...editing, ativo: v })} /><Label>Ativo</Label></div>
 
+          <div className="rounded-md border border-dashed bg-muted/30 p-2 text-xs text-muted-foreground">
+            As palavras-chave, sinónimos, expressões, materiais e termos negativos gerados pela IA
+            estão no separador <span className="font-medium text-foreground">Conhecimento IA</span>.
+            Os campos abaixo são apenas para palavras-chave manuais simples (legado).
+          </div>
+
           <div>
             <Label>Palavras-chave positivas</Label>
+
             <div className="flex gap-2 mt-1">
               <Input value={kwPos} onChange={(e) => setKwPos(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addKw("positivas", kwPos); setKwPos(""); } }} placeholder="Premir Enter para adicionar" />
               <Button type="button" variant="outline" onClick={() => { addKw("positivas", kwPos); setKwPos(""); }}>Adicionar</Button>

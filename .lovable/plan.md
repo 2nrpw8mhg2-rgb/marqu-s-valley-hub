@@ -1,79 +1,76 @@
-# Relatório Final do Knowledge Builder — qualquer âmbito
+## Diagnóstico
 
-## Problema
+O dialog **Editar Artigo Mestre** (categorias → editar) já tem dois separadores:
 
-Hoje o **Relatório Final de Conhecimento** só é construído quando o âmbito é **Artigo Mestre** (`scope.tipo === "artigo"`). Para Especialidade e Subespecialidade, o `resumo` guardado é apenas `{ fontes, counts }` e a UI cai para o painel "Progresso" com totais e logs técnicos — exactamente o que o utilizador quer eliminar como resultado principal.
+- **Geral** → campos do artigo + duas listas legadas "Palavras-chave positivas/negativas" (tabela antiga `biblioteca_artigo_keywords`, nunca alimentada pelo Knowledge Builder).
+- **Conhecimento IA** → componente `ArtigoConhecimentoTab` que já mostra TUDO o que pediste: palavras-chave, sinónimos, expressões, materiais e termos negativos, com confiança, peso, ocorrências, exemplos, origem (IA / MQ / orçamentos / vizinhos / utilizador) e ações (aprovar, editar, desativar, eliminar). Lê de `biblioteca_artigo_conhecimento`, a mesma tabela que o Knowledge Builder escreve.
 
-A solução é estender o mesmo relatório (com agrupamento por tipo **e** por Artigo Mestre) a Especialidade e Subespecialidade, mantendo os logs apenas numa secção colapsável "Logs técnicos".
+O problema é puramente de **descoberta**: o separador não sinaliza que tem conteúdo, e o separador "Geral" mostra listas vazias que parecem ser o sítio dos termos.
 
-## O que vai mudar
+## Alterações (todas em `ArtigoMestreFormDialog.tsx`)
 
-### 1. Backend — `src/lib/biblioteca-mestra/knowledge-builder.server.ts`
+### 1. Badge de contagem no separador "Conhecimento IA"
 
-Construir o `resumo` rico para **todos os âmbitos**, não só `artigo`.
+Carregar a contagem de termos ativos por artigo quando o dialog abre em modo edição:
 
-Durante o ciclo `for (const artigoId of ids)`:
-- Acumular por artigo: `codigo`, `descricao`, contexto (esp/sub/cat), `novosIds` desse artigo, `fontesPorArtigo` (historico/cand/vizinhos/correcoes), `errado?` flag.
-- Manter `antesSnapshot` por artigo (mini-snapshot count por tipo + confiança ponderada) para calcular `perTipo.antes/depois/delta` agregados.
-
-No fim, em vez do bloco actual restrito a `scope.tipo==="artigo"`:
-- Carregar `biblioteca_artigo_conhecimento` para **todos os `ids` processados** com sucesso (`.in("artigo_mestre_id", ids)`), incluindo `artigo_mestre_id` no select.
-- Construir:
-  - `escopo`: `{ tipo, especialidade, subespecialidade, artigo? }` resolvido por nome/código (lookup leve nas tabelas `biblioteca_especialidades`/`biblioteca_subespecialidades`/`biblioteca_artigos`).
-  - `execucao`: `{ totalArtigos, processados, saltados, falhados, modo }`.
-  - `perTipo` agregado (antes/depois/delta somado sobre todos os artigos).
-  - `perOrigem` agregado.
-  - `confiancaGlobal` ponderada por peso sobre todos os termos.
-  - `fontes` (agregadas): `historico { total, validados, auto, descricoesUnicas }`, `candidatos { total }`, `vizinhos { artigos, exemplos }`, `correcoes { total }`, `reutilizados { total }`.
-  - `termos`: lista achatada com `{ id, artigoMestreId, artigoCodigo, artigoDescricao, tipo, termo, peso, confianca, origem, ocorrencias, exemplos, justificacao, novo }`.
-  - `artigos`: `[{ id, codigo, descricao, contexto, totalTermos, novos, falhou?, erro? }]` para a vista "por Artigo Mestre".
-  - `counts`, `semHistorico`, `erro`.
-
-Para âmbito = Artigo continua a funcionar (caso degenerado de `ids.length === 1`).
-
-### 2. Tipos — `src/lib/biblioteca-mestra/types.ts`
-
-Estender `KnowledgeRunReport`:
-- Adicionar `escopo: { tipo: "especialidade"|"subespecialidade"|"artigo"; especialidade?: string; subespecialidade?: string; artigo?: {id, codigo, descricao} }`.
-- Adicionar `execucao: { totalArtigos, processados, saltados, falhados, modo }`.
-- Adicionar `artigos: KnowledgeRunReportArtigo[]` (novo tipo com totais por artigo).
-- Em `KnowledgeRunReportTermo`, adicionar `artigoMestreId`, `artigoCodigo`, `artigoDescricao` (opcionais para compatibilidade).
-- Tornar `artigo` (single) opcional / mantê-lo só preenchido para âmbito Artigo.
-
-### 3. UI — `src/components/biblioteca-mestra/KnowledgeRunReport.tsx`
-
-Refactor para suportar âmbito alargado mantendo a estética actual:
-
-- **Cabeçalho**: título dinâmico
-  - Artigo → mantém actual.
-  - Subespecialidade → "030.01 — Demolições Gerais" + breadcrumb da especialidade.
-  - Especialidade → nome da especialidade.
-- **Resumo da execução**: cartões com `Artigos processados X/Y · Saltados · Falhados · Modo · Estado`.
-- **Antes vs Depois** (totais agregados) — já existe, passa a usar `perTipo` agregado.
-- **Fontes analisadas** — já existe, passa a usar fontes agregadas.
-- **Conhecimento gerado** — duas vistas via tabs `Tabs` (shadcn):
-  - **Por Tipo** (vista actual com `Accordion` dos 5 tipos, todos os termos achatados).
-  - **Por Artigo Mestre**: `Accordion` por artigo (código + descrição + badge "X termos / Y novos"); dentro, sub-accordion ou secções compactas por tipo só com os termos desse artigo.
-- **Detalhe do termo** (sheet): adicionar linha "Artigo Mestre: <código — descrição>" quando vier preenchido.
-- **Logs técnicos** (colapsável `Collapsible`, fechado por defeito) no fundo — move o que hoje aparece no painel de progresso (`log[]`, mensagens `A:0 B:0 C:11`).
-- **Ações**: o botão "Aprovar conhecimento" continua a funcionar (a função já lê `resumo.termos` e aprova `novo && origem==='ia'` de qualquer artigo). "Editar conhecimento" só fica disponível para âmbito Artigo.
-
-### 4. Página — `src/routes/_app/biblioteca-mestra.knowledge-builder.tsx`
-
-Substituir a condição actual:
-```
-s.estado === "concluido" && s.scope_tipo === "artigo" && (s.resumo as any)?.termos
-```
-por simplesmente:
-```
-s.estado === "concluido" && (s.resumo as any)?.termos
+```tsx
+const { data: countConhecimento = 0 } = useQuery({
+  queryKey: ["bm-conhecimento-count", editing?.id],
+  queryFn: async () => {
+    if (!editing?.id) return 0;
+    const { count } = await supabase
+      .from("biblioteca_artigo_conhecimento")
+      .select("id", { count: "exact", head: true })
+      .eq("artigo_mestre_id", editing.id)
+      .eq("ativo", true);
+    return count ?? 0;
+  },
+  enabled: !!editing?.id,
+});
 ```
 
-O painel de Progresso fica visível apenas enquanto `isRunning`/`erro`/`cancelado`. Quando concluído, mostra apenas o `KnowledgeRunReport`.
+E no separador:
 
-## Out of scope
+```tsx
+<TabsTrigger value="conhecimento" className="gap-1.5">
+  Conhecimento IA
+  {countConhecimento > 0 && (
+    <Badge variant="secondary" className="h-5 px-1.5 text-[10px] tabular-nums">
+      {countConhecimento}
+    </Badge>
+  )}
+</TabsTrigger>
+```
 
-- Sem mudanças no motor de geração da IA, prompt, ou tabelas.
-- Sem novas server functions.
-- Sem alterações ao schema do `biblioteca_knowledge_run` (o `resumo jsonb` aceita o payload alargado).
-- Sem export por artigo (o export JSON actual continua a despejar o `report` completo).
+### 2. Abrir no separador "Conhecimento IA" quando o artigo já tem termos
+
+Trocar `defaultValue="geral"` por estado controlado:
+
+```tsx
+const [tab, setTab] = useState<"geral" | "conhecimento">("geral");
+useEffect(() => {
+  if (countConhecimento > 0) setTab("conhecimento");
+  else setTab("geral");
+}, [countConhecimento, editing?.id]);
+<Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+```
+
+### 3. Nota no separador "Geral"
+
+Acima das listas legadas "Palavras-chave positivas/negativas", adicionar uma nota discreta que aponta para o separador novo, para que o utilizador não se confunda com dois sítios para a mesma coisa:
+
+```tsx
+<div className="rounded-md border border-dashed bg-muted/30 p-2 text-xs text-muted-foreground">
+  As palavras-chave, sinónimos, expressões, materiais e termos negativos gerados pela IA
+  estão no separador <span className="font-medium text-foreground">Conhecimento IA</span>.
+  Os campos abaixo são apenas para palavras-chave manuais simples (legado).
+</div>
+```
+
+(Não remover as listas legadas neste passo — podem ainda ser usadas por outros utilizadores; apenas sinalizar a hierarquia.)
+
+## Fora do âmbito
+
+- Não alterar `ArtigoConhecimentoTab` (já mostra tudo).
+- Não tocar nas tabelas, no Knowledge Builder, nem na lógica de geração/aprovação.
+- Não migrar nem eliminar `biblioteca_artigo_keywords` (decisão separada).
