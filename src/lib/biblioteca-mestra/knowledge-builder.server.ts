@@ -437,7 +437,7 @@ async function callAI(prompt: string): Promise<Generated> {
   };
 }
 
-type PersistResult = { inseridos: number; perTipo: Record<string, number> };
+type PersistResult = { inseridos: number; perTipo: Record<string, number>; novosIds: string[] };
 
 function calcOcorrenciasEExemplos(
   termo: string,
@@ -520,11 +520,16 @@ async function persistir(
     }
   }
 
+  let novosIds: string[] = [];
   if (rows.length) {
-    const { error } = await sb.from("biblioteca_artigo_conhecimento").insert(rows);
+    const { data: ins, error } = await sb
+      .from("biblioteca_artigo_conhecimento")
+      .insert(rows)
+      .select("id");
     if (error) throw error;
+    novosIds = (ins ?? []).map((r) => r.id as string);
   }
-  return { inseridos: rows.length, perTipo };
+  return { inseridos: rows.length, perTipo, novosIds };
 }
 
 async function appendLog(sb: Sb, runId: string, msg: string) {
@@ -576,6 +581,40 @@ export async function processRun(runId: string) {
     let saltados = 0;
     let falhados = 0;
     let ultimaFontes: Fontes | null = null;
+    const novosIdsAll: string[] = [];
+
+    // snapshot "antes" para relatório de artigo
+    let antesSnapshot: {
+      perTipo: Record<string, { count: number; somaPeso: number; somaPesoConf: number }>;
+      confiancaGlobal: number;
+      total: number;
+    } | null = null;
+    if (scope.tipo === "artigo") {
+      const { data: prev } = await sb
+        .from("biblioteca_artigo_conhecimento")
+        .select("tipo, peso, confianca")
+        .eq("artigo_mestre_id", scope.artigoId)
+        .eq("ativo", true);
+      const snap = {
+        perTipo: {} as Record<string, { count: number; somaPeso: number; somaPesoConf: number }>,
+        confiancaGlobal: 0,
+        total: (prev ?? []).length,
+      };
+      let sp = 0, spc = 0;
+      for (const r of prev ?? []) {
+        const t = r.tipo as string;
+        const p = Math.abs(Number(r.peso) || 0);
+        const c = Number(r.confianca) || 0;
+        if (!snap.perTipo[t]) snap.perTipo[t] = { count: 0, somaPeso: 0, somaPesoConf: 0 };
+        snap.perTipo[t].count++;
+        snap.perTipo[t].somaPeso += p;
+        snap.perTipo[t].somaPesoConf += p * c;
+        sp += p;
+        spc += p * c;
+      }
+      snap.confiancaGlobal = sp > 0 ? Math.round(spc / sp) : 0;
+      antesSnapshot = snap;
+    }
 
     for (const artigoId of ids) {
       const { data: chk } = await sb
@@ -619,6 +658,7 @@ export async function processRun(runId: string) {
         const prompt = buildPrompt(fontes, run.modo as Modo);
         const gen = await callAI(prompt);
         const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes);
+        novosIdsAll.push(...res.novosIds);
 
         for (const k of Object.keys(res.perTipo)) counts[k] = (counts[k] ?? 0) + res.perTipo[k];
         processados++;
@@ -650,29 +690,98 @@ export async function processRun(runId: string) {
     if (scope.tipo === "artigo") {
       const { data: rows } = await sb
         .from("biblioteca_artigo_conhecimento")
-        .select("tipo, confianca, peso, origem")
+        .select("id, tipo, termo, peso, confianca, origem, ocorrencias, exemplos, justificacao")
         .eq("artigo_mestre_id", scope.artigoId)
-        .eq("ativo", true);
-      const perTipo: Record<string, number> = {
-        palavra_chave: 0, sinonimo: 0, expressao: 0, material: 0, termo_negativo: 0,
-      };
+        .eq("ativo", true)
+        .order("tipo")
+        .order("peso", { ascending: false });
+
+      const TIPOS = ["palavra_chave", "sinonimo", "expressao", "material", "termo_negativo"];
+      const perTipoDepois: Record<string, { count: number; somaPeso: number; somaPesoConf: number }> = {};
       const perOrigem: Record<string, number> = {};
-      let somaPeso = 0;
-      let somaPesoConf = 0;
+      let somaPeso = 0, somaPesoConf = 0;
+      const novosSet = new Set(novosIdsAll);
+      const termos: any[] = [];
+
       for (const r of rows ?? []) {
-        perTipo[r.tipo as string] = (perTipo[r.tipo as string] ?? 0) + 1;
-        perOrigem[r.origem as string] = (perOrigem[r.origem as string] ?? 0) + 1;
+        const t = r.tipo as string;
         const p = Math.abs(Number(r.peso) || 0);
+        const c = Number(r.confianca) || 0;
+        if (!perTipoDepois[t]) perTipoDepois[t] = { count: 0, somaPeso: 0, somaPesoConf: 0 };
+        perTipoDepois[t].count++;
+        perTipoDepois[t].somaPeso += p;
+        perTipoDepois[t].somaPesoConf += p * c;
+        perOrigem[r.origem as string] = (perOrigem[r.origem as string] ?? 0) + 1;
         somaPeso += p;
-        somaPesoConf += p * (Number(r.confianca) || 0);
+        somaPesoConf += p * c;
+        termos.push({
+          id: r.id,
+          tipo: r.tipo,
+          termo: r.termo,
+          peso: r.peso,
+          confianca: r.confianca,
+          origem: r.origem,
+          ocorrencias: r.ocorrencias ?? 0,
+          exemplos: r.exemplos ?? [],
+          justificacao: r.justificacao ?? null,
+          novo: novosSet.has(r.id as string),
+        });
       }
+
+      const perTipo: Record<string, { antes: number; depois: number; delta: number }> = {};
+      for (const t of TIPOS) {
+        const a = antesSnapshot?.perTipo?.[t]?.count ?? 0;
+        const d = perTipoDepois[t]?.count ?? 0;
+        perTipo[t] = { antes: a, depois: d, delta: d - a };
+      }
+
+      // correcoes do utilizador (best-effort por código de artigo)
+      let correcoesTotal = 0;
+      if (ultimaFontes?.artigo?.codigo) {
+        const { count } = await sb
+          .from("classificacao_aprendizagem")
+          .select("id", { count: "exact", head: true })
+          .eq("codigo_artigo", ultimaFontes.artigo.codigo);
+        correcoesTotal = count ?? 0;
+      }
+
+      const reutilizados = (rows ?? []).length - novosIdsAll.length;
+      const confiancaDepois = somaPeso > 0 ? Math.round(somaPesoConf / somaPeso) : 0;
+
       resumo = {
+        artigo: {
+          id: scope.artigoId,
+          codigo: ultimaFontes?.artigo?.codigo ?? "",
+          descricao: ultimaFontes?.artigo?.descricao ?? "",
+          especialidade: ultimaFontes?.contexto?.especialidade ?? "",
+          subespecialidade: ultimaFontes?.contexto?.subespecialidade ?? "",
+          categoria: ultimaFontes?.contexto?.categoria ?? "",
+        },
+        confiancaGlobal: {
+          antes: antesSnapshot?.confiancaGlobal ?? 0,
+          depois: confiancaDepois,
+        },
         perTipo,
         perOrigem,
         total: (rows ?? []).length,
-        confiancaGlobal: somaPeso > 0 ? Math.round(somaPesoConf / somaPeso) : 0,
+        totalNovos: novosIdsAll.length,
+        fontes: {
+          historico: {
+            total: ultimaFontes?.totalHistorico ?? 0,
+            validados: ultimaFontes?.historicoValidados ?? 0,
+            auto: ultimaFontes?.historicoAuto ?? 0,
+            descricoesUnicas: ultimaFontes?.historico?.length ?? 0,
+          },
+          candidatos: { total: ultimaFontes?.totalCandidatos ?? 0 },
+          vizinhos: {
+            artigos: ultimaFontes?.vizinhosArtigos ?? 0,
+            exemplos: (ultimaFontes?.vizinhos ?? []).reduce((acc, v) => acc + v.exemplos.length, 0),
+          },
+          correcoes: { total: correcoesTotal },
+          reutilizados: { total: Math.max(0, reutilizados) },
+        },
+        termos,
         counts,
-        fontes: fontesAgg,
         semHistorico: ultimaFontes?.semHistorico ?? false,
       };
     }

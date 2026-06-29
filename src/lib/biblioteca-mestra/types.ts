@@ -127,6 +127,45 @@ export type ArtigoConhecimento = {
   updated_at: string;
 };
 
+export type KnowledgeRunReportTermo = {
+  id: string;
+  tipo: ConhecimentoTipo;
+  termo: string;
+  peso: number;
+  confianca: number;
+  origem: ConhecimentoOrigem;
+  ocorrencias: number;
+  exemplos: string[];
+  justificacao: string | null;
+  novo: boolean;
+};
+
+export type KnowledgeRunReport = {
+  artigo: {
+    id: string;
+    codigo: string;
+    descricao: string;
+    especialidade: string;
+    subespecialidade: string;
+    categoria: string;
+  };
+  confiancaGlobal: { antes: number; depois: number };
+  perTipo: Record<ConhecimentoTipo, { antes: number; depois: number; delta: number }>;
+  perOrigem: Record<string, number>;
+  total: number;
+  totalNovos: number;
+  fontes: {
+    historico: { total: number; validados: number; auto: number; descricoesUnicas: number };
+    candidatos: { total: number };
+    vizinhos: { artigos: number; exemplos: number };
+    correcoes: { total: number };
+    reutilizados: { total: number };
+  };
+  termos: KnowledgeRunReportTermo[];
+  counts: Record<string, number>;
+  semHistorico: boolean;
+};
+
 export const CONHECIMENTO_TIPOS: {
   value: ConhecimentoTipo;
   label: string;
