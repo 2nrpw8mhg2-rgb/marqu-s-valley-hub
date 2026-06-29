@@ -980,8 +980,8 @@ async function persistir(
       const key = `${meta.tipo}::${t.termo.toLowerCase()}`;
       if (setExist.has(key)) continue;
       setExist.add(key);
-      const peso = Number.isFinite(t.peso) && t.peso !== 0 ? t.peso : meta.pesoDefault;
-      const pesoFinal = meta.sign < 0 ? -Math.abs(peso) : Math.abs(peso);
+      const pesoBruto = Number.isFinite(t.peso) ? t.peso : meta.pesoDefault;
+      const pesoFinal = pesoBruto === 0 ? 0 : (meta.sign < 0 ? -Math.abs(pesoBruto) : Math.abs(pesoBruto));
       const { ocorrencias, exemplos } = calcOcorrenciasEExemplos(t.termo, fontes.historico, fontes.candidatos);
       // Prefer reported fonte; auto-promote to historico if termo really aparece no histórico.
       let fonte: FonteOrigem = t.fonte ?? "inferido";
