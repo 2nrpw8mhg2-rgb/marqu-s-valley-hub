@@ -547,7 +547,7 @@ ${linhasA}
 FONTE B — Descrições BRUTAS candidatas (peso MÉDIO, top ${candidatos.length} de ${fontes.totalCandidatos} encontradas em orçamentos importados ainda não classificados):
 ${linhasB}
 
-FONTE C — Artigos VIZINHOS na mesma subespecialidade (peso BAIXO, usar p/ termos negativos e diferenciação):
+FONTE C — Artigos VIZINHOS na mesma subespecialidade (peso BAIXO, usar p/ diferenciação):
 ${linhasC}
 ${existentesTxt}${avisoSemHist}
 
@@ -556,18 +556,21 @@ GERA até ${TIPO_LIMIT} elementos por tipo, em JSON estrito:
   "palavras_chave": [{"termo":"...","peso":<5..50>,"confianca":<0..100>,"fonte":"historico|candidatos|vizinhos|inferido","justificacao":"..."}],
   "sinonimos":      [{"termo":"...","peso":<5..30>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
   "expressoes":     [{"termo":"...","peso":<10..60>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
-  "materiais":      [{"termo":"...","peso":<3..20>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
-  "termos_negativos":[{"termo":"...","peso":<5..40>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}]
+  "materiais":      [{"termo":"...","peso":<3..20>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}]
 }
+
+⚠ NÃO GERES termos_negativos. São derivados automaticamente pelo sistema a partir
+de análise estatística inter-especialidades. Qualquer "termos_negativos" no teu output
+será descartado.
 
 REGRAS DE CONFIANÇA POR FONTE
 - fonte="historico" → 80-95 (95 se aparecer em descrições [validado])
 - fonte="candidatos" → 55-80 (proporcional à similaridade observada)
-- fonte="vizinhos" → 40-60 (usar sobretudo p/ termos_negativos)
+- fonte="vizinhos" → 40-60 (usar para discriminar termos próprios deste artigo)
 - fonte="inferido" → 50-70 (terminologia técnica geral relacionada)
 
 REGRAS DE IDIOMA — PORTUGUÊS DE PORTUGAL (OBRIGATÓRIO E NÃO NEGOCIÁVEL)
-- Todo o output (termos, sinónimos, expressões, materiais, termos negativos e justificações) DEVE estar em **Português de Portugal (pt-PT)**. Proibido pt-BR, inglês ou mistura.
+- Todo o output (termos, sinónimos, expressões, materiais e justificações) DEVE estar em **Português de Portugal (pt-PT)**. Proibido pt-BR, inglês ou mistura.
 - A Biblioteca Mestra é referência de terminologia portuguesa da construção civil (mapas de quantidades, cadernos de encargos, medições). Usa sempre vocabulário praticado em Portugal por engenheiros, arquitetos, medidores e empreiteiros.
 - Normalização OBRIGATÓRIA — nunca gerar a forma pt-BR como termo principal:
   concreto→betão · concreto armado→betão armado · concretagem→betonagem · concreto magro→betão de limpeza ·
@@ -586,12 +589,13 @@ REGRAS DE IDIOMA — PORTUGUÊS DE PORTUGAL (OBRIGATÓRIO E NÃO NEGOCIÁVEL)
 REGRAS
 - Termos técnicos, minúsculas, sem pontuação supérflua, exclusivamente pt-PT.
 - Expressões são frases curtas (2-6 palavras) típicas de MQ portugueses, ex: "fornecimento e aplicação de".
-- Termos negativos: palavras associadas a OUTROS artigos (ver FONTE C) que devem reduzir confiança neste.
+- Nunca repitas o mesmo termo (mesma raiz/singular/plural) em listas diferentes.
 - "fonte" é OBRIGATÓRIO em cada termo.
 - justificacao = UMA frase curta (máx. 120 caracteres), em pt-PT.
 - NÃO inventes materiais sem evidência nas fontes.
 - Devolve APENAS o JSON, sem comentários, sem markdown.`;
 }
+
 
 // ============================================================
 // Camada de normalização linguística pt-BR → pt-PT
