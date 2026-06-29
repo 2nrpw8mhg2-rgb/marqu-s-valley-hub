@@ -155,36 +155,6 @@ type IndiceGlobal = {
   artigoEsp: Map<string, string>;
 };
 
-function addToIdx(idx: IndiceGlobal, termoCanon: string, espId: string, artigoId: string) {
-  if (!termoCanon || termoCanon.length < 4) return;
-  let m = idx.termoEspArtigos.get(termoCanon);
-  if (!m) { m = new Map(); idx.termoEspArtigos.set(termoCanon, m); }
-  let s = m.get(espId);
-  if (!s) { s = new Set(); m.set(espId, s); }
-  s.add(artigoId);
-}
-
-async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
-  const idx: IndiceGlobal = {
-    termoEspArtigos: new Map(),
-    totalPorEsp: new Map(),
-    nomeEsp: new Map(),
-    artigoEsp: new Map(),
-  };
-
-  const { data: esps } = await sb.from("biblioteca_especialidades").select("id, nome");
-  for (const e of esps ?? []) idx.nomeEsp.set(e.id as string, (e.nome as string) ?? "");
-
-  const { data: subs } = await sb
-    .from("biblioteca_subespecialidades")
-    .select("id, especialidade_id");
-  const subEsp = new Map<string, string>();
-  for (const s of subs ?? []) subEsp.set(s.id as string, s.especialidade_id as string);
-
-  const { data: arts } = await sb
-    .from("biblioteca_artigos")
-    .select("id, subespecialidade_id, descricao")
-    .eq("ativo", true);
 
 function addToIdx(idx: IndiceGlobal, termoCanon: string, espId: string, artigoId: string) {
   if (tokenGenerico(termoCanon)) return;
