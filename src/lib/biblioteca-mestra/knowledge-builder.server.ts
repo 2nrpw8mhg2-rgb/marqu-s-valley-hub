@@ -1093,20 +1093,40 @@ export async function processRun(runId: string) {
       .eq("id", runId);
     await appendLog(sb, runId, `Início: ${ids.length} artigos no âmbito`);
 
-    // Limpeza inicial: apaga negativos antigos que sejam stopwords ou
-    // vocabulário genérico de obra (resíduos de versões anteriores).
+    // Limpeza inicial: apaga negativos antigos que sejam stopwords,
+    // vocabulário genérico de obra, ou termos estruturais bloqueados para
+    // artigos da família demolições/estrutura (resíduos de versões anteriores).
     try {
       const { data: antigos } = await sb
         .from("biblioteca_artigo_conhecimento")
-        .select("id, termo")
+        .select("id, termo, artigo_mestre_id")
         .eq("tipo", "termo_negativo");
+
+      // Família por artigo mestre, para aplicar bloqueio estrutural.
+      const artIds = Array.from(new Set((antigos ?? []).map((r) => r.artigo_mestre_id as string)));
+      const familiaPorArtigo = new Map<string, string | null>();
+      if (artIds.length) {
+        const { data: artsFam } = await sb
+          .from("biblioteca_artigos")
+          .select("id, biblioteca_subespecialidades(biblioteca_especialidades(nome))")
+          .in("id", artIds);
+        for (const r of (artsFam ?? []) as any[]) {
+          const nomeEsp = r?.biblioteca_subespecialidades?.biblioteca_especialidades?.nome ?? "";
+          familiaPorArtigo.set(r.id as string, familiaEspecialidade(nomeEsp, null));
+        }
+      }
+
       const aRemover = (antigos ?? []).filter((r) => {
         const c = canonicalizar((r.termo as string) ?? "");
-        return c && tokenGenerico(c);
+        if (!c) return false;
+        if (tokenGenerico(c)) return true;
+        const fam = familiaPorArtigo.get(r.artigo_mestre_id as string) ?? null;
+        const bloq = bloqueioParaFamilia(fam);
+        return bloq.has(c);
       }).map((r) => r.id as string);
       if (aRemover.length) {
         await sb.from("biblioteca_artigo_conhecimento").delete().in("id", aRemover);
-        await appendLog(sb, runId, `Limpeza: removidos ${aRemover.length} negativos genéricos antigos`);
+        await appendLog(sb, runId, `Limpeza: removidos ${aRemover.length} negativos inválidos antigos (genéricos ou estruturais bloqueados)`);
       }
     } catch (e: any) {
       await appendLog(sb, runId, `Limpeza falhou (ignorado): ${e?.message ?? e}`);
