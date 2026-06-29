@@ -61,6 +61,53 @@ export type Database = {
           },
         ]
       }
+      biblioteca_artigo_conhecimento: {
+        Row: {
+          artigo_mestre_id: string
+          ativo: boolean
+          confianca: number
+          created_at: string
+          id: string
+          origem: Database["public"]["Enums"]["biblioteca_conhecimento_origem"]
+          peso: number
+          termo: string
+          tipo: Database["public"]["Enums"]["biblioteca_conhecimento_tipo"]
+          updated_at: string
+        }
+        Insert: {
+          artigo_mestre_id: string
+          ativo?: boolean
+          confianca?: number
+          created_at?: string
+          id?: string
+          origem?: Database["public"]["Enums"]["biblioteca_conhecimento_origem"]
+          peso?: number
+          termo: string
+          tipo: Database["public"]["Enums"]["biblioteca_conhecimento_tipo"]
+          updated_at?: string
+        }
+        Update: {
+          artigo_mestre_id?: string
+          ativo?: boolean
+          confianca?: number
+          created_at?: string
+          id?: string
+          origem?: Database["public"]["Enums"]["biblioteca_conhecimento_origem"]
+          peso?: number
+          termo?: string
+          tipo?: Database["public"]["Enums"]["biblioteca_conhecimento_tipo"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_artigo_conhecimento_artigo_mestre_id_fkey"
+            columns: ["artigo_mestre_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       biblioteca_artigo_keywords: {
         Row: {
           artigo_id: string
@@ -1720,6 +1767,8 @@ export type Database = {
         Returns: boolean
       }
       normalizar_descricao: { Args: { _t: string }; Returns: string }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role: "admin" | "orcamentista" | "diretor_obra" | "comprador"
@@ -1733,6 +1782,17 @@ export type Database = {
         | "transporte"
         | "taxa_licenca"
         | "outros"
+      biblioteca_conhecimento_origem:
+        | "ia"
+        | "utilizador"
+        | "sistema"
+        | "importacao"
+      biblioteca_conhecimento_tipo:
+        | "palavra_chave"
+        | "sinonimo"
+        | "expressao"
+        | "material"
+        | "termo_negativo"
       biblioteca_keyword_origem: "manual" | "ia"
       biblioteca_keyword_tipo: "positiva" | "negativa"
       categoria_sistema:
@@ -1964,6 +2024,19 @@ export const Constants = {
         "transporte",
         "taxa_licenca",
         "outros",
+      ],
+      biblioteca_conhecimento_origem: [
+        "ia",
+        "utilizador",
+        "sistema",
+        "importacao",
+      ],
+      biblioteca_conhecimento_tipo: [
+        "palavra_chave",
+        "sinonimo",
+        "expressao",
+        "material",
+        "termo_negativo",
       ],
       biblioteca_keyword_origem: ["manual", "ia"],
       biblioteca_keyword_tipo: ["positiva", "negativa"],
