@@ -49,6 +49,39 @@ const STOPWORDS = new Set([
   "respetivos", "respetivas", "incluindo", "trabalhos",
 ]);
 
+// Vocabulário genérico de obra: verbos/substantivos comuns a TODAS as
+// especialidades. Nunca podem virar termos negativos porque não discriminam
+// nada. Já em forma canónica (sem acentos, singular aproximado).
+const GENERICOS_OBRA = new Set([
+  "fornecimento", "aplicacao", "execucao", "instalacao", "montagem", "desmontagem",
+  "remocao", "demolicao", "transporte", "carga", "descarga", "limpeza", "ensaio",
+  "teste", "testes", "verificacao", "controlo", "manutencao", "reparacao",
+  "substituicao", "ligacao", "integracao", "acabamento", "acabamentos",
+  "preparacao", "regularizacao", "nivelamento", "protecao", "isolamento",
+  "vedacao", "fixacao", "alinhamento", "assentamento", "implantacao",
+  "marcacao", "medicao", "gestao", "coordenacao", "supervisao", "seguranca",
+  "qualidade", "conformidade", "norma", "normas", "especificacao", "projeto",
+  "desenho", "peca", "pecas", "item", "itens", "artigo", "artigos", "trabalho",
+  "trabalhos", "servico", "servicos", "obra", "obras", "estaleiro", "material",
+  "materiais", "equipamento", "equipamentos", "ferramenta", "ferramentas",
+  "unidade", "metro", "metros", "tonelada", "conjunto", "kit", "sistema",
+  "sistemas", "componente", "componentes", "elemento", "elementos", "tipo",
+  "tipos", "modelo", "modelos", "marca", "marcas", "cor", "cores", "dimensao",
+  "dimensoes", "espessura", "altura", "largura", "comprimento", "diametro",
+  "qualquer", "diversos", "varios", "geral", "gerais", "novo", "novos", "nova",
+  "novas", "existente", "existentes", "incluido", "incluidos", "incluindo",
+  "necessario", "necessaria", "respetivo", "respetiva", "respetivos",
+  "respetivas", "completo", "completa", "completos", "completas",
+]);
+
+function tokenGenerico(c: string): boolean {
+  if (!c) return true;
+  if (/\d/.test(c)) return true;
+  if (c.length < 5) return true;
+  if (c.includes(" ")) return false;
+  return STOPWORDS.has(c) || GENERICOS_OBRA.has(c);
+}
+
 function admin(): Sb {
   return createClient<Database>(
     process.env.SUPABASE_URL!,
@@ -122,8 +155,9 @@ type IndiceGlobal = {
   artigoEsp: Map<string, string>;
 };
 
+
 function addToIdx(idx: IndiceGlobal, termoCanon: string, espId: string, artigoId: string) {
-  if (!termoCanon || termoCanon.length < 4) return;
+  if (tokenGenerico(termoCanon)) return;
   let m = idx.termoEspArtigos.get(termoCanon);
   if (!m) { m = new Map(); idx.termoEspArtigos.set(termoCanon, m); }
   let s = m.get(espId);
@@ -148,23 +182,21 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
   const subEsp = new Map<string, string>();
   for (const s of subs ?? []) subEsp.set(s.id as string, s.especialidade_id as string);
 
+  // Apenas mapeamento artigo→especialidade e total por especialidade.
+  // NÃO tokenizamos descrições mestras (contêm muito vocabulário genérico).
   const { data: arts } = await sb
     .from("biblioteca_artigos")
-    .select("id, subespecialidade_id, descricao")
+    .select("id, subespecialidade_id")
     .eq("ativo", true);
 
   for (const a of arts ?? []) {
     const espId = subEsp.get(a.subespecialidade_id as string);
     if (!espId) continue;
-    const aid = a.id as string;
-    idx.artigoEsp.set(aid, espId);
+    idx.artigoEsp.set(a.id as string, espId);
     idx.totalPorEsp.set(espId, (idx.totalPorEsp.get(espId) ?? 0) + 1);
-    for (const tok of tokenize((a.descricao as string) ?? "")) {
-      addToIdx(idx, lemaSingular(tok), espId, aid);
-    }
   }
 
-  // Termos positivos já gravados reforçam o índice
+  // FONTE 1: termos positivos já curados na biblioteca.
   const { data: conhec } = await sb
     .from("biblioteca_artigo_conhecimento")
     .select("artigo_mestre_id, tipo, termo")
@@ -177,12 +209,37 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
     if (c) addToIdx(idx, c, espId, r.artigo_mestre_id as string);
   }
 
+  // FONTE 2: classificações reais (validadas ou auto) — único sinal de uso real.
+  const { data: classifs } = await sb
+    .from("classificacao_artigos")
+    .select("descricao_original, artigo_mestre_id, estado")
+    .in("estado", ["validado", "classificado_auto"])
+    .not("artigo_mestre_id", "is", null);
+  for (const r of classifs ?? []) {
+    const aid = r.artigo_mestre_id as string | null;
+    if (!aid) continue;
+    const espId = idx.artigoEsp.get(aid);
+    if (!espId) continue;
+    const vistos = new Set<string>();
+    for (const tok of tokenize((r.descricao_original as string) ?? "")) {
+      const c = lemaSingular(tok);
+      if (vistos.has(c)) continue;
+      vistos.add(c);
+      addToIdx(idx, c, espId, aid);
+    }
+  }
+
   return idx;
 }
 
 // Calcula termos negativos para um artigo a partir do índice global.
-// Critério: termo praticamente ausente nesta especialidade e
-// dominante (≥40% dos artigos) noutra especialidade.
+// Critérios estatísticos cumulativos para evitar falsos negativos:
+//  - termo aparece em ≥ 5 artigos no total (suporte global)
+//  - ≥ 4 artigos numa especialidade dominante (suporte absoluto)
+//  - ≥ 50 % dos artigos dessa especialidade contêm o termo (dominância relativa)
+//  - ≥ 70 % de TODAS as ocorrências estão concentradas nessa especialidade (exclusividade)
+//  - ausente ou quase ausente neste artigo (presença ≤ 1 %, ≤ 1 artigo)
+//  - não é stopword nem vocabulário genérico de obra
 function derivarNegativos(
   artigoEspId: string,
   vocPositivoCanonico: Set<string>,
@@ -190,37 +247,45 @@ function derivarNegativos(
   maxResultados = 12
 ): GeneratedTermo[] {
   const totalThisEsp = idx.totalPorEsp.get(artigoEspId) ?? 0;
-  type Cand = { termo: string; espDom: string; domPct: number };
+  type Cand = { termo: string; espDom: string; domPct: number; exclusividade: number; suporte: number; totalAll: number };
   const out: Cand[] = [];
 
   for (const [termoCanon, espMap] of idx.termoEspArtigos.entries()) {
-    if (termoCanon.length < 4) continue;
-    if (STOPWORDS.has(termoCanon)) continue;
+    if (tokenGenerico(termoCanon)) continue;
     if (vocPositivoCanonico.has(termoCanon)) continue;
-    // Termo já presente neste artigo via outro vocabulário
-    const thisEspSet = espMap.get(artigoEspId);
-    const presencaThis = totalThisEsp > 0 ? (thisEspSet?.size ?? 0) / totalThisEsp : 0;
-    if (presencaThis > 0.02) continue;
 
-    let bestEsp = "", bestDom = 0;
+    const thisEspSet = espMap.get(artigoEspId);
+    const thisCount = thisEspSet?.size ?? 0;
+    if (thisCount > 1) continue;
+    const presencaThis = totalThisEsp > 0 ? thisCount / totalThisEsp : 0;
+    if (presencaThis > 0.01) continue;
+
+    let bestEsp = "", bestDom = 0, bestSize = 0;
+    let totalAll = 0;
     for (const [espId, artSet] of espMap.entries()) {
+      totalAll += artSet.size;
       if (espId === artigoEspId) continue;
       const total = idx.totalPorEsp.get(espId) ?? 0;
       if (total < 3) continue;
       const dom = artSet.size / total;
-      if (dom > bestDom) { bestDom = dom; bestEsp = espId; }
+      if (dom > bestDom) { bestDom = dom; bestEsp = espId; bestSize = artSet.size; }
     }
-    if (bestDom < 0.40 || !bestEsp) continue;
-    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom });
+    if (totalAll < 5) continue;
+    if (bestSize < 4) continue;
+    if (bestDom < 0.50 || !bestEsp) continue;
+    const exclusividade = totalAll > 0 ? bestSize / totalAll : 0;
+    if (exclusividade < 0.70) continue;
+
+    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll });
   }
 
-  out.sort((a, b) => b.domPct - a.domPct);
+  out.sort((a, b) => (b.exclusividade * b.domPct) - (a.exclusividade * a.domPct));
   return out.slice(0, maxResultados).map((n) => ({
     termo: n.termo,
     peso: 30,
-    confianca: Math.round(Math.min(95, 55 + n.domPct * 40)),
+    confianca: Math.round(Math.min(95, 55 + n.exclusividade * n.domPct * 45)),
     fonte: "vizinhos",
-    justificacao: `Predominante em ${idx.nomeEsp.get(n.espDom) ?? ""} (${Math.round(n.domPct * 100)}%) e ausente neste artigo.`,
+    justificacao: `Específico de ${idx.nomeEsp.get(n.espDom) ?? ""} (${n.suporte} de ${n.totalAll} ocorrências, ${Math.round(n.exclusividade * 100)}%) e ausente neste artigo.`,
   }));
 }
 
@@ -966,6 +1031,25 @@ export async function processRun(runId: string) {
       .update({ estado: "em_curso", total_artigos: ids.length })
       .eq("id", runId);
     await appendLog(sb, runId, `Início: ${ids.length} artigos no âmbito`);
+
+    // Limpeza inicial: apaga negativos antigos que sejam stopwords ou
+    // vocabulário genérico de obra (resíduos de versões anteriores).
+    try {
+      const { data: antigos } = await sb
+        .from("biblioteca_artigo_conhecimento")
+        .select("id, termo")
+        .eq("tipo", "termo_negativo");
+      const aRemover = (antigos ?? []).filter((r) => {
+        const c = canonicalizar((r.termo as string) ?? "");
+        return c && tokenGenerico(c);
+      }).map((r) => r.id as string);
+      if (aRemover.length) {
+        await sb.from("biblioteca_artigo_conhecimento").delete().in("id", aRemover);
+        await appendLog(sb, runId, `Limpeza: removidos ${aRemover.length} negativos genéricos antigos`);
+      }
+    } catch (e: any) {
+      await appendLog(sb, runId, `Limpeza falhou (ignorado): ${e?.message ?? e}`);
+    }
 
     // Índice estatístico inter-especialidades (calculado UMA vez por run).
     await appendLog(sb, runId, "A construir índice estatístico inter-especialidades…");
