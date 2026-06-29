@@ -550,7 +550,11 @@ function ArtigosPage() {
                     <button onClick={() => setEditing({ ...editing!, negativas: (editing!.negativas ?? []).filter((x) => x !== t) })}><X className="h-3 w-3" /></button>
                   </Badge>
                 ))}
-              </div>
+            </TabsContent>
+            <TabsContent value="conhecimento" className="max-h-[70vh] overflow-y-auto mt-3">
+              <ArtigoConhecimentoTab artigoId={editing?.id ?? null} />
+            </TabsContent>
+          </Tabs>
             </div>
           </div>
           <DialogFooter>
