@@ -1,91 +1,80 @@
-
 ## Problema
 
-O Knowledge Builder está a gerar **os mesmos termos como positivos e negativos** no mesmo artigo (ex.: "betão", "vigas", "pilares" aparecem em palavras-chave **e** em termos negativos de Demolições Estruturais), porque os negativos são livremente inventados pela IA a partir da FONTE C (artigos vizinhos da mesma subespecialidade) e não há validação cruzada antes de gravar. Há ainda duplicados ("betão" três vezes), falta de normalização singular/plural e nenhuma estatística inter-especialidades a sustentar os negativos.
+Mesmo com a derivação determinística, termos como "teste" e "integração" estão a aparecer como negativos em todos os artigos. A causa é tripla:
+
+1. **Fonte demasiado permissiva.** O índice global é alimentado pelos tokens das próprias `biblioteca_artigos.descricao` de TODAS as especialidades. Descrições contêm verbos/substantivos genéricos ("teste de estanquidade", "integração de sistemas", "ensaio", "ligação") que aparecem só numa especialidade pequena (ex.: instalações) e ficam "dominantes" — pelo critério atual, viram negativos para todas as outras.
+2. **Falta de suporte absoluto.** Basta `dom ≥ 40 %` numa especialidade com 3 artigos (2 artigos a conter o termo = 66 %) para o termo ser elegível, mesmo aparecendo só duas vezes na base inteira. Não há limiar mínimo de artigos absolutos nem de exclusividade ("aparece sobretudo aqui").
+3. **Lista de termos genéricos curta.** A `STOPWORDS` cobre conectores mas deixa passar dezenas de verbos/substantivos de obra (teste, ensaio, integração, ligação, montagem, fixação, remoção, transporte, limpeza, controlo, verificação, manutenção, etc.) que nunca devem ser negativos de ninguém porque são vocabulário genérico de construção.
 
 ## Objetivo
 
-Transformar a geração de conhecimento num processo **estatisticamente fundamentado**:
-- Negativos só existem se forem **dominantes noutras especialidades e ausentes neste artigo**.
-- Um termo **nunca** pode estar em duas listas em simultâneo.
-- Tudo normalizado (acentos, plural, espaços) e único.
-- Mostrar **frequência e origem** ao utilizador para explicabilidade.
+Garantir que **só termos especificamente discriminantes** entre especialidades possam virar negativos, com base estatística forte, e nunca verbos/substantivos genéricos de construção civil.
 
-## O que vai mudar
+## O que muda
 
-Toda a alteração concentra-se em `src/lib/biblioteca-mestra/knowledge-builder.server.ts` (motor) e dois pequenos ajustes na UI (`ArtigoConhecimentoTab.tsx` para mostrar frequência/explicação). Sem alterações de schema — os campos `ocorrencias`, `justificacao`, `exemplos` e `confianca` já existem em `biblioteca_artigo_conhecimento`.
+Tudo concentrado em `src/lib/biblioteca-mestra/knowledge-builder.server.ts`. Sem migrações, sem alterações de UI nem de schema.
 
-### 1. Normalização canónica de termos (nova função `canonicalizar`)
+### 1. Fonte do índice mais limpa
 
-Aplicada antes de qualquer comparação ou gravação:
-- minúsculas + remover acentos (já existe em `normalize`)
-- colapsar espaços
-- remover pontuação supérflua
-- **lema singular** simples para pt-PT: regras finais (`ões→ão`, `ães→ão`, `is→l`, `ns→m`, e por último `s$` quando o termo tem ≥4 caracteres e não termina em `ês`/`ós`/`às`)
-- chave única = forma canónica; duplicados eliminados mantendo a melhor confiança/peso
+`construirIndiceGlobal` deixa de tokenizar `biblioteca_artigos.descricao`. O índice global passa a ser construído **apenas** a partir de:
+- `biblioteca_artigo_conhecimento` (positivos: palavra_chave, sinonimo, expressao, material) — já curado.
+- `classificacao_artigos.descricao` e `descricao_original` em estado `validado` ou `auto` — tokenizado, mas atribuído à especialidade do `artigo_mestre_id` resolvido.
 
-### 2. Análise estatística inter-especialidades (novo passo no início do run)
+Resultado: o índice mede o que realmente caracteriza uma especialidade no histórico real, não o vocabulário ruidoso das descrições mestras (que misturam verbos genéricos e técnica).
 
-No arranque de `processRun`, antes do ciclo por artigo, construir **uma só vez** um índice global:
+### 2. Lista alargada de termos genéricos de obra (`GENERICOS_OBRA`)
 
-```text
-termoCanonico → Map<especialidade_id, { artigos: Set<id>, ocorrencias: number }>
+Novo `Set` carregado em conjunto com `STOPWORDS` e aplicado em `derivarNegativos` (e também em `addToIdx` para nem entrar no índice). Inclui, entre outros:
+
+```
+fornecimento, aplicacao, execucao, instalacao, montagem, desmontagem,
+remocao, demolicao, transporte, carga, descarga, limpeza, ensaio, teste,
+verificacao, controlo, manutencao, reparacao, substituicao, ligacao,
+integracao, acabamento, preparacao, regularizacao, nivelamento,
+protecao, isolamento, vedacao, fixacao, alinhamento, assentamento,
+implantacao, marcacao, medicao, gestao, coordenacao, supervisao,
+seguranca, qualidade, conformidade, norma, especificacao, projeto,
+desenho, peca, item, artigo, trabalho, servico, obra, estaleiro,
+material, equipamento, ferramenta, mao, obra, dia, hora, unidade,
+metro, metros, quilo, tonelada, conjunto, kit, sistema, componente
 ```
 
-Fontes alimentadoras:
-- `biblioteca_artigo_conhecimento` (tipos positivos) agrupado por especialidade do artigo
-- `biblioteca_artigos.descricao` tokenizada
-- `classificacao_artigos.descricao_original` (validados/auto) agrupados pela especialidade do `artigo_mestre_id`
+(Já normalizados sem acentos para casar com a forma canónica.)
 
-Resultado: para cada termo conseguimos calcular `dominanciaEspecialidade(termo, espId) = artigosNaEsp / artigosTotaisDaEsp` e identificar a **especialidade dominante**.
+### 3. Critérios estatísticos mais exigentes em `derivarNegativos`
 
-### 3. Geração de negativos passa a ser determinística (não vem da IA)
+Substituir o gate atual (`presencaThis ≤ 2 %` + `dom ≥ 40 %`) por uma combinação simultânea:
 
-A IA continua a gerar `palavras_chave`, `sinonimos`, `expressoes`, `materiais`. **`termos_negativos` deixa de ser pedido à IA** — passa a ser calculado por `derivarNegativos(artigo, indiceGlobal)`:
+- **Suporte absoluto mínimo:** termo tem de aparecer em **≥ 4 artigos** da especialidade dominante (não só percentagem).
+- **Exclusividade:** ≥ **70 %** das ocorrências totais do termo em todas as especialidades estão concentradas na dominante (`artigosNaDom / somaArtigosTodasEsp ≥ 0.70`).
+- **Dominância relativa:** mantém `dom ≥ 0.50` (subido de 0.40) na especialidade dominante.
+- **Ausência aqui:** `presencaThis ≤ 1 %` e `thisEspSet.size ≤ 1` em absoluto.
+- **Total mínimo do índice:** termo aparece em ≥ 5 artigos somando todas as especialidades. Abaixo disso é ruído.
+- **Filtros de natureza:** rejeitar se `GENERICOS_OBRA` contém o termo, se contém dígitos, ou se tem menos de 5 caracteres.
 
-Para cada termo do índice global, é negativo do artigo X se:
-- `dominanciaEspecialidade(termo, espDoArtigo) < 0.02` (praticamente ausente)
-- `max(dominanciaEspecialidade(termo, outraEsp)) ≥ 0.40` (dominante noutra)
-- não pertence ao vocabulário positivo do artigo nem dos seus vizinhos
-- não é stopword nem token genérico (`fornecimento`, `aplicacao`, etc.)
+Limite final mantém-se em 12 negativos por artigo, ordenados por exclusividade × dominância.
 
-Cada negativo carrega `justificacao` automática:
-`"Predominante em Eletricidade (87% dos artigos) e ausente em Demolições Estruturais."`
-`origem = "artigos_vizinhos"` ou nova etiqueta `"estatistica"` (reutilizo `artigos_vizinhos` para não tocar no enum).
+### 4. Justificação mais informativa
 
-### 4. Validação cruzada antes de gravar (novo `resolverConflitos`)
+`justificacao` passa a indicar suporte absoluto e exclusividade:
 
-Logo antes do `persistir`:
-1. Construir `Set<canonical>` de todos os positivos (palavras-chave + sinónimos + expressões + materiais).
-2. Filtrar `termos_negativos` removendo qualquer termo cuja forma canónica esteja no Set positivo.
-3. Eliminar duplicados intra-lista pela forma canónica.
-4. Eliminar negativos que pertençam ao vocabulário dominante do artigo (top-tokens da descrição do artigo + termos com `ocorrencias > 0` no histórico próprio).
-5. Registar no log do run quantos foram filtrados e porquê.
+```
+"Específico de Instalações Elétricas (12 de 14 ocorrências, 86 %) e ausente neste artigo."
+```
 
-### 5. Persistir frequência real
+### 5. Limpeza de negativos antigos contraditórios/genéricos
 
-O `ocorrencias` gravado passa a usar o índice global (nº de artigos onde o termo aparece) em vez de só contar dentro do histórico do próprio artigo, e `justificacao` ganha texto curto do tipo:
-`"Aprendido em 34 MQ · 112 artigos · dominante em Demolições Estruturais (95%)."`
-
-### 6. UI — explicabilidade
-
-Em `src/components/biblioteca-mestra/ArtigoConhecimentoTab.tsx`:
-- Mostrar `termo (N)` onde N = `ocorrencias`.
-- Tooltip/segunda linha com `justificacao` quando existir.
-- Badge "negativo" ganha um ícone de info ligado à `justificacao` que explica em que especialidade é dominante.
-
-Sem alterações na tabela.
+Adicionar passo no início de cada `processRun` (independente do modo escolhido): apagar de `biblioteca_artigo_conhecimento` os registos `tipo = 'termo_negativo'` cujo `canonicalizar(termo)` esteja em `GENERICOS_OBRA` ou `STOPWORDS`, registando no log do run quantos foram removidos. Garante limpeza imediata sem o utilizador ter de saber qual modo usar.
 
 ## Detalhes técnicos
 
-- Mantém-se o `callAI`, mas o prompt deixa de pedir `termos_negativos` (e passa a impor: "**não devolvas termos negativos — são derivados estatisticamente pelo sistema**"). Reduz tokens e elimina a fonte do conflito.
-- `normalizarGenerated` é estendida para usar a nova `canonicalizar` e devolver `Set<canonical>` para passar a `resolverConflitos`.
-- O índice global é construído com `service_role` no início do run. Custo: 1× scan de `biblioteca_artigo_conhecimento` + 1× scan de `classificacao_artigos` filtrado por estados validado/auto. Em memória do run.
-- Para runs com âmbito "artigo" único, ainda assim construímos o índice (pequeno overhead, mas é o que sustenta os negativos).
-- Sem mudanças no schema; sem migrações.
+- A tokenização de `classificacao_artigos.descricao` continua a usar `tokenize`/`lemaSingular`, mas qualquer token cuja forma canónica caia em `STOPWORDS ∪ GENERICOS_OBRA` é descartado em `addToIdx` (atalho antes de criar entradas no `Map`).
+- O cálculo de "soma de ocorrências em todas especialidades" reaproveita o próprio `Map<espId, Set<artigoId>>` somando os `size` — sem custo extra de I/O.
+- A limpeza inicial usa `service_role` (já temos `admin()`), `delete` filtrado por `tipo = 'termo_negativo'` e `termo ilike any(...)`. Lista materializada em JS a partir de `GENERICOS_OBRA`.
+- O prompt da IA não precisa de mudar (já está proibido gerar negativos).
 
 ## Fora de âmbito
 
-- Não se altera o engine de classificação (`src/lib/classificacao/engine.ts`).
-- Não se mexe na tabela `biblioteca_artigo_conhecimento` nem nos seus enums.
-- Não se eliminam automaticamente os negativos contraditórios já gravados; o utilizador pode correr **"Regenerar tudo (apenas IA)"** depois do deploy para limpar.
+- Não se altera o engine de classificação.
+- Não se mexe na UI (`ArtigoConhecimentoTab`, `KnowledgeRunReport`).
+- Não se altera schema nem RLS.
