@@ -432,8 +432,19 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
                             )}
                           </div>
                         </AccordionTrigger>
-                        <AccordionContent className="px-3 pb-3">
-                          <TermosChips lista={lista} onPick={setSelected} mostraArtigo={!isArtigoScope} />
+                        <AccordionContent className="px-3 pb-3 space-y-2">
+                          <TermosChips lista={lista} onPick={setSelected} onEdit={openEditor} onDelete={setRemoverTermo} mostraArtigo={!isArtigoScope} />
+                          {isArtigoScope && report.artigo && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={() => openCreate(t.value, report.artigo!.id, { codigo: report.artigo!.codigo, descricao: report.artigo!.descricao })}
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Adicionar {t.label.toLowerCase()}
+                            </Button>
+                          )}
                         </AccordionContent>
                       </AccordionItem>
                     );
