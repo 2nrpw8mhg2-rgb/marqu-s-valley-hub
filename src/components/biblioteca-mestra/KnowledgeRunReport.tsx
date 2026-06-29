@@ -2,9 +2,15 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Accordion,
   AccordionContent,
@@ -18,6 +24,13 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ConfiancaBar } from "@/components/classificacao/ConfiancaBar";
@@ -40,6 +53,8 @@ import {
   AlertTriangle,
   ChevronDown,
   Terminal,
+  Trash2,
+  Plus,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -49,6 +64,17 @@ type Props = {
   report: KnowledgeRunReport;
   onClose: () => void;
   onRegenerar: () => void;
+};
+
+type EditDraft = {
+  id?: string;
+  artigoMestreId: string;
+  artigoCodigo?: string;
+  artigoDescricao?: string;
+  tipo: ConhecimentoTipo;
+  termo: string;
+  peso: number;
+  confianca: number;
 };
 
 const TIPO_BY_VALUE: Record<string, (typeof CONHECIMENTO_TIPOS)[number]> = Object.fromEntries(
@@ -72,6 +98,11 @@ function deltaText(d: number) {
 
 export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Props) {
   const [selected, setSelected] = useState<KnowledgeRunReportTermo | null>(null);
+  const [editor, setEditor] = useState<EditDraft | null>(null);
+  const [removerTermo, setRemoverTermo] = useState<KnowledgeRunReportTermo | null>(null);
+  const [overrides, setOverrides] = useState<Map<string, Partial<KnowledgeRunReportTermo>>>(new Map());
+  const [deleted, setDeleted] = useState<Set<string>>(new Set());
+  const [added, setAdded] = useState<KnowledgeRunReportTermo[]>([]);
   const navigate = useNavigate();
   const aprovarFn = useServerFn(aprovarConhecimentoRun);
 
@@ -84,24 +115,144 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
   const escopoTipo = report.escopo?.tipo ?? (report.artigo ? "artigo" : "especialidade");
   const isArtigoScope = escopoTipo === "artigo";
 
+  const mergedTermos = useMemo<KnowledgeRunReportTermo[]>(() => {
+    const base = (report.termos ?? [])
+      .filter((t) => !deleted.has(t.id))
+      .map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}) }));
+    return [...base, ...added];
+  }, [report.termos, overrides, deleted, added]);
+
   const termosPorTipo = useMemo(() => {
     const acc: Record<string, KnowledgeRunReportTermo[]> = {};
-    for (const t of report.termos ?? []) {
+    for (const t of mergedTermos) {
       (acc[t.tipo] ??= []).push(t);
     }
     return acc;
-  }, [report.termos]);
+  }, [mergedTermos]);
 
   const termosPorArtigo = useMemo(() => {
     const acc = new Map<string, KnowledgeRunReportTermo[]>();
-    for (const t of report.termos ?? []) {
+    for (const t of mergedTermos) {
       const k = t.artigoMestreId ?? "_";
       const arr = acc.get(k) ?? [];
       arr.push(t);
       acc.set(k, arr);
     }
     return acc;
-  }, [report.termos]);
+  }, [mergedTermos]);
+
+  const tipoPesoDefault = (t: ConhecimentoTipo) =>
+    CONHECIMENTO_TIPOS.find((x) => x.value === t)?.pesoDefault ?? 10;
+
+  const openEditor = (t: KnowledgeRunReportTermo) => {
+    setEditor({
+      id: t.id,
+      artigoMestreId: t.artigoMestreId ?? report.artigo?.id ?? "",
+      artigoCodigo: t.artigoCodigo,
+      artigoDescricao: t.artigoDescricao,
+      tipo: t.tipo,
+      termo: t.termo,
+      peso: t.peso,
+      confianca: t.confianca,
+    });
+    setSelected(null);
+  };
+
+  const openCreate = (tipo: ConhecimentoTipo, artigoId: string, art?: { codigo?: string; descricao?: string }) => {
+    setEditor({
+      artigoMestreId: artigoId,
+      artigoCodigo: art?.codigo,
+      artigoDescricao: art?.descricao,
+      tipo,
+      termo: "",
+      peso: tipoPesoDefault(tipo),
+      confianca: 100,
+    });
+  };
+
+  const saveEditor = useMutation({
+    mutationFn: async (e: EditDraft) => {
+      const termo = e.termo.trim();
+      if (!termo) throw new Error("Termo obrigatório");
+      if (!e.artigoMestreId) throw new Error("Sem artigo associado");
+      const payload = {
+        artigo_mestre_id: e.artigoMestreId,
+        tipo: e.tipo,
+        termo,
+        peso: Number(e.peso),
+        confianca: Math.max(0, Math.min(100, Number(e.confianca) || 0)),
+        origem: "utilizador" as const,
+        ativo: true,
+      };
+      if (e.id) {
+        const { error } = await supabase
+          .from("biblioteca_artigo_conhecimento")
+          .update(payload)
+          .eq("id", e.id);
+        if (error) throw error;
+        return { ...e, id: e.id, termo };
+      }
+      const { data, error } = await supabase
+        .from("biblioteca_artigo_conhecimento")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (error) throw error;
+      return { ...e, id: data.id as string, termo };
+    },
+    onSuccess: (saved) => {
+      if (editor?.id) {
+        setOverrides((prev) => {
+          const next = new Map(prev);
+          next.set(saved.id!, { termo: saved.termo, peso: saved.peso, confianca: saved.confianca, tipo: saved.tipo });
+          return next;
+        });
+        toast.success("Termo atualizado");
+      } else {
+        const novo: KnowledgeRunReportTermo = {
+          id: saved.id!,
+          tipo: saved.tipo,
+          termo: saved.termo,
+          peso: saved.peso,
+          confianca: saved.confianca,
+          origem: "utilizador",
+          ocorrencias: 0,
+          exemplos: [],
+          justificacao: null,
+          novo: true,
+          artigoMestreId: saved.artigoMestreId,
+          artigoCodigo: saved.artigoCodigo,
+          artigoDescricao: saved.artigoDescricao,
+        };
+        setAdded((prev) => [...prev, novo]);
+        toast.success("Termo adicionado");
+      }
+      setEditor(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteTermo = useMutation({
+    mutationFn: async (t: KnowledgeRunReportTermo) => {
+      const { error } = await supabase
+        .from("biblioteca_artigo_conhecimento")
+        .delete()
+        .eq("id", t.id);
+      if (error) throw error;
+      return t;
+    },
+    onSuccess: (t) => {
+      // se for um termo adicionado localmente, remove de added
+      setAdded((prev) => prev.filter((x) => x.id !== t.id));
+      setDeleted((prev) => new Set(prev).add(t.id));
+      setRemoverTermo(null);
+      setSelected(null);
+      toast.success("Termo eliminado");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
 
   const handleExport = () => {
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
@@ -281,8 +432,19 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
                             )}
                           </div>
                         </AccordionTrigger>
-                        <AccordionContent className="px-3 pb-3">
-                          <TermosChips lista={lista} onPick={setSelected} mostraArtigo={!isArtigoScope} />
+                        <AccordionContent className="px-3 pb-3 space-y-2">
+                          <TermosChips lista={lista} onPick={setSelected} onEdit={openEditor} onDelete={setRemoverTermo} mostraArtigo={!isArtigoScope} />
+                          {isArtigoScope && report.artigo && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={() => openCreate(t.value, report.artigo!.id, { codigo: report.artigo!.codigo, descricao: report.artigo!.descricao })}
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Adicionar {t.label.toLowerCase()}
+                            </Button>
+                          )}
                         </AccordionContent>
                       </AccordionItem>
                     );
@@ -326,7 +488,6 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
                           )}
                           {CONHECIMENTO_TIPOS.map((t) => {
                             const sub = lista.filter((x) => x.tipo === t.value);
-                            if (sub.length === 0) return null;
                             return (
                               <div key={t.value}>
                                 <div className="flex items-center gap-2 mb-1">
@@ -334,14 +495,24 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
                                     {t.labelShort}
                                   </Badge>
                                   <span className="text-xs text-muted-foreground tabular-nums">({sub.length})</span>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-1.5 text-[10px] ml-auto"
+                                    onClick={() => openCreate(t.value, art.id, { codigo: art.codigo, descricao: art.descricao })}
+                                  >
+                                    <Plus className="h-3 w-3 mr-0.5" /> Adicionar
+                                  </Button>
                                 </div>
-                                <TermosChips lista={sub} onPick={setSelected} mostraArtigo={false} />
+                                {sub.length > 0 ? (
+                                  <TermosChips lista={sub} onPick={setSelected} onEdit={openEditor} onDelete={setRemoverTermo} mostraArtigo={false} />
+                                ) : (
+                                  <div className="text-[11px] text-muted-foreground italic">Sem termos.</div>
+                                )}
                               </div>
                             );
                           })}
-                          {lista.length === 0 && !art.falhou && (
-                            <div className="text-xs text-muted-foreground">Sem termos.</div>
-                          )}
                         </AccordionContent>
                       </AccordionItem>
                     );
@@ -469,11 +640,108 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
                     </div>
                   </div>
                 )}
+
+                <div className="flex gap-2 pt-3 border-t">
+                  <Button size="sm" variant="outline" onClick={() => openEditor(selected)}>
+                    <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => setRemoverTermo(selected)}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Eliminar
+                  </Button>
+                </div>
               </div>
             </>
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Editor de termo (criar/editar) */}
+      <Dialog open={!!editor} onOpenChange={(o) => !o && setEditor(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editor?.id ? "Editar termo" : "Adicionar termo manualmente"}</DialogTitle>
+          </DialogHeader>
+          {editor && (
+            <div className="space-y-3">
+              {editor.artigoCodigo && (
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-mono">{editor.artigoCodigo}</span> {editor.artigoDescricao}
+                </div>
+              )}
+              <div>
+                <Label className="text-xs">Tipo</Label>
+                <Select
+                  value={editor.tipo}
+                  onValueChange={(v) => setEditor({ ...editor, tipo: v as ConhecimentoTipo, peso: tipoPesoDefault(v as ConhecimentoTipo) })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CONHECIMENTO_TIPOS.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Termo</Label>
+                <Input
+                  value={editor.termo}
+                  onChange={(e) => setEditor({ ...editor, termo: e.target.value })}
+                  placeholder="ex: betão armado"
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Peso</Label>
+                  <Input
+                    type="number"
+                    value={editor.peso}
+                    onChange={(e) => setEditor({ ...editor, peso: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Confiança (%)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={editor.confianca}
+                    onChange={(e) => setEditor({ ...editor, confianca: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditor(null)}>Cancelar</Button>
+            <Button onClick={() => editor && saveEditor.mutate(editor)} disabled={saveEditor.isPending || !editor?.termo.trim()}>
+              {editor?.id ? "Guardar" : "Adicionar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmar eliminação */}
+      <AlertDialog open={!!removerTermo} onOpenChange={(o) => !o && setRemoverTermo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar termo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vai eliminar definitivamente <span className="font-semibold">"{removerTermo?.termo}"</span> do conhecimento deste artigo. Esta ação não pode ser anulada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => removerTermo && deleteTermo.mutate(removerTermo)}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
@@ -481,10 +749,14 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
 function TermosChips({
   lista,
   onPick,
+  onEdit,
+  onDelete,
   mostraArtigo,
 }: {
   lista: KnowledgeRunReportTermo[];
   onPick: (t: KnowledgeRunReportTermo) => void;
+  onEdit: (t: KnowledgeRunReportTermo) => void;
+  onDelete: (t: KnowledgeRunReportTermo) => void;
   mostraArtigo: boolean;
 }) {
   if (lista.length === 0) {
@@ -493,25 +765,48 @@ function TermosChips({
   return (
     <div className="flex flex-wrap gap-1.5">
       {lista.map((termo) => (
-        <button
+        <div
           key={termo.id}
-          onClick={() => onPick(termo)}
-          className={`text-xs px-2 py-1 rounded border transition-colors ${
+          className={`group inline-flex items-stretch text-xs rounded border overflow-hidden transition-colors ${
             termo.novo
-              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-              : "border-muted-foreground/20 bg-muted/40 hover:bg-muted"
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              : "border-muted-foreground/20 bg-muted/40"
           }`}
-          title={
-            termo.justificacao ??
-            (mostraArtigo && termo.artigoCodigo ? `${termo.artigoCodigo} — ${termo.artigoDescricao}` : undefined)
-          }
         >
-          {termo.novo ? <span className="mr-1">🟢</span> : <span className="mr-1 text-muted-foreground">⚪</span>}
-          {termo.termo}
-          {mostraArtigo && termo.artigoCodigo && (
-            <span className="ml-1 text-[10px] text-muted-foreground font-mono">· {termo.artigoCodigo}</span>
-          )}
-        </button>
+          <button
+            type="button"
+            onClick={() => onPick(termo)}
+            className="px-2 py-1 hover:bg-black/5 dark:hover:bg-white/5 text-left"
+            title={
+              termo.justificacao ??
+              (mostraArtigo && termo.artigoCodigo ? `${termo.artigoCodigo} — ${termo.artigoDescricao}` : undefined)
+            }
+          >
+            {termo.novo ? <span className="mr-1">🟢</span> : <span className="mr-1 text-muted-foreground">⚪</span>}
+            {termo.termo}
+            {mostraArtigo && termo.artigoCodigo && (
+              <span className="ml-1 text-[10px] text-muted-foreground font-mono">· {termo.artigoCodigo}</span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onEdit(termo); }}
+            className="px-1.5 border-l border-current/10 opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5"
+            title="Editar termo"
+            aria-label="Editar"
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(termo); }}
+            className="px-1.5 border-l border-current/10 opacity-60 hover:opacity-100 hover:bg-destructive/10 text-destructive"
+            title="Eliminar termo"
+            aria-label="Eliminar"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
       ))}
     </div>
   );
