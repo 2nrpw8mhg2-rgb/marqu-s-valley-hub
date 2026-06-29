@@ -276,7 +276,20 @@ function KnowledgeBuilderPage() {
         </Card>
       </div>
 
-      {s && (
+      {s && s.estado === "concluido" && s.scope_tipo === "artigo" && (s.resumo as any)?.termos && runId && (
+        <KnowledgeRunReport
+          runId={runId}
+          report={s.resumo as any}
+          onClose={() => setRunId(null)}
+          onRegenerar={() => {
+            setModo("regenerar");
+            setRunId(null);
+            setTimeout(() => start.mutate(), 50);
+          }}
+        />
+      )}
+
+      {s && !(s.estado === "concluido" && s.scope_tipo === "artigo" && (s.resumo as any)?.termos) && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base flex items-center gap-2">
