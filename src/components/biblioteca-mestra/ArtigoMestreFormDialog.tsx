@@ -149,11 +149,19 @@ export function ArtigoMestreFormDialog({ open, onOpenChange, initial }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle>{editing?.id ? "Editar" : "Novo"} Artigo Mestre</DialogTitle></DialogHeader>
-        <Tabs defaultValue="geral" className="w-full">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "geral" | "conhecimento")} className="w-full">
           <TabsList>
             <TabsTrigger value="geral">Geral</TabsTrigger>
-            <TabsTrigger value="conhecimento">Conhecimento IA</TabsTrigger>
+            <TabsTrigger value="conhecimento" className="gap-1.5">
+              Conhecimento IA
+              {countConhecimento > 0 && (
+                <Badge variant="secondary" className="h-5 px-1.5 text-[10px] tabular-nums">
+                  {countConhecimento}
+                </Badge>
+              )}
+            </TabsTrigger>
           </TabsList>
+
           <TabsContent value="geral" className="space-y-3 max-h-[70vh] overflow-y-auto mt-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
