@@ -287,15 +287,8 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
     if (!espId) continue;
     const c = canonicalizar(r.termo as string);
     if (c) addToIdx(idx, c, espId, r.artigo_mestre_id as string);
-
-    // Para termos negativos, interessa também o vocabulário discriminante
-    // dentro de expressões positivas já curadas. Ex.: "argamassa de cimento"
-    // deve contribuir para "cimento" como termo de outra especialidade.
-    for (const tok of tokenize((r.termo as string) ?? "")) {
-      const t = lemaSingular(tok);
-      if (t && t !== c) addToIdx(idx, t, espId, r.artigo_mestre_id as string);
-    }
   }
+
 
   // FONTE 2: classificações reais (validadas ou auto) — único sinal de uso real.
   const { data: classifs } = await sb
