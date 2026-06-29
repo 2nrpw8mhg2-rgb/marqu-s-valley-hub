@@ -212,23 +212,20 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
   // FONTE 2: classificações reais (validadas ou auto) — único sinal de uso real.
   const { data: classifs } = await sb
     .from("classificacao_artigos")
-    .select("descricao_original, descricao, artigo_origem_id, estado")
+    .select("descricao_original, artigo_mestre_id, estado")
     .in("estado", ["validado", "classificado_auto"])
-    .not("artigo_origem_id", "is", null);
+    .not("artigo_mestre_id", "is", null);
   for (const r of classifs ?? []) {
-    const aid = r.artigo_origem_id as string | null;
+    const aid = r.artigo_mestre_id as string | null;
     if (!aid) continue;
     const espId = idx.artigoEsp.get(aid);
     if (!espId) continue;
-    const textos = [(r.descricao as string) ?? "", (r.descricao_original as string) ?? ""];
     const vistos = new Set<string>();
-    for (const txt of textos) {
-      for (const tok of tokenize(txt)) {
-        const c = lemaSingular(tok);
-        if (vistos.has(c)) continue;
-        vistos.add(c);
-        addToIdx(idx, c, espId, aid);
-      }
+    for (const tok of tokenize((r.descricao_original as string) ?? "")) {
+      const c = lemaSingular(tok);
+      if (vistos.has(c)) continue;
+      vistos.add(c);
+      addToIdx(idx, c, espId, aid);
     }
   }
 
