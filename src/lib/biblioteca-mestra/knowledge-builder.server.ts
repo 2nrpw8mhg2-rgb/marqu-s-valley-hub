@@ -520,11 +520,16 @@ async function persistir(
     }
   }
 
+  let novosIds: string[] = [];
   if (rows.length) {
-    const { error } = await sb.from("biblioteca_artigo_conhecimento").insert(rows);
+    const { data: ins, error } = await sb
+      .from("biblioteca_artigo_conhecimento")
+      .insert(rows)
+      .select("id");
     if (error) throw error;
+    novosIds = (ins ?? []).map((r) => r.id as string);
   }
-  return { inseridos: rows.length, perTipo };
+  return { inseridos: rows.length, perTipo, novosIds };
 }
 
 async function appendLog(sb: Sb, runId: string, msg: string) {
