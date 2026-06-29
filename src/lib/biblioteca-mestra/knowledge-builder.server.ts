@@ -328,6 +328,7 @@ type VizinhoEntry = { codigo: string; descricao: string; exemplos: string[] };
 type Fontes = {
   artigo: { codigo: string; descricao: string; observacoes: string };
   contexto: { especialidade: string; subespecialidade: string; categoria: string };
+  especialidadeId: string | null;
   historico: HistoricoEntry[];
   totalHistorico: number;
   historicoValidados: number;
@@ -339,6 +340,7 @@ type Fontes = {
   existentes: { tipo: string; termo: string }[];
   semHistorico: boolean;
 };
+
 
 async function recolherFontes(sb: Sb, artigoId: string): Promise<Fontes> {
   const { data: a } = await sb
