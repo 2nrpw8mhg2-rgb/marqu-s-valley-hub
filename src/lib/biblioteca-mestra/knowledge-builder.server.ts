@@ -1423,12 +1423,19 @@ export async function processRun(runId: string) {
             null
           );
           const bloqueio = bloqueioParaFamilia(familia);
+          const apenasOperacoesDemolicao = artigoEhDemolicao(
+            fontes.contexto.especialidade,
+            fontes.contexto.subespecialidade,
+            fontes.contexto.categoria,
+            fontes.artigo.descricao
+          );
           gen.termos_negativos = derivarNegativos(
             fontes.especialidadeId,
             vocPositivo,
             vocReais,
             bloqueio,
-            indice
+            indice,
+            apenasOperacoesDemolicao
           );
           if (gen.termos_negativos.length === 0) {
             await appendLog(sb, runId, `negativos: não foram encontrados termos com confiança suficiente para ${fontes.artigo.codigo}`);
