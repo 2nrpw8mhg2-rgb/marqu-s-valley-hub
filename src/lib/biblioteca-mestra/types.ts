@@ -138,10 +138,41 @@ export type KnowledgeRunReportTermo = {
   exemplos: string[];
   justificacao: string | null;
   novo: boolean;
+  artigoMestreId?: string;
+  artigoCodigo?: string;
+  artigoDescricao?: string;
+};
+
+export type KnowledgeRunReportArtigo = {
+  id: string;
+  codigo: string;
+  descricao: string;
+  especialidade?: string;
+  subespecialidade?: string;
+  categoria?: string;
+  totalTermos: number;
+  novos: number;
+  falhou?: boolean;
+  erro?: string | null;
+};
+
+export type KnowledgeRunReportEscopo = {
+  tipo: "especialidade" | "subespecialidade" | "artigo";
+  especialidade?: string;
+  subespecialidade?: string;
+  artigo?: { id: string; codigo: string; descricao: string };
 };
 
 export type KnowledgeRunReport = {
-  artigo: {
+  escopo?: KnowledgeRunReportEscopo;
+  execucao?: {
+    totalArtigos: number;
+    processados: number;
+    saltados: number;
+    falhados: number;
+    modo: string;
+  };
+  artigo?: {
     id: string;
     codigo: string;
     descricao: string;
@@ -162,10 +193,13 @@ export type KnowledgeRunReport = {
     reutilizados: { total: number };
   };
   termos: KnowledgeRunReportTermo[];
+  artigos?: KnowledgeRunReportArtigo[];
   counts: Record<string, number>;
   semHistorico: boolean;
   erro?: string | null;
+  log?: { ts: string; msg: string }[];
 };
+
 
 
 export const CONHECIMENTO_TIPOS: {
