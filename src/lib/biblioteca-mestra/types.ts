@@ -107,7 +107,9 @@ export type ConhecimentoOrigem =
   | "sistema"
   | "importacao"
   | "mapas_quantidades"
-  | "biblioteca_mestra";
+  | "biblioteca_mestra"
+  | "orcamentos_brutos"
+  | "artigos_vizinhos";
 
 export type ArtigoConhecimento = {
   id: string;
