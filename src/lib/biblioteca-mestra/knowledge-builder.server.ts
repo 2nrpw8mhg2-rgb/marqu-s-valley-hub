@@ -99,6 +99,56 @@ const BLOQUEIO_DEMOLICOES_ESTRUTURA = new Set<string>(
   ].map((t) => canonicalizar(t)).filter(Boolean)
 );
 
+// ============================================================
+// Materiais / produtos / elementos construtivos — NUNCA podem virar
+// termo negativo em nenhuma especialidade. Identificam o objecto sobre
+// o qual o trabalho é executado, não o tipo de trabalho. Tratá-los como
+// negativos destruiria o score de artigos legítimos (ex.: "demolição de
+// parede em bloco de betão" pertence a Demolições, mas contém "bloco",
+// "betão", "parede").
+// ============================================================
+const MATERIAIS_CONSTRUCAO = new Set<string>(
+  [
+    // Massas e ligantes
+    "betao", "bloco", "tijolo", "cimento", "cimenticio", "argamassa",
+    "areia", "brita", "gravilha", "agregado", "inerte", "cal",
+    // Pedra e madeira
+    "pedra", "granito", "marmore", "ardosia", "calcario",
+    "madeira", "contraplacado", "mdf", "osb",
+    // Metais
+    "aco", "ferro", "aluminio", "cobre", "latao", "inox", "zinco", "chumbo",
+    // Plásticos / tubagens
+    "pvc", "ppr", "peex", "multicamada", "polietileno", "polipropileno",
+    // Cerâmicos e revestimentos
+    "ceramica", "ceramico", "mosaico", "azulejo", "porcelanico", "gres",
+    "terracota",
+    // Acabamentos e bases
+    "reboco", "estuque", "betonilha", "gesso", "pladur",
+    // Isolamentos
+    "la mineral", "la de rocha", "la de vidro", "xps", "eps", "poliuretano",
+    "cortica",
+    // Outros materiais
+    "argila", "fibra", "junta", "selante", "mastique", "vidro", "espelho",
+    "tela", "geotextil", "membrana", "papel", "tinta", "primario", "verniz",
+    "esmalte", "asfalto", "betume",
+    // Elementos construtivos comuns
+    "parede", "pavimento", "tecto", "teto", "laje", "viga", "pilar",
+    "calcada", "lajeta", "lajeado", "pave", "cubo", "paralelo",
+  ].map((t) => canonicalizar(t)).filter(Boolean)
+);
+
+// Operações / acções / verbos que identificam trabalho. Quando um candidato
+// a negativo pertence a este conjunto, recebe bónus de score (ainda tem de
+// passar os gates estatísticos — não é injectado do nada).
+const OPERACOES_ALVO = new Set<string>(
+  [
+    "fornecimento", "aplicacao", "execucao", "assentamento", "montagem",
+    "instalacao", "colocacao", "fabrico", "betonagem", "pintura",
+    "impermeabilizacao", "regularizacao", "acabamento", "afagamento",
+    "polimento", "envernizamento",
+  ].map((t) => canonicalizar(t)).filter(Boolean)
+);
+
 // Inferir família a partir do nome/código da especialidade.
 function familiaEspecialidade(nomeEsp: string, codigoEsp?: string | null): string | null {
   const n = normalize(`${codigoEsp ?? ""} ${nomeEsp}`);
@@ -110,6 +160,7 @@ function bloqueioParaFamilia(familia: string | null): Set<string> {
   if (familia === "demolicoes_estrutura") return BLOQUEIO_DEMOLICOES_ESTRUTURA;
   return new Set();
 }
+
 
 function admin(): Sb {
   return createClient<Database>(
@@ -236,15 +287,8 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
     if (!espId) continue;
     const c = canonicalizar(r.termo as string);
     if (c) addToIdx(idx, c, espId, r.artigo_mestre_id as string);
-
-    // Para termos negativos, interessa também o vocabulário discriminante
-    // dentro de expressões positivas já curadas. Ex.: "argamassa de cimento"
-    // deve contribuir para "cimento" como termo de outra especialidade.
-    for (const tok of tokenize((r.termo as string) ?? "")) {
-      const t = lemaSingular(tok);
-      if (t && t !== c) addToIdx(idx, t, espId, r.artigo_mestre_id as string);
-    }
   }
+
 
   // FONTE 2: classificações reais (validadas ou auto) — único sinal de uso real.
   const { data: classifs } = await sb
@@ -298,6 +342,8 @@ function derivarNegativos(
     if (vocPositivoCanonico.has(termoCanon)) continue;
     if (vocReaisDoArtigo.has(termoCanon)) continue;
     if (bloqueioFamilia.has(termoCanon)) continue;
+    if (MATERIAIS_CONSTRUCAO.has(termoCanon)) continue;
+
 
     const thisEspSet = espMap.get(artigoEspId);
     const thisCount = thisEspSet?.size ?? 0;
@@ -324,8 +370,10 @@ function derivarNegativos(
     // termos bons ficam artificialmente bloqueados. A confiança combina
     // exclusividade com suporte absoluto observado; bestDom fica como gate.
     const suporteScore = Math.min(1, Math.log2(bestSize + 1) / 4);
-    const score = exclusividade * suporteScore;
+    let score = exclusividade * suporteScore;
+    if (OPERACOES_ALVO.has(termoCanon)) score += 0.10;
     if (score < 0.50) continue;
+
 
     out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, score });
   }
@@ -1127,10 +1175,12 @@ export async function processRun(runId: string) {
         }
       }
 
+      let removidosMateriais = 0;
       const aRemover = (antigos ?? []).filter((r) => {
         const c = canonicalizar((r.termo as string) ?? "");
         if (!c) return false;
         if (tokenGenerico(c)) return true;
+        if (MATERIAIS_CONSTRUCAO.has(c)) { removidosMateriais++; return true; }
         const fam = familiaPorArtigo.get(r.artigo_mestre_id as string) ?? null;
         const bloq = bloqueioParaFamilia(fam);
         return bloq.has(c);
@@ -1138,7 +1188,11 @@ export async function processRun(runId: string) {
       if (aRemover.length) {
         await sb.from("biblioteca_artigo_conhecimento").delete().in("id", aRemover);
         await appendLog(sb, runId, `Limpeza: removidos ${aRemover.length} negativos inválidos antigos (genéricos ou estruturais bloqueados)`);
+        if (removidosMateriais > 0) {
+          await appendLog(sb, runId, `Limpeza: negativos removidos por serem materiais: ${removidosMateriais}`);
+        }
       }
+
     } catch (e: any) {
       await appendLog(sb, runId, `Limpeza falhou (ignorado): ${e?.message ?? e}`);
     }
