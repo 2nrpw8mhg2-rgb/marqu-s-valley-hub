@@ -615,7 +615,9 @@ export async function processRun(runId: string) {
     let saltados = 0;
     let falhados = 0;
     let ultimaFontes: Fontes | null = null;
+    let ultimoErro: string | null = null;
     const novosIdsAll: string[] = [];
+
 
     // snapshot "antes" para relatório de artigo
     let antesSnapshot: {
