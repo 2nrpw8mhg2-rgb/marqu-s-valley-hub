@@ -367,15 +367,26 @@ REGRAS DE CONFIANÇA POR FONTE
 - fonte="vizinhos" → 40-60 (usar sobretudo p/ termos_negativos)
 - fonte="inferido" → 50-70 (terminologia técnica geral relacionada)
 
+REGRAS DE IDIOMA (OBRIGATÓRIO)
+- Todo o output (termos, sinónimos, expressões, materiais, justificações) DEVE estar em **Português de Portugal (pt-PT)**. Nunca pt-BR, nunca inglês, nunca mistura.
+- Normaliza terminologia brasileira para a portuguesa. Tabela mínima:
+  concreto→betão, concreto armado→betão armado, forma→cofragem, concretagem→betonagem,
+  tubulação→tubagem, contrapiso→camada de regularização, piso cerâmico→pavimento cerâmico,
+  argamassa colante→cimento-cola, rodapé (acabamento)→rodapé (manter), calçada→passeio.
+- Se um termo aparecer em pt-BR nas FONTES, regista a forma pt-PT como termo principal
+  e a forma pt-BR como **sinónimo** (relação de equivalência para reconhecimento futuro).
+- Sem anglicismos (não usar "score", "build", "update", "knowledge"); usar confiança, geração, atualização, conhecimento.
+
 REGRAS
-- Termos técnicos, minúsculas, sem pontuação supérflua, PT-PT.
+- Termos técnicos, minúsculas, sem pontuação supérflua, pt-PT.
 - Expressões são frases curtas (2-6 palavras) típicas de MQ, ex: "fornecimento e aplicação de".
 - Termos negativos: palavras associadas a OUTROS artigos (ver FONTE C) que devem reduzir confiança neste.
 - "fonte" é OBRIGATÓRIO em cada termo.
-- justificacao = UMA frase curta (máx. 120 caracteres).
+- justificacao = UMA frase curta (máx. 120 caracteres), em pt-PT.
 - NÃO inventes materiais sem evidência nas fontes.
 - Devolve APENAS o JSON, sem comentários, sem markdown.`;
 }
+
 
 function parseJsonLoose(raw: string): any {
   if (!raw) return {};
