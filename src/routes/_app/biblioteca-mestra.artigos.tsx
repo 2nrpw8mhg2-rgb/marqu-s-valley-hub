@@ -22,6 +22,8 @@ import { Plus, Pencil, Trash2, Search, X, Sparkles, FolderInput, Power, GitBranc
 import type { Especialidade, Subespecialidade, Categoria, ArtigoMestre, ArtigoKeyword, Unidade, ArtigoTipo, ArtigoEstadoIA } from "@/lib/biblioteca-mestra/types";
 import { ARTIGO_TIPOS, ARTIGO_ESTADOS_IA } from "@/lib/biblioteca-mestra/types";
 import { ArtigoRelacoesDialog } from "@/components/biblioteca-mestra/ArtigoRelacoesDialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArtigoConhecimentoTab } from "@/components/biblioteca-mestra/ArtigoConhecimentoTab";
 
 export const Route = createFileRoute("/_app/biblioteca-mestra/artigos")({
   head: () => ({ meta: [{ title: "Artigos Mestre — Biblioteca Mestra — MV OS" }] }),
@@ -435,9 +437,14 @@ function ArtigosPage() {
 
       {/* Editar/Criar */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader><DialogTitle>{editing?.id ? "Editar" : "Novo"} Artigo Mestre</DialogTitle></DialogHeader>
-          <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+          <Tabs defaultValue="geral" className="w-full">
+            <TabsList>
+              <TabsTrigger value="geral">Geral</TabsTrigger>
+              <TabsTrigger value="conhecimento">Conhecimento IA</TabsTrigger>
+            </TabsList>
+            <TabsContent value="geral" className="space-y-3 max-h-[70vh] overflow-y-auto mt-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Subespecialidade *</Label>
@@ -545,7 +552,11 @@ function ArtigosPage() {
                 ))}
               </div>
             </div>
-          </div>
+            </TabsContent>
+            <TabsContent value="conhecimento" className="max-h-[70vh] overflow-y-auto mt-3">
+              <ArtigoConhecimentoTab artigoId={editing?.id ?? null} />
+            </TabsContent>
+          </Tabs>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
             <Button onClick={() => editing && save.mutate(editing)} disabled={save.isPending}>Guardar</Button>
