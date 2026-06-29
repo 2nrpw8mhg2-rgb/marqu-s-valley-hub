@@ -6,7 +6,7 @@ type Sb = SupabaseClient<Database>;
 const TIPO_LIMIT = 8;
 const MQ_TOP = 40;
 
-type GeneratedTermo = { termo: string; peso: number; confianca: number };
+type GeneratedTermo = { termo: string; peso: number; confianca: number; justificacao?: string };
 type Generated = {
   palavras_chave: GeneratedTermo[];
   sinonimos: GeneratedTermo[];
@@ -172,17 +172,18 @@ ${existentesTxt}
 
 GERA até ${TIPO_LIMIT} elementos por tipo, em JSON estrito, com esta forma exacta:
 {
-  "palavras_chave": [{"termo":"...","peso":<5..50>,"confianca":<0..100>}],
-  "sinonimos":      [{"termo":"...","peso":<5..30>,"confianca":<0..100>}],
-  "expressoes":     [{"termo":"...","peso":<10..60>,"confianca":<0..100>}],
-  "materiais":      [{"termo":"...","peso":<3..20>,"confianca":<0..100>}],
-  "termos_negativos":[{"termo":"...","peso":<5..40>,"confianca":<0..100>}]
+  "palavras_chave": [{"termo":"...","peso":<5..50>,"confianca":<0..100>,"justificacao":"..."}],
+  "sinonimos":      [{"termo":"...","peso":<5..30>,"confianca":<0..100>,"justificacao":"..."}],
+  "expressoes":     [{"termo":"...","peso":<10..60>,"confianca":<0..100>,"justificacao":"..."}],
+  "materiais":      [{"termo":"...","peso":<3..20>,"confianca":<0..100>,"justificacao":"..."}],
+  "termos_negativos":[{"termo":"...","peso":<5..40>,"confianca":<0..100>,"justificacao":"..."}]
 }
 
 REGRAS
 - Os termos devem ser técnicos, em minúsculas, sem pontuação supérflua, em PT-PT.
 - Expressões são frases curtas (2-6 palavras) típicas de MQ, ex: "fornecimento e aplicação de".
 - Termos negativos são palavras associadas a OUTROS artigos que devem reduzir confiança neste; usa o contexto estrutural.
+- A justificacao é UMA frase curta (máx. 120 caracteres) explicando porque foi associado este termo.
 - Se houver poucas descrições reais, sê conservador (menos termos, confiança ≤ 70).
 - A confiança deve refletir frequência e consistência observada.
 - NÃO inventes materiais que não façam sentido para este artigo.
@@ -227,6 +228,7 @@ async function callAI(prompt: string): Promise<Generated> {
             termo: String(x?.termo ?? "").trim(),
             peso: Math.round(Number(x?.peso) || 0),
             confianca: Math.max(0, Math.min(100, Math.round(Number(x?.confianca) || 60))),
+            justificacao: x?.justificacao ? String(x.justificacao).trim().slice(0, 200) : undefined,
           }))
           .filter((x) => x.termo.length > 0)
           .slice(0, TIPO_LIMIT)
@@ -242,11 +244,28 @@ async function callAI(prompt: string): Promise<Generated> {
 
 type PersistResult = { inseridos: number; perTipo: Record<string, number> };
 
+type MqEntry = { descricao: string; ocorrencias: number };
+
+function calcOcorrenciasEExemplos(termo: string, mqTop: MqEntry[]): { ocorrencias: number; exemplos: string[] } {
+  const t = termo.toLowerCase();
+  if (!t) return { ocorrencias: 0, exemplos: [] };
+  let oc = 0;
+  const ex: string[] = [];
+  for (const m of mqTop) {
+    if (m.descricao.includes(t)) {
+      oc += m.ocorrencias;
+      if (ex.length < 3) ex.push(m.descricao.slice(0, 160));
+    }
+  }
+  return { ocorrencias: oc, exemplos: ex };
+}
+
 async function persistir(
   sb: Sb,
   artigoId: string,
   gen: Generated,
-  modo: Modo
+  modo: Modo,
+  mqTop: MqEntry[]
 ): Promise<PersistResult> {
   if (modo === "regenerar") {
     await sb
@@ -281,14 +300,19 @@ async function persistir(
       setExist.add(key);
       const peso = Number.isFinite(t.peso) && t.peso !== 0 ? t.peso : meta.pesoDefault;
       const pesoFinal = meta.sign < 0 ? -Math.abs(peso) : Math.abs(peso);
+      const { ocorrencias, exemplos } = calcOcorrenciasEExemplos(t.termo, mqTop);
+      const origem = ocorrencias > 0 ? "mapas_quantidades" : "ia";
       rows.push({
         artigo_mestre_id: artigoId,
         tipo: meta.tipo,
         termo: t.termo,
         peso: pesoFinal,
         confianca: t.confianca,
-        origem: "ia",
+        origem,
         ativo: true,
+        ocorrencias,
+        justificacao: t.justificacao ?? null,
+        exemplos,
       });
       perTipo[meta.tipo]++;
     }
@@ -383,7 +407,7 @@ export async function processRun(runId: string) {
         const fontes = await recolherFontes(sb, artigoId);
         const prompt = buildPrompt(fontes, run.modo as Modo);
         const gen = await callAI(prompt);
-        const res = await persistir(sb, artigoId, gen, run.modo as Modo);
+        const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes.mqTop);
 
         for (const k of Object.keys(res.perTipo)) counts[k] = (counts[k] ?? 0) + res.perTipo[k];
         processados++;
@@ -411,9 +435,36 @@ export async function processRun(runId: string) {
       }
     }
 
+    // Calcular resumo final (apenas para scope=artigo, mais útil na ficha)
+    let resumo: any = null;
+    if (scope.tipo === "artigo") {
+      const { data: rows } = await sb
+        .from("biblioteca_artigo_conhecimento")
+        .select("tipo, confianca, peso")
+        .eq("artigo_mestre_id", scope.artigoId)
+        .eq("ativo", true);
+      const perTipo: Record<string, number> = {
+        palavra_chave: 0, sinonimo: 0, expressao: 0, material: 0, termo_negativo: 0,
+      };
+      let somaPeso = 0;
+      let somaPesoConf = 0;
+      for (const r of rows ?? []) {
+        perTipo[r.tipo as string] = (perTipo[r.tipo as string] ?? 0) + 1;
+        const p = Math.abs(Number(r.peso) || 0);
+        somaPeso += p;
+        somaPesoConf += p * (Number(r.confianca) || 0);
+      }
+      resumo = {
+        perTipo,
+        total: (rows ?? []).length,
+        confiancaGlobal: somaPeso > 0 ? Math.round(somaPesoConf / somaPeso) : 0,
+        counts,
+      };
+    }
+
     await sb
       .from("biblioteca_knowledge_run")
-      .update({ estado: "concluido", concluido_em: new Date().toISOString() })
+      .update({ estado: "concluido", concluido_em: new Date().toISOString(), resumo })
       .eq("id", runId);
     await appendLog(sb, runId, `Concluído: ${processados} processados, ${saltados} saltados, ${falhados} falhados`);
   } catch (e: any) {

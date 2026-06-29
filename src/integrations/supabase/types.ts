@@ -67,7 +67,10 @@ export type Database = {
           ativo: boolean
           confianca: number
           created_at: string
+          exemplos: Json
           id: string
+          justificacao: string | null
+          ocorrencias: number
           origem: Database["public"]["Enums"]["biblioteca_conhecimento_origem"]
           peso: number
           termo: string
@@ -79,7 +82,10 @@ export type Database = {
           ativo?: boolean
           confianca?: number
           created_at?: string
+          exemplos?: Json
           id?: string
+          justificacao?: string | null
+          ocorrencias?: number
           origem?: Database["public"]["Enums"]["biblioteca_conhecimento_origem"]
           peso?: number
           termo: string
@@ -91,7 +97,10 @@ export type Database = {
           ativo?: boolean
           confianca?: number
           created_at?: string
+          exemplos?: Json
           id?: string
+          justificacao?: string | null
+          ocorrencias?: number
           origem?: Database["public"]["Enums"]["biblioteca_conhecimento_origem"]
           peso?: number
           termo?: string
@@ -413,6 +422,7 @@ export type Database = {
           log: Json
           modo: string
           processados: number
+          resumo: Json | null
           saltados: number
           scope_ids: Json
           scope_tipo: string
@@ -434,6 +444,7 @@ export type Database = {
           log?: Json
           modo: string
           processados?: number
+          resumo?: Json | null
           saltados?: number
           scope_ids?: Json
           scope_tipo: string
@@ -455,6 +466,7 @@ export type Database = {
           log?: Json
           modo?: string
           processados?: number
+          resumo?: Json | null
           saltados?: number
           scope_ids?: Json
           scope_tipo?: string
@@ -1853,6 +1865,8 @@ export type Database = {
         | "utilizador"
         | "sistema"
         | "importacao"
+        | "mapas_quantidades"
+        | "biblioteca_mestra"
       biblioteca_conhecimento_tipo:
         | "palavra_chave"
         | "sinonimo"
@@ -2096,6 +2110,8 @@ export const Constants = {
         "utilizador",
         "sistema",
         "importacao",
+        "mapas_quantidades",
+        "biblioteca_mestra",
       ],
       biblioteca_conhecimento_tipo: [
         "palavra_chave",

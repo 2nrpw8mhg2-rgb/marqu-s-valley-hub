@@ -101,7 +101,13 @@ export type ConhecimentoTipo =
   | "material"
   | "termo_negativo";
 
-export type ConhecimentoOrigem = "ia" | "utilizador" | "sistema" | "importacao";
+export type ConhecimentoOrigem =
+  | "ia"
+  | "utilizador"
+  | "sistema"
+  | "importacao"
+  | "mapas_quantidades"
+  | "biblioteca_mestra";
 
 export type ArtigoConhecimento = {
   id: string;
@@ -112,6 +118,9 @@ export type ArtigoConhecimento = {
   origem: ConhecimentoOrigem;
   confianca: number;
   ativo: boolean;
+  ocorrencias: number;
+  justificacao: string | null;
+  exemplos: string[];
   created_at: string;
   updated_at: string;
 };
@@ -119,19 +128,27 @@ export type ArtigoConhecimento = {
 export const CONHECIMENTO_TIPOS: {
   value: ConhecimentoTipo;
   label: string;
+  labelShort: string;
   pesoDefault: number;
   className: string;
 }[] = [
-  { value: "palavra_chave", label: "Palavra-chave", pesoDefault: 30, className: "border-blue-500/40 text-blue-700 dark:text-blue-400" },
-  { value: "sinonimo", label: "Sinónimo", pesoDefault: 10, className: "border-violet-500/40 text-violet-700 dark:text-violet-400" },
-  { value: "expressao", label: "Expressão", pesoDefault: 40, className: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" },
-  { value: "material", label: "Material", pesoDefault: 8, className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
-  { value: "termo_negativo", label: "Termo negativo", pesoDefault: -30, className: "border-destructive/40 text-destructive" },
+  { value: "palavra_chave", label: "Palavra-chave", labelShort: "Palavras-chave", pesoDefault: 30, className: "border-blue-500/40 text-blue-700 dark:text-blue-400" },
+  { value: "sinonimo", label: "Sinónimo", labelShort: "Sinónimos", pesoDefault: 10, className: "border-violet-500/40 text-violet-700 dark:text-violet-400" },
+  { value: "expressao", label: "Expressão", labelShort: "Expressões", pesoDefault: 40, className: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" },
+  { value: "material", label: "Material", labelShort: "Materiais", pesoDefault: 8, className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
+  { value: "termo_negativo", label: "Termo negativo", labelShort: "Termos negativos", pesoDefault: -30, className: "border-destructive/40 text-destructive" },
 ];
 
-export const CONHECIMENTO_ORIGENS: { value: ConhecimentoOrigem; label: string; className: string }[] = [
-  { value: "utilizador", label: "Utilizador", className: "border-slate-500/40 text-slate-700 dark:text-slate-300" },
-  { value: "ia", label: "IA", className: "border-blue-500/40 text-blue-700 dark:text-blue-400" },
-  { value: "sistema", label: "Sistema", className: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" },
-  { value: "importacao", label: "Importação", className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
+export const CONHECIMENTO_ORIGENS: {
+  value: ConhecimentoOrigem;
+  label: string;
+  icon: string;
+  className: string;
+}[] = [
+  { value: "utilizador", label: "Utilizador", icon: "👤", className: "border-slate-500/40 text-slate-700 dark:text-slate-300" },
+  { value: "ia", label: "IA", icon: "🤖", className: "border-blue-500/40 text-blue-700 dark:text-blue-400" },
+  { value: "mapas_quantidades", label: "Mapas de Quantidades", icon: "📄", className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
+  { value: "biblioteca_mestra", label: "Biblioteca Mestra", icon: "📚", className: "border-violet-500/40 text-violet-700 dark:text-violet-400" },
+  { value: "sistema", label: "Sistema", icon: "⚙️", className: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" },
+  { value: "importacao", label: "Importação", icon: "📥", className: "border-cyan-500/40 text-cyan-700 dark:text-cyan-400" },
 ];
