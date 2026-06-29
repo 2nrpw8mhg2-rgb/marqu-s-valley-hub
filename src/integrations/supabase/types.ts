@@ -398,6 +398,72 @@ export type Database = {
         }
         Relationships: []
       }
+      biblioteca_knowledge_run: {
+        Row: {
+          cancelar: boolean
+          concluido_em: string | null
+          counts: Json
+          created_at: string
+          erro_msg: string | null
+          estado: string
+          falhados: number
+          id: string
+          iniciado_em: string
+          iniciado_por: string | null
+          log: Json
+          modo: string
+          processados: number
+          saltados: number
+          scope_ids: Json
+          scope_tipo: string
+          total_artigos: number
+          ultimo_artigo: string | null
+          updated_at: string
+        }
+        Insert: {
+          cancelar?: boolean
+          concluido_em?: string | null
+          counts?: Json
+          created_at?: string
+          erro_msg?: string | null
+          estado?: string
+          falhados?: number
+          id?: string
+          iniciado_em?: string
+          iniciado_por?: string | null
+          log?: Json
+          modo: string
+          processados?: number
+          saltados?: number
+          scope_ids?: Json
+          scope_tipo: string
+          total_artigos?: number
+          ultimo_artigo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cancelar?: boolean
+          concluido_em?: string | null
+          counts?: Json
+          created_at?: string
+          erro_msg?: string | null
+          estado?: string
+          falhados?: number
+          id?: string
+          iniciado_em?: string
+          iniciado_por?: string | null
+          log?: Json
+          modo?: string
+          processados?: number
+          saltados?: number
+          scope_ids?: Json
+          scope_tipo?: string
+          total_artigos?: number
+          ultimo_artigo?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       biblioteca_sistema_artigos: {
         Row: {
           artigo_id: string
