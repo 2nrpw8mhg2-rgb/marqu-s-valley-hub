@@ -967,6 +967,16 @@ export async function processRun(runId: string) {
       .eq("id", runId);
     await appendLog(sb, runId, `Início: ${ids.length} artigos no âmbito`);
 
+    // Índice estatístico inter-especialidades (calculado UMA vez por run).
+    await appendLog(sb, runId, "A construir índice estatístico inter-especialidades…");
+    const indice = await construirIndiceGlobal(sb);
+    await appendLog(
+      sb,
+      runId,
+      `Índice: ${indice.termoEspArtigos.size} termos × ${indice.totalPorEsp.size} especialidades`
+    );
+
+
     const counts: Record<string, number> = {
       palavra_chave: 0, sinonimo: 0, expressao: 0, material: 0, termo_negativo: 0,
     };
