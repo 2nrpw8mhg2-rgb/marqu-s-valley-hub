@@ -239,8 +239,15 @@ export function ArtigoMestreFormDialog({ open, onOpenChange, initial }: Props) {
           <div><Label>Observações</Label><Textarea value={editing?.observacoes ?? ""} onChange={(e) => setEditing({ ...editing, observacoes: e.target.value })} /></div>
           <div className="flex items-center gap-2"><Switch checked={editing?.ativo ?? true} onCheckedChange={(v) => setEditing({ ...editing, ativo: v })} /><Label>Ativo</Label></div>
 
+          <div className="rounded-md border border-dashed bg-muted/30 p-2 text-xs text-muted-foreground">
+            As palavras-chave, sinónimos, expressões, materiais e termos negativos gerados pela IA
+            estão no separador <span className="font-medium text-foreground">Conhecimento IA</span>.
+            Os campos abaixo são apenas para palavras-chave manuais simples (legado).
+          </div>
+
           <div>
             <Label>Palavras-chave positivas</Label>
+
             <div className="flex gap-2 mt-1">
               <Input value={kwPos} onChange={(e) => setKwPos(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addKw("positivas", kwPos); setKwPos(""); } }} placeholder="Premir Enter para adicionar" />
               <Button type="button" variant="outline" onClick={() => { addKw("positivas", kwPos); setKwPos(""); }}>Adicionar</Button>
