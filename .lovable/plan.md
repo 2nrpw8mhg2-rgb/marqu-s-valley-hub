@@ -1,122 +1,91 @@
-## Knowledge Builder — Fontes Multi-Nível
+## Relatório de Geração de Conhecimento (modo artigo)
 
-Evoluir `recolherFontes` para consultar três fontes distintas, com pesos e confiança próprios, e refletir tudo isto no prompt da IA, na persistência e no painel "Conhecimento IA".
+Reformular o ecrã final do Knowledge Builder, quando o âmbito é **um Artigo Mestre**, transformando-o num relatório completo, expansível e auditável. O ecrã antigo (contadores secos) passa a ser apenas o fallback para âmbitos em massa (especialidade/subespecialidade).
 
-### 1. Três fontes em `recolherFontes(sb, artigoId)`
+### 1. Backend — enriquecer o `resumo` da run
 
-**Fonte A — Histórico do Artigo Mestre** (mantém + refina)
-- Query a `classificacao_artigos` com estados `validado`, `classificado_manual`, `classificado_auto`.
-- Agrupar por descrição normalizada, contando ocorrências por estado.
-- Confiança base por linha:
-  - `validado` / `classificado_manual` → 95
-  - `classificado_auto` → `min(85, score original)` (usar coluna de score se existir; senão 70)
-- Resultado: `historico[]` com `{ descricao, ocorrencias, confiancaBase, estado }`.
+Ficheiro: `src/lib/biblioteca-mestra/knowledge-builder.server.ts`
 
-**Fonte B — Orçamentos brutos** (`orcamento_artigos`)
-- Ativa quando `historico.length < 20` OU sempre como complemento (limite 200 linhas).
-- Filtro: linhas ainda não classificadas para este artigo (sem entrada em `classificacao_artigos` para o par `orcamento_artigo_id` × `artigo_mestre_id`, ou estado `sem_classificacao`).
-- Procura por similaridade textual (pg_trgm via `similarity()`) entre `orcamento_artigos.descricao` e o conjunto:
-  - descrição do Artigo Mestre
-  - keywords já existentes no `biblioteca_artigo_conhecimento` deste artigo
-  - nome da especialidade/subespecialidade/categoria
-- Threshold de similaridade ≥ 0.25; ordenar por score desc, top 60.
-- Confiança base: `Math.round(40 + similaridade*40)` (intervalo 50–80).
-- Resultado: `candidatos[]` com `{ descricao, similaridade, confiancaBase }`.
-
-**Fonte C — Artigos semelhantes**
-- Buscar até 15 artigos da mesma subespecialidade (fallback: mesma especialidade) excluindo o atual.
-- Para cada um, ler top descrições validadas de `classificacao_artigos` (limit 5 por artigo).
-- Devolver `semelhantes[]` com `{ artigoCodigo, artigoDescricao, exemplos[] }`.
-- Usado pela IA principalmente para gerar **termos negativos** (palavras comuns nos vizinhos mas que não pertencem a este artigo) e contexto.
-- Confiança base baixa (40–55) se o termo só aparecer aqui.
-
-### 2. Prompt da IA
-
-Estender `buildPrompt` para incluir secções claramente separadas:
+Antes de chamar `persistir`, capturar um **snapshot "antes"** do conhecimento existente do artigo (por tipo: contagem + confiança média ponderada + lista `tipo::termo`). Em `persistir`, devolver também a lista de IDs dos termos novos inseridos. No final, para `scope.tipo === "artigo"`, gravar em `resumo` (jsonb da `biblioteca_knowledge_run`) um payload novo:
 
 ```
-FONTE A — Descrições validadas para este artigo (peso alto, N=…)
-  (123x) [validado] fornecimento e aplicação de…
-  …
-FONTE B — Descrições brutas candidatas por similaridade (peso médio, N=…)
-  (sim 0.72) execução de vedação provisória em…
-  …
-FONTE C — Artigos vizinhos para diferenciação (N artigos, N=… exemplos)
-  Artigo "Tapumes": pintura, sinalização, …
-  Artigo "Portões Provisórios": automação, motor, …
-```
-
-Instruções adicionais à IA:
-- Para cada termo, indicar **fonte_origem** (`historico` | `candidatos` | `vizinhos` | `inferido`) na resposta JSON.
-- A confiança deve refletir a fonte (regras acima).
-- Termos que aparecem nos vizinhos mas não no artigo → marcar como `termos_negativos`.
-- Quando `FONTE A` for vazia, ser conservador: confiança ≤ 65 e adicionar prefixo `[provisório]` na justificação.
-
-### 3. Persistência
-
-Em `persistir`:
-- Acrescentar campo `fonte_origem` (texto) à linha guardada.
-- Mapear `fonte_origem` → coluna `origem` do enum existente:
-  - `historico` → `mapas_quantidades`
-  - `candidatos` → novo valor `orcamentos_brutos` (ver migração)
-  - `vizinhos` → novo valor `artigos_vizinhos`
-  - `inferido` → `ia`
-- `calcOcorrenciasEExemplos` passa a varrer as três fontes (histórico + candidatos), guardando até 3 exemplos com tag da fonte.
-
-### 4. Migração SQL
-
-```sql
-ALTER TYPE biblioteca_conhecimento_origem
-  ADD VALUE IF NOT EXISTS 'orcamentos_brutos';
-ALTER TYPE biblioteca_conhecimento_origem
-  ADD VALUE IF NOT EXISTS 'artigos_vizinhos';
-
--- Índice trigram para pesquisa rápida em orcamento_artigos
-CREATE INDEX IF NOT EXISTS idx_orc_art_descr_trgm
-  ON orcamento_artigos USING gin (descricao gin_trgm_ops);
-```
-
-(`pg_trgm` já está instalado — confirmado pelas funções `similarity_op` listadas.)
-
-### 5. Resumo / painel de fontes
-
-Estender o `resumo` JSON gravado no `biblioteca_knowledge_run` com:
-```json
 {
-  "fontes": {
-    "historico_validado": 124,
-    "historico_auto": 86,
-    "candidatos_brutos": 312,
-    "vizinhos_analisados": 14
+  artigo: { id, codigo, descricao, especialidade, subespecialidade, categoria },
+  confiancaGlobal: { antes, depois },
+  perTipo: { palavra_chave: { antes, depois, delta }, ... },
+  fontes: {
+    historico: { total, validados, auto, descricoesUnicas },
+    candidatos: { total },
+    vizinhos: { artigos, exemplos },
+    correcoes: { total },   // contar classificacao_aprendizagem por artigo, se existir
+    reutilizados: { total } // termos pré-existentes mantidos
   },
-  "semHistorico": false,
-  …
+  termos: [
+    {
+      id, tipo, termo, peso, confianca, origem,
+      ocorrencias, exemplos[], justificacao,
+      novo: true|false
+    }, ...
+  ],
+  counts, semHistorico
 }
 ```
 
-Em `ArtigoConhecimentoTab.tsx`:
-- Dashboard ganha um bloco **"Fontes analisadas"** com as 4 métricas (ícone + número + label).
-- Quando `semHistorico === true`, mostrar banner informativo amarelo no topo:
-  > "Este Artigo Mestre ainda não possui histórico validado. A IA usou descrições semelhantes de mapas importados e artigos vizinhos. A confiança inicial é inferior até validação."
-- Coluna "Origem" passa a distinguir os 4 ícones: 📄 histórico, 📥 bruto, 🧭 vizinho, 🤖 IA.
-- No painel de detalhe (Sheet), separar exemplos por fonte.
+A lista `termos` inclui **tudo o que está ativo no artigo** (novos + pré-existentes), marcando `novo: true` apenas para os criados nesta run. Isto sustenta o "Novos vs já existentes" do UI.
 
-### 6. Diálogo de geração
+Os âmbitos em massa mantêm o `resumo` atual (perTipo/perOrigem/fontes agregados).
 
-No `AlertDialog` do botão "Gerar Conhecimento IA", atualizar o texto da análise:
-- "Histórico validado deste artigo"
-- "Descrições brutas similares em mapas importados"
-- "Artigos tecnicamente próximos (para termos negativos)"
-- Tempo estimado ~15–20 s.
+### 2. Frontend — novo componente de relatório
 
-### Ficheiros afetados
+Ficheiro novo: `src/components/biblioteca-mestra/KnowledgeRunReport.tsx`
 
-- **Migração nova**: `supabase/migrations/<ts>_knowledge_sources_multi.sql`
-- `src/lib/biblioteca-mestra/knowledge-builder.server.ts` — `recolherFontes`, `buildPrompt`, `callAI` (aceitar `fonte_origem`), `persistir`, `processRun` (resumo).
-- `src/components/biblioteca-mestra/ArtigoConhecimentoTab.tsx` — bloco de fontes, banner, ícones de origem, detalhe.
-- `src/lib/biblioteca-mestra/types.ts` — estender `CONHECIMENTO_ORIGENS` com `orcamentos_brutos` e `artigos_vizinhos` (label + ícone).
+Renderizado em `src/routes/_app/biblioteca-mestra.knowledge-builder.tsx` quando `status.estado === "concluido"` **e** `scope_tipo === "artigo"`. Substitui o card "Progresso" final. Para os outros âmbitos mantém-se o card atual.
 
-### Fora do âmbito (esta iteração)
+Layout:
 
-- Knowledge Builder em lote (scope ≠ artigo) continua a usar apenas Fonte A — manter compatibilidade.
-- Reescrever motor de classificação para usar os novos pesos de origem.
+```text
+┌─ ✅ Conhecimento gerado com sucesso ───────────────────────┐
+│ 050.06 — Betão Projetado via húmida                       │
+│ Especialidade / Subespecialidade / Categoria              │
+│                              Confiança Global  🟢 94%     │
+├─ Antes vs Depois ─────────────────────────────────────────┤
+│ Palavras-chave 12 → 18 (+6)   Sinónimos 5 → 8 (+3)  ...   │
+│ Confiança Global  78%  ↓  94%                             │
+├─ Fontes utilizadas ───────────────────────────────────────┤
+│ 📄 Histórico   📥 Orçamentos   📚 Vizinhos   👤 Correções │
+├─ Conhecimento gerado (accordion por tipo) ────────────────┤
+│ ▶ Palavras-chave (18)   ⬤ 6 novos                         │
+│ ▶ Sinónimos (8)         ⬤ 3 novos                         │
+│ ...                                                       │
+│   ao expandir → chips de termos, 🟢 novos / ⚪ existentes  │
+│   cada chip clicável → painel lateral                     │
+├─ Ações ───────────────────────────────────────────────────┤
+│ [Aprovar]  [Editar]  [Regenerar]  [Exportar]  [Fechar]    │
+└────────────────────────────────────────────────────────────┘
+```
+
+Detalhes:
+
+- Cabeçalho: `ConfiancaBar` reutilizado para a confiança global.
+- "Antes vs Depois": grid de 5 tipos + linha de confiança global, usando os campos `perTipo.{antes, depois, delta}` e `confiancaGlobal.{antes, depois}` do resumo.
+- "Fontes utilizadas": 4 cards (histórico / orçamentos brutos / vizinhos / correções) com os totais. Reaproveita os ícones do `CONHECIMENTO_ORIGENS`.
+- "Conhecimento gerado": `Accordion` do shadcn, um item por tipo. Cada item mostra `(total) ⬤ N novos`. Ao expandir, chips de termos (`Badge`) com cor verde para `novo: true` e cinza para existentes; ao clicar um chip abre um `Sheet` lateral.
+- Sheet lateral por termo: termo + origem (ícone+label), ocorrências, peso, confiança (`ConfiancaBar`), até 3 exemplos reais (do array `exemplos`), justificação da IA.
+- Ações:
+  - **Aprovar conhecimento** → marca todos os termos `novo` com `origem === "ia"` como `origem = "utilizador"` (ou flag de validação; reusar update simples a `biblioteca_artigo_conhecimento`).
+  - **Editar conhecimento** → navega para a ficha do artigo (`biblioteca-mestra/artigos` com query/aba conhecimento).
+  - **Regenerar conhecimento** → reabre o ecrã de configuração com `modo="regenerar"` pré-selecionado e re-arranca.
+  - **Exportar conhecimento** → CSV/JSON client-side com a lista `termos`.
+  - **Guardar e fechar** → limpa `runId` no estado local.
+
+### 3. Pequenos suportes
+
+- Adicionar 2 server fns auxiliares em `src/lib/biblioteca-mestra/knowledge-builder.functions.ts`:
+  - `aprovarConhecimentoRun({ runId })` — usa `requireSupabaseAuth`, lê `resumo.termos` da run, faz update em `biblioteca_artigo_conhecimento` (set origem → `utilizador`) apenas para os ids `novo: true`.
+- Tipos partilhados de relatório em `src/lib/biblioteca-mestra/types.ts` (`KnowledgeRunReport`).
+- Sem alterações à BD (já existem `resumo jsonb`, `biblioteca_artigo_conhecimento.ocorrencias/exemplos/justificacao/origem`).
+
+### Fora do âmbito
+
+- Âmbito massivo (especialidade/subespecialidade) continua com o card atual de progresso/contadores; o relatório detalhado só faz sentido para 1 artigo.
+- Nenhuma alteração ao motor de geração (fontes, prompt, IA) — esta tarefa é apenas apresentação + snapshot.
