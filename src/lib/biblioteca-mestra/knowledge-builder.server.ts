@@ -821,7 +821,9 @@ export async function processRun(runId: string) {
         termos,
         counts,
         semHistorico: ultimaFontes?.semHistorico ?? false,
+        erro: (falhados > 0 || novosIdsAll.length === 0) && ultimoErro ? ultimoErro : null,
       };
+
     }
 
     await sb
