@@ -1223,8 +1223,33 @@ export async function processRun(runId: string) {
           for (const tok of tokenize(fontes.artigo.descricao)) {
             vocPositivo.add(lemaSingular(tok));
           }
-          gen.termos_negativos = derivarNegativos(fontes.especialidadeId, vocPositivo, indice);
+          // Vocabulário REAL deste artigo mestre (descrições já classificadas).
+          // Se um termo candidato aparece aqui, NÃO pode ser negativo.
+          const vocReais = new Set<string>();
+          for (const h of fontes.historico) {
+            for (const tok of tokenize(h.descricao)) {
+              const c = lemaSingular(tok);
+              if (c) vocReais.add(c);
+            }
+          }
+          // Bloqueio estrutural por família de especialidade.
+          const familia = familiaEspecialidade(
+            fontes.contexto.especialidade,
+            null
+          );
+          const bloqueio = bloqueioParaFamilia(familia);
+          gen.termos_negativos = derivarNegativos(
+            fontes.especialidadeId,
+            vocPositivo,
+            vocReais,
+            bloqueio,
+            indice
+          );
+          if (gen.termos_negativos.length === 0) {
+            await appendLog(sb, runId, `negativos: não foram encontrados termos com confiança suficiente para ${fontes.artigo.codigo}`);
+          }
         }
+
 
         // Validação cruzada: elimina conflitos positivo/negativo e duplicados.
         const conflitos = resolverConflitos(gen);
