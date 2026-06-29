@@ -272,16 +272,24 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
 function derivarNegativos(
   artigoEspId: string,
   vocPositivoCanonico: Set<string>,
+  vocReaisDoArtigo: Set<string>,
+  bloqueioFamilia: Set<string>,
   idx: IndiceGlobal,
-  maxResultados = 12
+  maxAlta = 6,
+  maxMedia = 6
 ): GeneratedTermo[] {
   const totalThisEsp = idx.totalPorEsp.get(artigoEspId) ?? 0;
-  type Cand = { termo: string; espDom: string; domPct: number; exclusividade: number; suporte: number; totalAll: number };
+  type Cand = {
+    termo: string; espDom: string; domPct: number; exclusividade: number;
+    suporte: number; totalAll: number; score: number;
+  };
   const out: Cand[] = [];
 
   for (const [termoCanon, espMap] of idx.termoEspArtigos.entries()) {
     if (tokenGenerico(termoCanon)) continue;
     if (vocPositivoCanonico.has(termoCanon)) continue;
+    if (vocReaisDoArtigo.has(termoCanon)) continue;
+    if (bloqueioFamilia.has(termoCanon)) continue;
 
     const thisEspSet = espMap.get(artigoEspId);
     const thisCount = thisEspSet?.size ?? 0;
@@ -295,27 +303,51 @@ function derivarNegativos(
       totalAll += artSet.size;
       if (espId === artigoEspId) continue;
       const total = idx.totalPorEsp.get(espId) ?? 0;
-      if (total < 3) continue;
+      if (total < 6) continue;
       const dom = artSet.size / total;
       if (dom > bestDom) { bestDom = dom; bestEsp = espId; bestSize = artSet.size; }
     }
-    if (totalAll < 5) continue;
-    if (bestSize < 4) continue;
-    if (bestDom < 0.50 || !bestEsp) continue;
+    if (totalAll < 8) continue;
+    if (bestSize < 6) continue;
+    if (bestDom < 0.65 || !bestEsp) continue;
     const exclusividade = totalAll > 0 ? bestSize / totalAll : 0;
-    if (exclusividade < 0.70) continue;
+    if (exclusividade < 0.80) continue;
 
-    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll });
+    const score = exclusividade * bestDom;
+    if (score < 0.55) continue;
+
+    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, score });
   }
 
-  out.sort((a, b) => (b.exclusividade * b.domPct) - (a.exclusividade * a.domPct));
-  return out.slice(0, maxResultados).map((n) => ({
-    termo: n.termo,
-    peso: 30,
-    confianca: Math.round(Math.min(95, 55 + n.exclusividade * n.domPct * 45)),
-    fonte: "vizinhos",
-    justificacao: `Específico de ${idx.nomeEsp.get(n.espDom) ?? ""} (${n.suporte} de ${n.totalAll} ocorrências, ${Math.round(n.exclusividade * 100)}%) e ausente neste artigo.`,
-  }));
+  out.sort((a, b) => b.score - a.score);
+
+  const altas: GeneratedTermo[] = [];
+  const medias: GeneratedTermo[] = [];
+  for (const n of out) {
+    const nivel: "alta" | "media" = n.score >= 0.70 ? "alta" : "media";
+    const just =
+      `"${n.termo}" é específico de ${idx.nomeEsp.get(n.espDom) ?? ""} ` +
+      `(${n.suporte} de ${n.totalAll} ocorrências; ${Math.round(n.exclusividade * 100)}% exclusividade, ` +
+      `${Math.round(n.domPct * 100)}% dominância) e nunca aparece no histórico real deste artigo.`;
+    if (nivel === "alta" && altas.length < maxAlta) {
+      altas.push({
+        termo: n.termo,
+        peso: 30, // será sinalizado negativo em persistir()
+        confianca: Math.round(Math.min(95, 80 + n.score * 15)),
+        fonte: "vizinhos",
+        justificacao: just,
+      });
+    } else if (nivel === "media" && medias.length < maxMedia) {
+      medias.push({
+        termo: n.termo,
+        peso: 0, // sugestão: motor ignora; utilizador valida e edita o peso
+        confianca: Math.round(Math.min(75, 55 + (n.score - 0.55) * 130)),
+        fonte: "vizinhos",
+        justificacao: `[sugestão] ${just}`,
+      });
+    }
+  }
+  return [...altas, ...medias];
 }
 
 // Garante que nenhum termo aparece em duas listas e que não há duplicados
