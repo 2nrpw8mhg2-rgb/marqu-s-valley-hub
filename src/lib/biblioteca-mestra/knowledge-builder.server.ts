@@ -49,6 +49,39 @@ const STOPWORDS = new Set([
   "respetivos", "respetivas", "incluindo", "trabalhos",
 ]);
 
+// Vocabulário genérico de obra: verbos/substantivos comuns a TODAS as
+// especialidades. Nunca podem virar termos negativos porque não discriminam
+// nada. Já em forma canónica (sem acentos, singular aproximado).
+const GENERICOS_OBRA = new Set([
+  "fornecimento", "aplicacao", "execucao", "instalacao", "montagem", "desmontagem",
+  "remocao", "demolicao", "transporte", "carga", "descarga", "limpeza", "ensaio",
+  "teste", "testes", "verificacao", "controlo", "manutencao", "reparacao",
+  "substituicao", "ligacao", "integracao", "acabamento", "acabamentos",
+  "preparacao", "regularizacao", "nivelamento", "protecao", "isolamento",
+  "vedacao", "fixacao", "alinhamento", "assentamento", "implantacao",
+  "marcacao", "medicao", "gestao", "coordenacao", "supervisao", "seguranca",
+  "qualidade", "conformidade", "norma", "normas", "especificacao", "projeto",
+  "desenho", "peca", "pecas", "item", "itens", "artigo", "artigos", "trabalho",
+  "trabalhos", "servico", "servicos", "obra", "obras", "estaleiro", "material",
+  "materiais", "equipamento", "equipamentos", "ferramenta", "ferramentas",
+  "unidade", "metro", "metros", "tonelada", "conjunto", "kit", "sistema",
+  "sistemas", "componente", "componentes", "elemento", "elementos", "tipo",
+  "tipos", "modelo", "modelos", "marca", "marcas", "cor", "cores", "dimensao",
+  "dimensoes", "espessura", "altura", "largura", "comprimento", "diametro",
+  "qualquer", "diversos", "varios", "geral", "gerais", "novo", "novos", "nova",
+  "novas", "existente", "existentes", "incluido", "incluidos", "incluindo",
+  "necessario", "necessaria", "respetivo", "respetiva", "respetivos",
+  "respetivas", "completo", "completa", "completos", "completas",
+]);
+
+function tokenGenerico(c: string): boolean {
+  if (!c) return true;
+  if (/\d/.test(c)) return true;
+  if (c.length < 5) return true;
+  if (c.includes(" ")) return false;
+  return STOPWORDS.has(c) || GENERICOS_OBRA.has(c);
+}
+
 function admin(): Sb {
   return createClient<Database>(
     process.env.SUPABASE_URL!,
