@@ -496,16 +496,14 @@ export function ArtigoConhecimentoTab({ artigoId }: Props) {
               </AlertDialogTitle>
               <AlertDialogDescription asChild>
                 <div className="space-y-2 text-sm">
-                  <div>A IA irá analisar:</div>
+                <div>A IA irá analisar três fontes:</div>
                   <ul className="ml-1 space-y-0.5 text-foreground">
-                    <li>✔ Descrição técnica do Artigo Mestre</li>
-                    <li>✔ Especialidade, Subespecialidade e Categoria</li>
-                    <li>✔ Biblioteca Mestra (contexto)</li>
-                    <li>✔ Histórico de classificações</li>
-                    <li>✔ Mapas de Quantidades reais associados</li>
+                    <li>📄 <span className="font-medium">Histórico validado</span> deste Artigo Mestre (peso alto)</li>
+                    <li>📥 <span className="font-medium">Descrições brutas</span> de mapas importados, por similaridade textual (peso médio)</li>
+                    <li>🧭 <span className="font-medium">Artigos vizinhos</span> da mesma subespecialidade, para diferenciação e termos negativos (peso baixo)</li>
                   </ul>
                   <div className="pt-2 text-xs text-muted-foreground">
-                    Tempo estimado: ~12 segundos. {registos.length > 0 && "Os termos gerados anteriormente pela IA serão substituídos; termos do utilizador são mantidos."}
+                    Tempo estimado: ~15–20 segundos. Cada termo é etiquetado com a sua origem e nível de confiança. {registos.length > 0 && "Os termos gerados anteriormente pela IA serão substituídos; termos do utilizador são mantidos."}
                   </div>
                 </div>
               </AlertDialogDescription>
