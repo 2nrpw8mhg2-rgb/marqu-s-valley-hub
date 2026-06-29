@@ -1,27 +1,36 @@
-## Correção do parser de resposta da IA
+## Norma Global de Idioma — Português de Portugal (pt-PT)
 
-A última run falhou com `Unexpected non-whitespace character after JSON at position 4580` — o modelo devolveu o JSON correto mas com texto/markdown extra a seguir, e o fallback regex guloso voltou a falhar. A run terminou marcada como `concluido` com 0 termos.
+Estabelecer pt-PT como norma transversal do MV OS, com efeito imediato em todo o conteúdo gerado pela IA e em toda a UI futura.
 
-### Alterações
+### 1. Memória de projeto (regra permanente)
 
-**1. `src/lib/biblioteca-mestra/knowledge-builder.server.ts` — `callAI`**
+Criar duas entradas em `mem://`:
 
-- Adicionar helper `parseJsonLoose(content)` que:
-  1. Remove fences ` ```json … ``` ` / ` ``` `.
-  2. Faz `JSON.parse` direto.
-  3. Se falhar, varre o conteúdo carácter a carácter (respeitando strings e escapes) e extrai o **primeiro objeto JSON balanceado**, ignorando o resto.
-  4. Se nada parsear, devolve `{}`.
-- Reforçar o system prompt: `"Devolve apenas JSON válido. Sem markdown, sem texto antes ou depois."`
-- Adicionar `max_tokens: 4000` ao pedido para evitar truncatura com fontes grandes.
+- **`mem://index.md` — Core** (sempre em contexto, aplicada a TODAS as ações):
+  - "Idioma único: Português de Portugal (pt-PT). Nunca pt-BR, inglês ou mistura. Aplica-se a UI, mensagens, IA, logs, conhecimento gerado."
+  - "Terminologia técnica de construção civil pt-PT: betão (não concreto), cofragem (não forma), tubagem (não tubulação), caixilharia, mapa de quantidades, dono de obra, empreitada, etc."
 
-**2. `src/lib/biblioteca-mestra/knowledge-builder.server.ts` — `processRun`**
+- **`mem://constraints/idioma-ptpt.md`** — lista detalhada de termos a usar / a evitar (Utilizar: Guardar, Eliminar, Editar, Gerar, Aprovar, Conhecimento, Ocorrências, Confiança, Peso, Estado, Fontes analisadas, Betão, Cofragem, Armadura, Tubagem, Caixilharia, Laje, Sapata, Viga, Pilar, Caleira, Impermeabilização, Gesso cartonado, etc. / Evitar: Salvar, Deletar, Excluir, Build, Update, Score, Knowledge Base, Concreto, Forma, Concretagem, Tubulação, Contrapiso, Piso cerâmico, etc.) + regra de normalização "Concreto armado → Betão armado".
 
-- Quando `scope.tipo === "artigo"` e o loop terminar com `falhados > 0` ou `total === 0`, anexar ao `resumo` o campo `erro` com a última mensagem do log (`✗ …`), para o UI poder distinguir "0 termos por falha" de "0 termos por escolha do utilizador".
+### 2. Reforço no prompt do Knowledge Builder
 
-**3. `src/components/biblioteca-mestra/KnowledgeRunReport.tsx`**
+Editar `src/lib/biblioteca-mestra/knowledge-builder.server.ts` (função `buildPrompt`):
 
-- Quando `report.erro` existir (ou `report.total === 0 && report.totalNovos === 0`), trocar o banner verde por banner âmbar **"⚠ Geração sem termos"** com a mensagem de erro e botão **Tentar novamente** (reusa o handler do botão Regenerar). Restante layout (fontes, antes/depois) mantém-se.
+- Adicionar bloco **REGRAS DE IDIOMA (OBRIGATÓRIO)** no início do prompt:
+  - "Todo o output deve estar em **Português de Portugal (pt-PT)**. Nunca pt-BR, nunca inglês."
+  - Tabela de normalização explícita: `concreto→betão`, `concreto armado→betão armado`, `forma→cofragem`, `concretagem→betonagem`, `tubulação→tubagem`, `contrapiso→camada de regularização`, `piso cerâmico→pavimento cerâmico`, `argamassa colante→cimento-cola`.
+  - "Se um termo aparecer em pt-BR nas FONTES, regista o equivalente pt-PT como termo principal e o pt-BR como **sinónimo** (relação de equivalência para reconhecimento futuro)."
+  - "Justificações também em pt-PT, sem anglicismos."
+
+### 3. Auditoria leve da UI atual
+
+Sem alterar layout, fazer varrimento e substituir ocorrências pontuais em componentes do Knowledge Builder e Biblioteca Mestra que estejam fora da norma:
+- "Salvar" → "Guardar", "Deletar"/"Excluir" → "Eliminar", "Score" → "Confiança", "Update" → "Atualizar", "Knowledge Base" → "Base de Conhecimento".
+
+Âmbito desta auditoria nesta iteração: ficheiros em `src/components/biblioteca-mestra/`, `src/routes/_app/biblioteca-mestra*`, `src/lib/biblioteca-mestra/`. Restantes módulos serão tratados à medida que forem tocados (a regra Core garante consistência futura).
 
 ### Fora do âmbito
 
-- Não muda o prompt de geração, fontes nem BD.
+- Sem alterações de BD, schemas ou nomes de colunas.
+- Sem i18n / sistema de tradução — pt-PT é a única língua suportada.
+- Sem reescrita massiva de toda a plataforma neste turno; a memória Core garante que qualquer trabalho futuro respeita a norma.
