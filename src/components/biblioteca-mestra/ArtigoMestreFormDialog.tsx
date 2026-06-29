@@ -126,9 +126,14 @@ export function ArtigoMestreFormDialog({ open, onOpenChange, initial }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle>{editing?.id ? "Editar" : "Novo"} Artigo Mestre</DialogTitle></DialogHeader>
-        <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+        <Tabs defaultValue="geral" className="w-full">
+          <TabsList>
+            <TabsTrigger value="geral">Geral</TabsTrigger>
+            <TabsTrigger value="conhecimento">Conhecimento IA</TabsTrigger>
+          </TabsList>
+          <TabsContent value="geral" className="space-y-3 max-h-[70vh] overflow-y-auto mt-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Subespecialidade *</Label>
