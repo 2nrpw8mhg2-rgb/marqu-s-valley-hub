@@ -1246,18 +1246,24 @@ export async function processRun(runId: string) {
       // Família por artigo mestre, para aplicar bloqueio estrutural.
       const artIds = Array.from(new Set((antigos ?? []).map((r) => r.artigo_mestre_id as string)));
       const familiaPorArtigo = new Map<string, string | null>();
+      const demolicaoPorArtigo = new Map<string, boolean>();
       if (artIds.length) {
         const { data: artsFam } = await sb
           .from("biblioteca_artigos")
-          .select("id, biblioteca_subespecialidades(biblioteca_especialidades(nome))")
+          .select("id, descricao, biblioteca_subespecialidades(nome, biblioteca_especialidades(nome)), biblioteca_categorias(nome)")
           .in("id", artIds);
         for (const r of (artsFam ?? []) as any[]) {
           const nomeEsp = r?.biblioteca_subespecialidades?.biblioteca_especialidades?.nome ?? "";
+          const nomeSub = r?.biblioteca_subespecialidades?.nome ?? "";
+          const nomeCat = r?.biblioteca_categorias?.nome ?? "";
+          const desc = r?.descricao ?? "";
           familiaPorArtigo.set(r.id as string, familiaEspecialidade(nomeEsp, null));
+          demolicaoPorArtigo.set(r.id as string, artigoEhDemolicao(nomeEsp, nomeSub, nomeCat, desc));
         }
       }
 
       let removidosMateriais = 0;
+      let removidosDemolicoes = 0;
       const aRemover = (antigos ?? []).filter((r) => {
         const c = canonicalizar((r.termo as string) ?? "");
         if (!c) return false;
@@ -1265,13 +1271,21 @@ export async function processRun(runId: string) {
         if (MATERIAIS_CONSTRUCAO.has(c)) { removidosMateriais++; return true; }
         const fam = familiaPorArtigo.get(r.artigo_mestre_id as string) ?? null;
         const bloq = bloqueioParaFamilia(fam);
-        return bloq.has(c);
+        if (bloq.has(c)) return true;
+        if (demolicaoPorArtigo.get(r.artigo_mestre_id as string) && !sanearNegativoDemolicoes(c)) {
+          removidosDemolicoes++;
+          return true;
+        }
+        return false;
       }).map((r) => r.id as string);
       if (aRemover.length) {
         await sb.from("biblioteca_artigo_conhecimento").delete().in("id", aRemover);
         await appendLog(sb, runId, `Limpeza: removidos ${aRemover.length} negativos inválidos antigos (genéricos ou estruturais bloqueados)`);
         if (removidosMateriais > 0) {
           await appendLog(sb, runId, `Limpeza: negativos removidos por serem materiais: ${removidosMateriais}`);
+        }
+        if (removidosDemolicoes > 0) {
+          await appendLog(sb, runId, `Limpeza: negativos removidos em Demolições por não serem operações incompatíveis: ${removidosDemolicoes}`);
         }
       }
 
