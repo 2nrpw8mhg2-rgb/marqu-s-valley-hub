@@ -367,24 +367,131 @@ REGRAS DE CONFIANÇA POR FONTE
 - fonte="vizinhos" → 40-60 (usar sobretudo p/ termos_negativos)
 - fonte="inferido" → 50-70 (terminologia técnica geral relacionada)
 
-REGRAS DE IDIOMA (OBRIGATÓRIO)
-- Todo o output (termos, sinónimos, expressões, materiais, justificações) DEVE estar em **Português de Portugal (pt-PT)**. Nunca pt-BR, nunca inglês, nunca mistura.
-- Normaliza terminologia brasileira para a portuguesa. Tabela mínima:
-  concreto→betão, concreto armado→betão armado, forma→cofragem, concretagem→betonagem,
-  tubulação→tubagem, contrapiso→camada de regularização, piso cerâmico→pavimento cerâmico,
-  argamassa colante→cimento-cola, rodapé (acabamento)→rodapé (manter), calçada→passeio.
-- Se um termo aparecer em pt-BR nas FONTES, regista a forma pt-PT como termo principal
-  e a forma pt-BR como **sinónimo** (relação de equivalência para reconhecimento futuro).
-- Sem anglicismos (não usar "score", "build", "update", "knowledge"); usar confiança, geração, atualização, conhecimento.
+REGRAS DE IDIOMA — PORTUGUÊS DE PORTUGAL (OBRIGATÓRIO E NÃO NEGOCIÁVEL)
+- Todo o output (termos, sinónimos, expressões, materiais, termos negativos e justificações) DEVE estar em **Português de Portugal (pt-PT)**. Proibido pt-BR, inglês ou mistura.
+- A Biblioteca Mestra é referência de terminologia portuguesa da construção civil (mapas de quantidades, cadernos de encargos, medições). Usa sempre vocabulário praticado em Portugal por engenheiros, arquitetos, medidores e empreiteiros.
+- Normalização OBRIGATÓRIA — nunca gerar a forma pt-BR como termo principal:
+  concreto→betão · concreto armado→betão armado · concretagem→betonagem · concreto magro→betão de limpeza ·
+  laje de concreto→laje de betão · forma (de concreto)→cofragem · escora→escoramento ·
+  tubulação→tubagem · contrapiso→camada de regularização · piso cerâmico→pavimento cerâmico ·
+  rejunte→betumação de juntas · argamassa colante→cimento-cola ·
+  alvenaria de concreto→alvenaria de blocos de betão · bloco de concreto→bloco de betão ·
+  esquadria→caixilharia · forro de gesso→teto falso em gesso cartonado ·
+  chapisco→salpico · emboço→reboco de regularização ·
+  calçada→passeio · meio-fio→lancil · prefeitura→câmara municipal.
+- Termos EXCLUSIVAMENTE brasileiros sem equivalente em Portugal (ex.: "tijolo baiano", "cobogó") NÃO devem ser gerados. Se aparecerem nas fontes, ignora-os silenciosamente e procura terminologia portuguesa equivalente, ou omite.
+- Se um termo aparecer em pt-BR nas FONTES e existir equivalente pt-PT: gera o equivalente pt-PT como termo principal e regista a forma pt-BR como **sinónimo** (peso baixo 5-10, confiança 40-60) para reconhecimento de descrições importadas.
+- Sem anglicismos: "confiança" (não score), "geração/atualização" (não build/update), "conhecimento" (não knowledge), "guardar" (não salvar), "eliminar" (não deletar/excluir).
+- Antes de devolveres o JSON, revê CADA termo: se contiver pt-BR ou inglês, substitui ou remove.
 
 REGRAS
-- Termos técnicos, minúsculas, sem pontuação supérflua, pt-PT.
-- Expressões são frases curtas (2-6 palavras) típicas de MQ, ex: "fornecimento e aplicação de".
+- Termos técnicos, minúsculas, sem pontuação supérflua, exclusivamente pt-PT.
+- Expressões são frases curtas (2-6 palavras) típicas de MQ portugueses, ex: "fornecimento e aplicação de".
 - Termos negativos: palavras associadas a OUTROS artigos (ver FONTE C) que devem reduzir confiança neste.
 - "fonte" é OBRIGATÓRIO em cada termo.
 - justificacao = UMA frase curta (máx. 120 caracteres), em pt-PT.
 - NÃO inventes materiais sem evidência nas fontes.
 - Devolve APENAS o JSON, sem comentários, sem markdown.`;
+}
+
+// ============================================================
+// Camada de normalização linguística pt-BR → pt-PT
+// Garante que nenhum termo brasileiro entra na Biblioteca Mestra,
+// mesmo que a IA falhe em seguir as regras do prompt.
+// ============================================================
+
+const PTBR_TO_PTPT: Array<[RegExp, string]> = [
+  [/\bconcreto\s+armado\b/gi, "betão armado"],
+  [/\bconcreto\s+magro\b/gi, "betão de limpeza"],
+  [/\blaje\s+de\s+concreto\b/gi, "laje de betão"],
+  [/\balvenaria\s+de\s+concreto\b/gi, "alvenaria de blocos de betão"],
+  [/\bbloco(s)?\s+de\s+concreto\b/gi, "bloco de betão"],
+  [/\bconcretagem\b/gi, "betonagem"],
+  [/\bconcreto\b/gi, "betão"],
+  [/\btubula[cç][aã]o\b/gi, "tubagem"],
+  [/\bcontrapiso\b/gi, "camada de regularização"],
+  [/\bpiso\s+cer[aâ]mico\b/gi, "pavimento cerâmico"],
+  [/\bargamassa\s+colante\b/gi, "cimento-cola"],
+  [/\brejunte\b/gi, "betumação de juntas"],
+  [/\besquadria(s)?\b/gi, "caixilharia"],
+  [/\bforro\s+de\s+gesso\b/gi, "teto falso em gesso cartonado"],
+  [/\bchapisco\b/gi, "salpico"],
+  [/\bembo[cç]o\b/gi, "reboco de regularização"],
+  [/\bmeio[-\s]?fio\b/gi, "lancil"],
+  [/\bcal[cç]ada\b/gi, "passeio"],
+  [/\bprefeitura\b/gi, "câmara municipal"],
+  [/\bforma(s)?\s+(de\s+madeira|met[aá]lica|para\s+concreto|para\s+bet[aã]o)\b/gi, "cofragem"],
+];
+
+// Termos exclusivamente brasileiros sem equivalente em Portugal → REJEITAR.
+const PTBR_EXCLUSIVOS: RegExp[] = [
+  /\btijolo\s+baiano\b/i,
+  /\bcobog[oó]\b/i,
+];
+
+// Padrões inequivocamente estrangeiros (pt-BR ou inglês) → REJEITAR.
+const TERMO_ESTRANGEIRO: RegExp[] = [
+  /\bvoc[eê]s?\b/i,
+  /\b(building|knowledge|score|update|deploy|workflow)\b/i,
+];
+
+function normalizarTextoPtPt(s: string): { texto: string; alterado: boolean } {
+  if (!s) return { texto: s, alterado: false };
+  let out = s;
+  for (const [re, sub] of PTBR_TO_PTPT) out = out.replace(re, sub);
+  return { texto: out, alterado: out !== s };
+}
+
+function termoRejeitado(s: string): boolean {
+  if (!s || !s.trim()) return true;
+  for (const re of PTBR_EXCLUSIVOS) if (re.test(s)) return true;
+  for (const re of TERMO_ESTRANGEIRO) if (re.test(s)) return true;
+  return false;
+}
+
+type NormStats = { rejeitados: number; convertidos: number; rejeitadosTermos: string[] };
+
+function normalizarGenerated(gen: Generated): NormStats {
+  const stats: NormStats = { rejeitados: 0, convertidos: 0, rejeitadosTermos: [] };
+  const sinonimosExtra: GeneratedTermo[] = [];
+
+  const aplicar = (arr: GeneratedTermo[]): GeneratedTermo[] => {
+    const out: GeneratedTermo[] = [];
+    const vistos = new Set<string>();
+    for (const t of arr) {
+      if (termoRejeitado(t.termo)) {
+        stats.rejeitados++;
+        if (stats.rejeitadosTermos.length < 20) stats.rejeitadosTermos.push(t.termo);
+        continue;
+      }
+      const { texto, alterado } = normalizarTextoPtPt(t.termo);
+      const just = t.justificacao ? normalizarTextoPtPt(t.justificacao).texto : t.justificacao;
+      const principal: GeneratedTermo = { ...t, termo: texto, justificacao: just };
+      const key = texto.toLowerCase().trim();
+      if (!vistos.has(key) && !termoRejeitado(texto)) {
+        vistos.add(key);
+        out.push(principal);
+      }
+      if (alterado) {
+        stats.convertidos++;
+        sinonimosExtra.push({
+          termo: t.termo,
+          peso: 8,
+          confianca: 50,
+          justificacao: "Forma pt-BR registada como sinónimo para reconhecimento de descrições importadas.",
+          fonte: t.fonte ?? "inferido",
+        });
+      }
+    }
+    return out;
+  };
+
+  gen.palavras_chave = aplicar(gen.palavras_chave);
+  gen.expressoes = aplicar(gen.expressoes);
+  gen.materiais = aplicar(gen.materiais);
+  gen.termos_negativos = aplicar(gen.termos_negativos);
+  gen.sinonimos = aplicar([...gen.sinonimos, ...sinonimosExtra]);
+  return stats;
 }
 
 
