@@ -244,11 +244,28 @@ async function callAI(prompt: string): Promise<Generated> {
 
 type PersistResult = { inseridos: number; perTipo: Record<string, number> };
 
+type MqEntry = { descricao: string; ocorrencias: number };
+
+function calcOcorrenciasEExemplos(termo: string, mqTop: MqEntry[]): { ocorrencias: number; exemplos: string[] } {
+  const t = termo.toLowerCase();
+  if (!t) return { ocorrencias: 0, exemplos: [] };
+  let oc = 0;
+  const ex: string[] = [];
+  for (const m of mqTop) {
+    if (m.descricao.includes(t)) {
+      oc += m.ocorrencias;
+      if (ex.length < 3) ex.push(m.descricao.slice(0, 160));
+    }
+  }
+  return { ocorrencias: oc, exemplos: ex };
+}
+
 async function persistir(
   sb: Sb,
   artigoId: string,
   gen: Generated,
-  modo: Modo
+  modo: Modo,
+  mqTop: MqEntry[]
 ): Promise<PersistResult> {
   if (modo === "regenerar") {
     await sb
@@ -283,14 +300,19 @@ async function persistir(
       setExist.add(key);
       const peso = Number.isFinite(t.peso) && t.peso !== 0 ? t.peso : meta.pesoDefault;
       const pesoFinal = meta.sign < 0 ? -Math.abs(peso) : Math.abs(peso);
+      const { ocorrencias, exemplos } = calcOcorrenciasEExemplos(t.termo, mqTop);
+      const origem = ocorrencias > 0 ? "mapas_quantidades" : "ia";
       rows.push({
         artigo_mestre_id: artigoId,
         tipo: meta.tipo,
         termo: t.termo,
         peso: pesoFinal,
         confianca: t.confianca,
-        origem: "ia",
+        origem,
         ativo: true,
+        ocorrencias,
+        justificacao: t.justificacao ?? null,
+        exemplos,
       });
       perTipo[meta.tipo]++;
     }
