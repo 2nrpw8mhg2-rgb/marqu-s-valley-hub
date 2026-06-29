@@ -640,11 +640,108 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
                     </div>
                   </div>
                 )}
+
+                <div className="flex gap-2 pt-3 border-t">
+                  <Button size="sm" variant="outline" onClick={() => openEditor(selected)}>
+                    <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => setRemoverTermo(selected)}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Eliminar
+                  </Button>
+                </div>
               </div>
             </>
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Editor de termo (criar/editar) */}
+      <Dialog open={!!editor} onOpenChange={(o) => !o && setEditor(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editor?.id ? "Editar termo" : "Adicionar termo manualmente"}</DialogTitle>
+          </DialogHeader>
+          {editor && (
+            <div className="space-y-3">
+              {editor.artigoCodigo && (
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-mono">{editor.artigoCodigo}</span> {editor.artigoDescricao}
+                </div>
+              )}
+              <div>
+                <Label className="text-xs">Tipo</Label>
+                <Select
+                  value={editor.tipo}
+                  onValueChange={(v) => setEditor({ ...editor, tipo: v as ConhecimentoTipo, peso: tipoPesoDefault(v as ConhecimentoTipo) })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CONHECIMENTO_TIPOS.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Termo</Label>
+                <Input
+                  value={editor.termo}
+                  onChange={(e) => setEditor({ ...editor, termo: e.target.value })}
+                  placeholder="ex: betão armado"
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Peso</Label>
+                  <Input
+                    type="number"
+                    value={editor.peso}
+                    onChange={(e) => setEditor({ ...editor, peso: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Confiança (%)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={editor.confianca}
+                    onChange={(e) => setEditor({ ...editor, confianca: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditor(null)}>Cancelar</Button>
+            <Button onClick={() => editor && saveEditor.mutate(editor)} disabled={saveEditor.isPending || !editor?.termo.trim()}>
+              {editor?.id ? "Guardar" : "Adicionar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmar eliminação */}
+      <AlertDialog open={!!removerTermo} onOpenChange={(o) => !o && setRemoverTermo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar termo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vai eliminar definitivamente <span className="font-semibold">"{removerTermo?.termo}"</span> do conhecimento deste artigo. Esta ação não pode ser anulada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => removerTermo && deleteTermo.mutate(removerTermo)}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
