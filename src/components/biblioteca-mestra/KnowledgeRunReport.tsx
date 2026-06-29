@@ -488,7 +488,6 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
                           )}
                           {CONHECIMENTO_TIPOS.map((t) => {
                             const sub = lista.filter((x) => x.tipo === t.value);
-                            if (sub.length === 0) return null;
                             return (
                               <div key={t.value}>
                                 <div className="flex items-center gap-2 mb-1">
@@ -496,14 +495,24 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
                                     {t.labelShort}
                                   </Badge>
                                   <span className="text-xs text-muted-foreground tabular-nums">({sub.length})</span>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-1.5 text-[10px] ml-auto"
+                                    onClick={() => openCreate(t.value, art.id, { codigo: art.codigo, descricao: art.descricao })}
+                                  >
+                                    <Plus className="h-3 w-3 mr-0.5" /> Adicionar
+                                  </Button>
                                 </div>
-                                <TermosChips lista={sub} onPick={setSelected} mostraArtigo={false} />
+                                {sub.length > 0 ? (
+                                  <TermosChips lista={sub} onPick={setSelected} onEdit={openEditor} onDelete={setRemoverTermo} mostraArtigo={false} />
+                                ) : (
+                                  <div className="text-[11px] text-muted-foreground italic">Sem termos.</div>
+                                )}
                               </div>
                             );
                           })}
-                          {lista.length === 0 && !art.falhou && (
-                            <div className="text-xs text-muted-foreground">Sem termos.</div>
-                          )}
                         </AccordionContent>
                       </AccordionItem>
                     );
