@@ -115,10 +115,11 @@ async function recolherFontes(sb: Sb, artigoId: string) {
     .slice(0, MQ_TOP)
     .map(([descricao, ocorrencias]) => ({ descricao, ocorrencias }));
 
-  const subRel = (a as any)?.biblioteca_subespecialidades;
+  const aAny = a as any;
+  const subRel = aAny?.biblioteca_subespecialidades;
   const especialidadeNome = subRel?.biblioteca_especialidades?.nome ?? "";
   const subespecialidadeNome = subRel?.nome ?? "";
-  const categoriaNome = (a as any)?.biblioteca_categorias?.nome ?? "";
+  const categoriaNome = aAny?.biblioteca_categorias?.nome ?? "";
 
   const { data: existentes } = await sb
     .from("biblioteca_artigo_conhecimento")
@@ -127,9 +128,9 @@ async function recolherFontes(sb: Sb, artigoId: string) {
 
   return {
     artigo: {
-      codigo: a?.codigo ?? "",
-      descricao: a?.descricao ?? "",
-      observacoes: a?.observacoes ?? "",
+      codigo: aAny?.codigo ?? "",
+      descricao: aAny?.descricao ?? "",
+      observacoes: aAny?.observacoes ?? "",
     },
     contexto: { especialidade: especialidadeNome, subespecialidade: subespecialidadeNome, categoria: categoriaNome },
     mqTop,
