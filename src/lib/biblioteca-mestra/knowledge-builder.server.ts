@@ -658,6 +658,7 @@ export async function processRun(runId: string) {
         const prompt = buildPrompt(fontes, run.modo as Modo);
         const gen = await callAI(prompt);
         const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes);
+        novosIdsAll.push(...res.novosIds);
 
         for (const k of Object.keys(res.perTipo)) counts[k] = (counts[k] ?? 0) + res.perTipo[k];
         processados++;
