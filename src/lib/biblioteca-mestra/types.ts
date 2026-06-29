@@ -164,7 +164,9 @@ export type KnowledgeRunReport = {
   termos: KnowledgeRunReportTermo[];
   counts: Record<string, number>;
   semHistorico: boolean;
+  erro?: string | null;
 };
+
 
 export const CONHECIMENTO_TIPOS: {
   value: ConhecimentoTipo;
