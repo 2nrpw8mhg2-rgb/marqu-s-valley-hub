@@ -240,6 +240,7 @@ export function ArtigoMestreFormDialog({ open, onOpenChange, initial }: Props) {
                 </Badge>
               ))}
             </div>
+          </div>
           </TabsContent>
           <TabsContent value="conhecimento" className="max-h-[70vh] overflow-y-auto mt-3">
             <ArtigoConhecimentoTab artigoId={editing?.id ?? null} />
