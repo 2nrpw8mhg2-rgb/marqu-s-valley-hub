@@ -1867,6 +1867,8 @@ export type Database = {
         | "importacao"
         | "mapas_quantidades"
         | "biblioteca_mestra"
+        | "orcamentos_brutos"
+        | "artigos_vizinhos"
       biblioteca_conhecimento_tipo:
         | "palavra_chave"
         | "sinonimo"
@@ -2112,6 +2114,8 @@ export const Constants = {
         "importacao",
         "mapas_quantidades",
         "biblioteca_mestra",
+        "orcamentos_brutos",
+        "artigos_vizinhos",
       ],
       biblioteca_conhecimento_tipo: [
         "palavra_chave",

@@ -1,124 +1,122 @@
-## Objetivo
+## Knowledge Builder — Fontes Multi-Nível
 
-Transformar a aba **Conhecimento IA** (dentro do diálogo *Editar Artigo Mestre*) de uma simples tabela técnica numa verdadeira **Ficha de Conhecimento do Artigo Mestre** — visual, auditável e centrada na ação de gerar conhecimento via IA.
+Evoluir `recolherFontes` para consultar três fontes distintas, com pesos e confiança próprios, e refletir tudo isto no prompt da IA, na persistência e no painel "Conhecimento IA".
 
-Ficheiro principal: `src/components/biblioteca-mestra/ArtigoConhecimentoTab.tsx`
-Suporte: `src/lib/biblioteca-mestra/knowledge-builder.functions.ts` / `.server.ts`, `src/lib/biblioteca-mestra/types.ts`.
+### 1. Três fontes em `recolherFontes(sb, artigoId)`
 
----
+**Fonte A — Histórico do Artigo Mestre** (mantém + refina)
+- Query a `classificacao_artigos` com estados `validado`, `classificado_manual`, `classificado_auto`.
+- Agrupar por descrição normalizada, contando ocorrências por estado.
+- Confiança base por linha:
+  - `validado` / `classificado_manual` → 95
+  - `classificado_auto` → `min(85, score original)` (usar coluna de score se existir; senão 70)
+- Resultado: `historico[]` com `{ descricao, ocorrencias, confiancaBase, estado }`.
 
-## 1. Dashboard de estado (topo da aba)
+**Fonte B — Orçamentos brutos** (`orcamento_artigos`)
+- Ativa quando `historico.length < 20` OU sempre como complemento (limite 200 linhas).
+- Filtro: linhas ainda não classificadas para este artigo (sem entrada em `classificacao_artigos` para o par `orcamento_artigo_id` × `artigo_mestre_id`, ou estado `sem_classificacao`).
+- Procura por similaridade textual (pg_trgm via `similarity()`) entre `orcamento_artigos.descricao` e o conjunto:
+  - descrição do Artigo Mestre
+  - keywords já existentes no `biblioteca_artigo_conhecimento` deste artigo
+  - nome da especialidade/subespecialidade/categoria
+- Threshold de similaridade ≥ 0.25; ordenar por score desc, top 60.
+- Confiança base: `Math.round(40 + similaridade*40)` (intervalo 50–80).
+- Resultado: `candidatos[]` com `{ descricao, similaridade, confiancaBase }`.
 
-Acrescentar, antes da tabela, um cartão de resumo com:
+**Fonte C — Artigos semelhantes**
+- Buscar até 15 artigos da mesma subespecialidade (fallback: mesma especialidade) excluindo o atual.
+- Para cada um, ler top descrições validadas de `classificacao_artigos` (limit 5 por artigo).
+- Devolver `semelhantes[]` com `{ artigoCodigo, artigoDescricao, exemplos[] }`.
+- Usado pela IA principalmente para gerar **termos negativos** (palavras comuns nos vizinhos mas que não pertencem a este artigo) e contexto.
+- Confiança base baixa (40–55) se o termo só aparecer aqui.
 
-- **Estado** — chip colorido: 🟡 Não gerado · 🔵 Em geração · 🟢 Gerado · ⚪ Editado manualmente
-- **Confiança global** — média ponderada da confiança × peso dos termos ativos (formato barra + %)
-- **Última geração** — data/hora da última run concluída (ou "Nunca")
-- **Fontes analisadas** — nº de fontes usadas na última run (MQ, biblioteca, etc.)
-- **Conhecimento aprovado** — nº de termos ativos validados
+### 2. Prompt da IA
 
-Dados vêm de `biblioteca_knowledge_run` (filtrar pelo `scope_ids->>artigoId`) + agregação de `biblioteca_artigo_conhecimento`.
+Estender `buildPrompt` para incluir secções claramente separadas:
 
-## 2. Botão "🧠 Gerar Conhecimento IA" como ação principal
-
-- Colocar em destaque (canto superior direito do painel, variante `default`/primária).
-- O botão **Adicionar** passa a secundário (`variant="outline"`, ícone +).
-- Ao clicar abre um `AlertDialog` de confirmação a explicar o que a IA vai analisar (lista com ✔) e tempo estimado.
-- Confirmação chama `startKnowledgeRun({ scope: { tipo: "artigo", artigoId }, modo: "regenerar" })` e faz polling com `getKnowledgeRunStatus` (já existem).
-- Durante a run: barra de progresso + botão **Cancelar** (usa `cancelKnowledgeRun`).
-- No fim, mostrar **resumo da geração** (toast + bloco inline): nº por tipo + confiança global obtida.
-
-## 3. Coluna "Origem" com ícones
-
-Substituir os badges de texto por ícones + tooltip:
-
-- 🤖 IA (`Bot`) · 👤 Utilizador (`User`) · 📄 Mapas de Quantidades (`FileSpreadsheet`) · 📚 Biblioteca Mestra (`Library`) · ⚙ Sistema (`Settings`) · 📥 Importação (`Upload`)
-
-Estender o enum `ConhecimentoOrigem` em `types.ts` com `"mapas_quantidades"` e `"biblioteca_mestra"` (migration a adicionar valores ao CHECK/enum). Atualizar `CONHECIMENTO_ORIGENS` com `icon` e `label`.
-
-## 4. Nova coluna "Ocorrências"
-
-- Adicionar coluna `ocorrencias int default 0` à tabela `biblioteca_artigo_conhecimento` (migration).
-- A geração IA preenche o valor (contagem real em MQ + histórico de classificações).
-- Render: número grande tabular + barra horizontal proporcional ao máximo da tabela.
-- Coluna ordenável (clique no cabeçalho).
-
-## 5. Painel lateral de detalhe do termo
-
-Ao clicar numa linha (não nos botões de ação) abre um `Sheet` lateral à direita com:
-
-- Termo + tipo + estado ativo
-- **Origem** (ícone + descrição completa)
-- **Encontrado em** — "287 mapas de quantidades" (placeholder até existirem dados)
-- **Exemplos reais** — lista de descrições de MQ onde o termo apareceu (top 5)
-- **Utilizado pela IA porque** — campo `justificacao text` (nova coluna, preenchida pela IA)
-- Acções: editar, ativar/desativar, remover
-
-Migration adiciona `justificacao text` e `exemplos jsonb` (array de strings curtas) a `biblioteca_artigo_conhecimento`.
-
-## 6. Visualização gráfica da confiança
-
-Substituir "92%" simples por:
-
-- Barra horizontal (componente `Progress` do shadcn) com cor semântica:
-  - ≥ 85% → verde · 60–84% → amarelo · < 60% → vermelho
-- Número à direita da barra
-- Tooltip com a categoria textual (Muito elevada / Média / Baixa)
-
-## 7. Cartão "Composição do conhecimento"
-
-Por baixo do dashboard de estado, um cartão com **contadores por tipo** (apenas termos ativos):
-
-- Palavras-chave · Sinónimos · Expressões · Materiais · Termos Negativos · **Total**
-- Cada contador é também filtro rápido (clique aplica `filtroTipo`).
-- Visual: grid horizontal de mini-cards com ícone tipográfico + número grande.
-
-## 8. Resumo do resultado da geração
-
-Após `getKnowledgeRunStatus` reportar `estado = "concluido"`:
-
-- Banner verde temporário no topo (descartável): "Conhecimento gerado com sucesso" + breakdown por tipo + confiança global.
-- Persistir o último resumo em `biblioteca_knowledge_run.resumo jsonb` (já deve existir; senão acrescentar) para reabertura.
-
-## 9. Layout final da aba (ordem visual)
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│  [Estado] [Confiança] [Última geração] [Fontes] [Aprovados] │ ← Dashboard
-├──────────────────────────────────────────────────────────────┤
-│  [PC 24] [Sin 12] [Expr 8] [Mat 14] [Neg 5]   Total: 63     │ ← Composição
-├──────────────────────────────────────────────────────────────┤
-│  [Pesquisar] [Tipo▾] [Inativos]  [+ Adicionar] [🧠 Gerar IA]│ ← Toolbar
-├──────────────────────────────────────────────────────────────┤
-│  Tipo │ Termo │ Peso │ Origem │ Ocorr. │ Confiança │ Ativo  │ ← Tabela
-│  ...  (linha clicável → abre Sheet de detalhe)              │
-└──────────────────────────────────────────────────────────────┘
+```
+FONTE A — Descrições validadas para este artigo (peso alto, N=…)
+  (123x) [validado] fornecimento e aplicação de…
+  …
+FONTE B — Descrições brutas candidatas por similaridade (peso médio, N=…)
+  (sim 0.72) execução de vedação provisória em…
+  …
+FONTE C — Artigos vizinhos para diferenciação (N artigos, N=… exemplos)
+  Artigo "Tapumes": pintura, sinalização, …
+  Artigo "Portões Provisórios": automação, motor, …
 ```
 
----
+Instruções adicionais à IA:
+- Para cada termo, indicar **fonte_origem** (`historico` | `candidatos` | `vizinhos` | `inferido`) na resposta JSON.
+- A confiança deve refletir a fonte (regras acima).
+- Termos que aparecem nos vizinhos mas não no artigo → marcar como `termos_negativos`.
+- Quando `FONTE A` for vazia, ser conservador: confiança ≤ 65 e adicionar prefixo `[provisório]` na justificação.
 
-## Alterações técnicas (resumo para revisão)
+### 3. Persistência
 
-1. **Migration Supabase** em `biblioteca_artigo_conhecimento`:
-   - `ocorrencias int not null default 0`
-   - `justificacao text`
-   - `exemplos jsonb not null default '[]'::jsonb`
-   - Adicionar valores `'mapas_quantidades'`, `'biblioteca_mestra'` ao tipo de origem.
-   - (Confirmar que `biblioteca_knowledge_run` tem `resumo jsonb`; adicionar se faltar.)
+Em `persistir`:
+- Acrescentar campo `fonte_origem` (texto) à linha guardada.
+- Mapear `fonte_origem` → coluna `origem` do enum existente:
+  - `historico` → `mapas_quantidades`
+  - `candidatos` → novo valor `orcamentos_brutos` (ver migração)
+  - `vizinhos` → novo valor `artigos_vizinhos`
+  - `inferido` → `ia`
+- `calcOcorrenciasEExemplos` passa a varrer as três fontes (histórico + candidatos), guardando até 3 exemplos com tag da fonte.
 
-2. **`types.ts`**: atualizar `ConhecimentoOrigem`, `CONHECIMENTO_ORIGENS` (com `icon`), e tipo `ArtigoConhecimento`.
+### 4. Migração SQL
 
-3. **`ArtigoConhecimentoTab.tsx`**: reestruturar em sub-componentes:
-   - `EstadoDashboard`, `ComposicaoCard`, `Toolbar`, `TabelaConhecimento`, `TermoDetalheSheet`, `GerarIADialog`, `ResumoGeracaoBanner`.
+```sql
+ALTER TYPE biblioteca_conhecimento_origem
+  ADD VALUE IF NOT EXISTS 'orcamentos_brutos';
+ALTER TYPE biblioteca_conhecimento_origem
+  ADD VALUE IF NOT EXISTS 'artigos_vizinhos';
 
-4. **Server functions** (`knowledge-builder.server.ts`): garantir que a geração popula `ocorrencias`, `justificacao`, `exemplos` e marca `origem` corretamente (já existe a infraestrutura de run).
+-- Índice trigram para pesquisa rápida em orcamento_artigos
+CREATE INDEX IF NOT EXISTS idx_orc_art_descr_trgm
+  ON orcamento_artigos USING gin (descricao gin_trgm_ops);
+```
 
-5. **Sem alterações** em outras páginas; tudo confinado à aba dentro do `ArtigoMestreFormDialog`.
+(`pg_trgm` já está instalado — confirmado pelas funções `similarity_op` listadas.)
 
----
+### 5. Resumo / painel de fontes
 
-## Fora de âmbito (não implementar agora)
+Estender o `resumo` JSON gravado no `biblioteca_knowledge_run` com:
+```json
+{
+  "fontes": {
+    "historico_validado": 124,
+    "historico_auto": 86,
+    "candidatos_brutos": 312,
+    "vizinhos_analisados": 14
+  },
+  "semHistorico": false,
+  …
+}
+```
 
-- Lógica real de contagem de ocorrências em MQ históricos (depende de pipeline de classificação) — fica como **placeholder** com valores reais quando a geração IA os fornecer; UI já preparada.
-- Sistema de aprovação/revisão multi-utilizador.
-- Versionamento histórico de runs.
+Em `ArtigoConhecimentoTab.tsx`:
+- Dashboard ganha um bloco **"Fontes analisadas"** com as 4 métricas (ícone + número + label).
+- Quando `semHistorico === true`, mostrar banner informativo amarelo no topo:
+  > "Este Artigo Mestre ainda não possui histórico validado. A IA usou descrições semelhantes de mapas importados e artigos vizinhos. A confiança inicial é inferior até validação."
+- Coluna "Origem" passa a distinguir os 4 ícones: 📄 histórico, 📥 bruto, 🧭 vizinho, 🤖 IA.
+- No painel de detalhe (Sheet), separar exemplos por fonte.
+
+### 6. Diálogo de geração
+
+No `AlertDialog` do botão "Gerar Conhecimento IA", atualizar o texto da análise:
+- "Histórico validado deste artigo"
+- "Descrições brutas similares em mapas importados"
+- "Artigos tecnicamente próximos (para termos negativos)"
+- Tempo estimado ~15–20 s.
+
+### Ficheiros afetados
+
+- **Migração nova**: `supabase/migrations/<ts>_knowledge_sources_multi.sql`
+- `src/lib/biblioteca-mestra/knowledge-builder.server.ts` — `recolherFontes`, `buildPrompt`, `callAI` (aceitar `fonte_origem`), `persistir`, `processRun` (resumo).
+- `src/components/biblioteca-mestra/ArtigoConhecimentoTab.tsx` — bloco de fontes, banner, ícones de origem, detalhe.
+- `src/lib/biblioteca-mestra/types.ts` — estender `CONHECIMENTO_ORIGENS` com `orcamentos_brutos` e `artigos_vizinhos` (label + ícone).
+
+### Fora do âmbito (esta iteração)
+
+- Knowledge Builder em lote (scope ≠ artigo) continua a usar apenas Fonte A — manter compatibilidade.
+- Reescrever motor de classificação para usar os novos pesos de origem.

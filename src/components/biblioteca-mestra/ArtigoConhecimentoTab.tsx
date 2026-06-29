@@ -333,6 +333,43 @@ export function ArtigoConhecimentoTab({ artigoId }: Props) {
           </div>
         </div>
 
+        {/* Banner: artigo sem histórico validado */}
+        {resumoVisivel?.semHistorico && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+            <div className="font-semibold text-amber-700 dark:text-amber-400">⚠ Sem histórico validado</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Este Artigo Mestre ainda não possui descrições classificadas. A IA usou descrições semelhantes
+              encontradas em mapas importados e em artigos vizinhos. A confiança inicial é inferior — valide
+              classificações reais para reforçar o conhecimento.
+            </div>
+          </div>
+        )}
+
+        {/* Fontes analisadas na última geração */}
+        {resumoVisivel?.fontes && (
+          <div className="rounded-md border bg-card p-3">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Fontes analisadas na última geração</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+              <div className="rounded border p-2">
+                <div className="text-[10px] uppercase text-muted-foreground">📄 Validadas</div>
+                <div className="text-lg font-semibold tabular-nums">{resumoVisivel.fontes.historico_validado ?? 0}</div>
+              </div>
+              <div className="rounded border p-2">
+                <div className="text-[10px] uppercase text-muted-foreground">🤖 Auto-classificadas</div>
+                <div className="text-lg font-semibold tabular-nums">{resumoVisivel.fontes.historico_auto ?? 0}</div>
+              </div>
+              <div className="rounded border p-2">
+                <div className="text-[10px] uppercase text-muted-foreground">📥 Brutas (orçamentos)</div>
+                <div className="text-lg font-semibold tabular-nums">{resumoVisivel.fontes.candidatos_brutos ?? 0}</div>
+              </div>
+              <div className="rounded border p-2">
+                <div className="text-[10px] uppercase text-muted-foreground">🧭 Artigos vizinhos</div>
+                <div className="text-lg font-semibold tabular-nums">{resumoVisivel.fontes.vizinhos_analisados ?? 0}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Banner de resumo da geração */}
         {resumoVisivel && (
           <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 flex items-start gap-3">
@@ -496,16 +533,14 @@ export function ArtigoConhecimentoTab({ artigoId }: Props) {
               </AlertDialogTitle>
               <AlertDialogDescription asChild>
                 <div className="space-y-2 text-sm">
-                  <div>A IA irá analisar:</div>
+                <div>A IA irá analisar três fontes:</div>
                   <ul className="ml-1 space-y-0.5 text-foreground">
-                    <li>✔ Descrição técnica do Artigo Mestre</li>
-                    <li>✔ Especialidade, Subespecialidade e Categoria</li>
-                    <li>✔ Biblioteca Mestra (contexto)</li>
-                    <li>✔ Histórico de classificações</li>
-                    <li>✔ Mapas de Quantidades reais associados</li>
+                    <li>📄 <span className="font-medium">Histórico validado</span> deste Artigo Mestre (peso alto)</li>
+                    <li>📥 <span className="font-medium">Descrições brutas</span> de mapas importados, por similaridade textual (peso médio)</li>
+                    <li>🧭 <span className="font-medium">Artigos vizinhos</span> da mesma subespecialidade, para diferenciação e termos negativos (peso baixo)</li>
                   </ul>
                   <div className="pt-2 text-xs text-muted-foreground">
-                    Tempo estimado: ~12 segundos. {registos.length > 0 && "Os termos gerados anteriormente pela IA serão substituídos; termos do utilizador são mantidos."}
+                    Tempo estimado: ~15–20 segundos. Cada termo é etiquetado com a sua origem e nível de confiança. {registos.length > 0 && "Os termos gerados anteriormente pela IA serão substituídos; termos do utilizador são mantidos."}
                   </div>
                 </div>
               </AlertDialogDescription>
