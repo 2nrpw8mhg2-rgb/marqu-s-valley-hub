@@ -1,114 +1,124 @@
-# Fase 2 — Knowledge Builder (Motor de Enriquecimento da Biblioteca)
-
 ## Objetivo
 
-Criar um novo módulo na Biblioteca Mestra que usa IA para gerar automaticamente a Base de Conhecimento (palavras-chave, sinónimos, expressões, materiais, termos negativos) de cada Artigo Mestre, aprendendo principalmente a partir dos Mapas de Quantidades reais já classificados.
+Transformar a aba **Conhecimento IA** (dentro do diálogo *Editar Artigo Mestre*) de uma simples tabela técnica numa verdadeira **Ficha de Conhecimento do Artigo Mestre** — visual, auditável e centrada na ação de gerar conhecimento via IA.
 
-Nesta fase **não altero** o motor de classificação atual — apenas gero e gravo conhecimento na tabela `biblioteca_artigo_conhecimento` (já criada na Fase 1).
+Ficheiro principal: `src/components/biblioteca-mestra/ArtigoConhecimentoTab.tsx`
+Suporte: `src/lib/biblioteca-mestra/knowledge-builder.functions.ts` / `.server.ts`, `src/lib/biblioteca-mestra/types.ts`.
 
-## Âmbito desta fase
+---
 
-- Permitir gerar para: **uma Especialidade** (com sub-seletor opcional de subespecialidade ou artigo único).
-- "Toda a Biblioteca" fica visível mas **desativada** com tooltip "Disponível após validação".
-- Validação inicial sobre `010 — Preparação da Obra`.
+## 1. Dashboard de estado (topo da aba)
 
-## Alterações
+Acrescentar, antes da tabela, um cartão de resumo com:
 
-### 1. Novo item no menu (`src/components/AppSidebar.tsx`)
-Adicionar na secção "Biblioteca Mestra":
-- `/biblioteca-mestra/knowledge-builder` — ícone `Brain` (Sparkles) — label **"Knowledge Builder"**.
+- **Estado** — chip colorido: 🟡 Não gerado · 🔵 Em geração · 🟢 Gerado · ⚪ Editado manualmente
+- **Confiança global** — média ponderada da confiança × peso dos termos ativos (formato barra + %)
+- **Última geração** — data/hora da última run concluída (ou "Nunca")
+- **Fontes analisadas** — nº de fontes usadas na última run (MQ, biblioteca, etc.)
+- **Conhecimento aprovado** — nº de termos ativos validados
 
-### 2. Nova rota: `src/routes/_app/biblioteca-mestra.knowledge-builder.tsx`
-Página com:
-- **Seletor de âmbito** (RadioGroup): Toda a Biblioteca (disabled) · Especialidade · Subespecialidade · Artigo único.
-- **Selects dependentes** (especialidade → subespecialidade → artigo).
-- **Modo de execução** (RadioGroup): Manter existente · Adicionar apenas novos · Regenerar tudo.
-- **Pré-visualização** (botão "Analisar fontes"): mostra nº de artigos no âmbito, nº de classificações reais encontradas (de `classificacao_artigos` com `estado='validado'` ou `auto_exato`), nº de artigos sem dados (que serão tratados só com nome+descrição).
-- **Botão principal**: "Enriquecer Biblioteca com IA".
-- **Painel de progresso em tempo real**: especialidade, X / Y artigos, contagens por tipo (palavras-chave, sinónimos, expressões, materiais, negativos), tempo decorrido, estado, último artigo processado, log scrollável.
-- **Resumo final** com botão "Ver artigos enriquecidos" (link para Pesquisa de Artigos filtrado).
+Dados vêm de `biblioteca_knowledge_run` (filtrar pelo `scope_ids->>artigoId`) + agregação de `biblioteca_artigo_conhecimento`.
 
-### 3. Server functions: `src/lib/biblioteca-mestra/knowledge-builder.functions.ts`
+## 2. Botão "🧠 Gerar Conhecimento IA" como ação principal
 
-`previewScope({ tipo, especialidadeId?, subespecialidadeId?, artigoId? })` →
-retorna `{ artigos: n, classificacoesReais: n, artigosSemDados: n }`.
+- Colocar em destaque (canto superior direito do painel, variante `default`/primária).
+- O botão **Adicionar** passa a secundário (`variant="outline"`, ícone +).
+- Ao clicar abre um `AlertDialog` de confirmação a explicar o que a IA vai analisar (lista com ✔) e tempo estimado.
+- Confirmação chama `startKnowledgeRun({ scope: { tipo: "artigo", artigoId }, modo: "regenerar" })` e faz polling com `getKnowledgeRunStatus` (já existem).
+- Durante a run: barra de progresso + botão **Cancelar** (usa `cancelKnowledgeRun`).
+- No fim, mostrar **resumo da geração** (toast + bloco inline): nº por tipo + confiança global obtida.
 
-`startKnowledgeRun({ scope, modo })` →
-- Cria registo em **nova tabela** `biblioteca_knowledge_run` (estado `em_curso`).
-- Retorna `runId`. Devolve imediato; processamento em background via fila simples (loop dentro da própria function chamada por SSE/polling).
+## 3. Coluna "Origem" com ícones
 
-`getKnowledgeRunStatus(runId)` →
-retorna progresso atual (artigos processados, contagens por tipo, estado, log das últimas 20 linhas).
+Substituir os badges de texto por ícones + tooltip:
 
-`cancelKnowledgeRun(runId)` →
-marca como `cancelado`; o processamento verifica esta flag entre artigos.
+- 🤖 IA (`Bot`) · 👤 Utilizador (`User`) · 📄 Mapas de Quantidades (`FileSpreadsheet`) · 📚 Biblioteca Mestra (`Library`) · ⚙ Sistema (`Settings`) · 📥 Importação (`Upload`)
 
-### 4. Motor de geração (`src/lib/biblioteca-mestra/knowledge-builder.server.ts`)
+Estender o enum `ConhecimentoOrigem` em `types.ts` com `"mapas_quantidades"` e `"biblioteca_mestra"` (migration a adicionar valores ao CHECK/enum). Atualizar `CONHECIMENTO_ORIGENS` com `icon` e `label`.
 
-Para cada Artigo Mestre no âmbito:
+## 4. Nova coluna "Ocorrências"
 
-1. **Recolha de fontes** (com pesos):
-   - **Fonte A — MQ reais**: `select descricao_original, count(*) from classificacao_artigos where artigo_mestre_id = X and estado in ('validado','auto_exato','auto_aprendido') group by descricao_original`. Fonte primária, peso máximo.
-   - **Fonte B — Nome do artigo** (`biblioteca_artigos.codigo` + descrição da categoria/subespecialidade).
-   - **Fonte C — Descrição do artigo** (`biblioteca_artigos.descricao`).
-   - **Fonte D — Contexto estrutural**: nomes da especialidade/subespecialidade/categoria + lista de artigos irmãos (apenas códigos+nomes, para a IA evitar "roubar" termos).
+- Adicionar coluna `ocorrencias int default 0` à tabela `biblioteca_artigo_conhecimento` (migration).
+- A geração IA preenche o valor (contagem real em MQ + histórico de classificações).
+- Render: número grande tabular + barra horizontal proporcional ao máximo da tabela.
+- Coluna ordenável (clique no cabeçalho).
 
-2. **Chamada à IA via Lovable AI Gateway** (`google/gemini-3-flash-preview`):
-   - Prompt sistema em PT-PT, role "engenheiro de conhecimento técnico de construção".
-   - Input: fontes A-D + (no modo "Adicionar apenas novos") lista de termos já existentes para evitar duplicados.
-   - **Output estruturado** (`Output.object` com Zod): `{ palavras_chave[], sinonimos[], expressoes[], materiais[], termos_negativos[] }`, cada item `{ termo, peso, confianca, justificacao }`.
-   - Pesos default por tipo seguem `CONHECIMENTO_TIPOS` em `src/lib/biblioteca-mestra/types.ts`; IA pode ajustar dentro de bounds.
-   - Confiança: combinada de (a) frequência nas MQ reais, (b) consistência sugerida pela IA. Fórmula: `min(99, round(0.6 * freq_norm * 100 + 0.4 * ia_conf))`.
+## 5. Painel lateral de detalhe do termo
 
-3. **Persistência** em `biblioteca_artigo_conhecimento`:
-   - Modo **Manter**: skip se já existem termos para o artigo.
-   - Modo **Adicionar novos**: upsert por `(artigo_mestre_id, tipo, lower(termo))` — só insere termos novos.
-   - Modo **Regenerar**: apaga onde `origem='ia'` (mantém `utilizador`/`importacao`) e insere o novo lote.
-   - `origem = 'ia'` em todos os registos gerados.
+Ao clicar numa linha (não nos botões de ação) abre um `Sheet` lateral à direita com:
 
-4. **Tratamento de falhas**:
-   - 429 / 402 / erro IA → grava no `log_jsonb` do run e continua para o próximo artigo (não aborta corrida inteira).
-   - Resumo final mostra `falhados[]`.
+- Termo + tipo + estado ativo
+- **Origem** (ícone + descrição completa)
+- **Encontrado em** — "287 mapas de quantidades" (placeholder até existirem dados)
+- **Exemplos reais** — lista de descrições de MQ onde o termo apareceu (top 5)
+- **Utilizado pela IA porque** — campo `justificacao text` (nova coluna, preenchida pela IA)
+- Acções: editar, ativar/desativar, remover
 
-### 5. Migração SQL — nova tabela `biblioteca_knowledge_run`
+Migration adiciona `justificacao text` e `exemplos jsonb` (array de strings curtas) a `biblioteca_artigo_conhecimento`.
+
+## 6. Visualização gráfica da confiança
+
+Substituir "92%" simples por:
+
+- Barra horizontal (componente `Progress` do shadcn) com cor semântica:
+  - ≥ 85% → verde · 60–84% → amarelo · < 60% → vermelho
+- Número à direita da barra
+- Tooltip com a categoria textual (Muito elevada / Média / Baixa)
+
+## 7. Cartão "Composição do conhecimento"
+
+Por baixo do dashboard de estado, um cartão com **contadores por tipo** (apenas termos ativos):
+
+- Palavras-chave · Sinónimos · Expressões · Materiais · Termos Negativos · **Total**
+- Cada contador é também filtro rápido (clique aplica `filtroTipo`).
+- Visual: grid horizontal de mini-cards com ícone tipográfico + número grande.
+
+## 8. Resumo do resultado da geração
+
+Após `getKnowledgeRunStatus` reportar `estado = "concluido"`:
+
+- Banner verde temporário no topo (descartável): "Conhecimento gerado com sucesso" + breakdown por tipo + confiança global.
+- Persistir o último resumo em `biblioteca_knowledge_run.resumo jsonb` (já deve existir; senão acrescentar) para reabertura.
+
+## 9. Layout final da aba (ordem visual)
 
 ```text
-biblioteca_knowledge_run
-- id, scope_tipo (especialidade|subespecialidade|artigo)
-- scope_ids (jsonb)
-- modo (manter|novos|regenerar)
-- estado (pendente|em_curso|concluido|cancelado|erro)
-- total_artigos, processados
-- counts_jsonb { palavras_chave, sinonimos, expressoes, materiais, negativos }
-- log_jsonb (array de eventos recentes)
-- iniciado_em, concluido_em, iniciado_por, erro_msg
-- created_at, updated_at
+┌──────────────────────────────────────────────────────────────┐
+│  [Estado] [Confiança] [Última geração] [Fontes] [Aprovados] │ ← Dashboard
+├──────────────────────────────────────────────────────────────┤
+│  [PC 24] [Sin 12] [Expr 8] [Mat 14] [Neg 5]   Total: 63     │ ← Composição
+├──────────────────────────────────────────────────────────────┤
+│  [Pesquisar] [Tipo▾] [Inativos]  [+ Adicionar] [🧠 Gerar IA]│ ← Toolbar
+├──────────────────────────────────────────────────────────────┤
+│  Tipo │ Termo │ Peso │ Origem │ Ocorr. │ Confiança │ Ativo  │ ← Tabela
+│  ...  (linha clicável → abre Sheet de detalhe)              │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-Com GRANTs (`authenticated` SELECT/INSERT/UPDATE; `service_role` ALL), RLS habilitado, política por `iniciado_por = auth.uid()` (ou `has_role(admin)`).
+---
 
-## Detalhes técnicos
+## Alterações técnicas (resumo para revisão)
 
-- **Stack**: TanStack server fns (`createServerFn`) em `*.functions.ts`, helpers IA em `*.server.ts` (carregar `supabaseAdmin`/Lovable AI dentro do handler).
-- **AI Gateway**: `createLovableAiGatewayProvider` (Fase 1 deste app já tem helper; se não existir, criar em `src/lib/ai-gateway.server.ts`).
-- **Polling**: cliente faz `useQuery({ refetchInterval: 1500 })` sobre `getKnowledgeRunStatus` enquanto estado for `em_curso`. Sem SSE para manter simples.
-- **Background work**: o handler `startKnowledgeRun` cria o run e arranca processamento síncrono numa Promise não aguardada (`void processRun(runId)`). Cada artigo: faz query MQ, chama IA, persiste, atualiza row do run.
-- **Concorrência**: 1 artigo de cada vez (sequencial) — evita rate-limits e simplifica progresso.
-- **Limites**: máximo 5 termos por tipo por artigo (para qualidade), top 40 descrições reais por artigo enviadas à IA.
+1. **Migration Supabase** em `biblioteca_artigo_conhecimento`:
+   - `ocorrencias int not null default 0`
+   - `justificacao text`
+   - `exemplos jsonb not null default '[]'::jsonb`
+   - Adicionar valores `'mapas_quantidades'`, `'biblioteca_mestra'` ao tipo de origem.
+   - (Confirmar que `biblioteca_knowledge_run` tem `resumo jsonb`; adicionar se faltar.)
 
-## Não alterado
+2. **`types.ts`**: atualizar `ConhecimentoOrigem`, `CONHECIMENTO_ORIGENS` (com `icon`), e tipo `ArtigoConhecimento`.
 
-- Motor de classificação atual (`src/lib/classificacao/engine.ts`, `src/lib/procurement/classifier*.ts`) — **nada muda**.
-- Tabela `biblioteca_artigo_conhecimento` (já criada na Fase 1) — apenas passamos a inserir registos com `origem='ia'`.
-- Aba "Conhecimento IA" na ficha do artigo continua a funcionar (vê os termos gerados).
-- Restantes páginas da Biblioteca Mestra — **nada muda**.
+3. **`ArtigoConhecimentoTab.tsx`**: reestruturar em sub-componentes:
+   - `EstadoDashboard`, `ComposicaoCard`, `Toolbar`, `TabelaConhecimento`, `TermoDetalheSheet`, `GerarIADialog`, `ResumoGeracaoBanner`.
 
-## Validação
+4. **Server functions** (`knowledge-builder.server.ts`): garantir que a geração popula `ocorrencias`, `justificacao`, `exemplos` e marca `origem` corretamente (já existe a infraestrutura de run).
 
-1. Menu mostra "Knowledge Builder" na secção Biblioteca Mestra.
-2. Selecionar Especialidade `010 — Preparação da Obra` + modo "Adicionar novos" → "Analisar fontes" mostra contagens reais.
-3. Clicar "Enriquecer" → painel atualiza a cada 1.5s, log mostra cada artigo.
-4. Ao concluir, abrir um artigo no separador "Conhecimento IA" → ver termos com badge "IA" e peso/confiança.
-5. Repetir em modo "Manter" → run termina rápido e indica artigos saltados.
-6. Repetir em modo "Regenerar" → termos `origem='ia'` substituídos; termos `origem='utilizador'` preservados.
-7. Cancelar a meio → estado fica `cancelado`, registos já gravados persistem.
+5. **Sem alterações** em outras páginas; tudo confinado à aba dentro do `ArtigoMestreFormDialog`.
+
+---
+
+## Fora de âmbito (não implementar agora)
+
+- Lógica real de contagem de ocorrências em MQ históricos (depende de pipeline de classificação) — fica como **placeholder** com valores reais quando a geração IA os fornecer; UI já preparada.
+- Sistema de aprovação/revisão multi-utilizador.
+- Versionamento histórico de runs.
