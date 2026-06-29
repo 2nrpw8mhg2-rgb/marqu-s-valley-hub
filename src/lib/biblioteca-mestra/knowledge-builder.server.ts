@@ -437,7 +437,7 @@ async function callAI(prompt: string): Promise<Generated> {
   };
 }
 
-type PersistResult = { inseridos: number; perTipo: Record<string, number> };
+type PersistResult = { inseridos: number; perTipo: Record<string, number>; novosIds: string[] };
 
 function calcOcorrenciasEExemplos(
   termo: string,
