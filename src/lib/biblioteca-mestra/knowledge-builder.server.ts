@@ -6,7 +6,7 @@ type Sb = SupabaseClient<Database>;
 const TIPO_LIMIT = 8;
 const MQ_TOP = 40;
 
-type GeneratedTermo = { termo: string; peso: number; confianca: number };
+type GeneratedTermo = { termo: string; peso: number; confianca: number; justificacao?: string };
 type Generated = {
   palavras_chave: GeneratedTermo[];
   sinonimos: GeneratedTermo[];
@@ -172,17 +172,18 @@ ${existentesTxt}
 
 GERA até ${TIPO_LIMIT} elementos por tipo, em JSON estrito, com esta forma exacta:
 {
-  "palavras_chave": [{"termo":"...","peso":<5..50>,"confianca":<0..100>}],
-  "sinonimos":      [{"termo":"...","peso":<5..30>,"confianca":<0..100>}],
-  "expressoes":     [{"termo":"...","peso":<10..60>,"confianca":<0..100>}],
-  "materiais":      [{"termo":"...","peso":<3..20>,"confianca":<0..100>}],
-  "termos_negativos":[{"termo":"...","peso":<5..40>,"confianca":<0..100>}]
+  "palavras_chave": [{"termo":"...","peso":<5..50>,"confianca":<0..100>,"justificacao":"..."}],
+  "sinonimos":      [{"termo":"...","peso":<5..30>,"confianca":<0..100>,"justificacao":"..."}],
+  "expressoes":     [{"termo":"...","peso":<10..60>,"confianca":<0..100>,"justificacao":"..."}],
+  "materiais":      [{"termo":"...","peso":<3..20>,"confianca":<0..100>,"justificacao":"..."}],
+  "termos_negativos":[{"termo":"...","peso":<5..40>,"confianca":<0..100>,"justificacao":"..."}]
 }
 
 REGRAS
 - Os termos devem ser técnicos, em minúsculas, sem pontuação supérflua, em PT-PT.
 - Expressões são frases curtas (2-6 palavras) típicas de MQ, ex: "fornecimento e aplicação de".
 - Termos negativos são palavras associadas a OUTROS artigos que devem reduzir confiança neste; usa o contexto estrutural.
+- A justificacao é UMA frase curta (máx. 120 caracteres) explicando porque foi associado este termo.
 - Se houver poucas descrições reais, sê conservador (menos termos, confiança ≤ 70).
 - A confiança deve refletir frequência e consistência observada.
 - NÃO inventes materiais que não façam sentido para este artigo.
@@ -227,6 +228,7 @@ async function callAI(prompt: string): Promise<Generated> {
             termo: String(x?.termo ?? "").trim(),
             peso: Math.round(Number(x?.peso) || 0),
             confianca: Math.max(0, Math.min(100, Math.round(Number(x?.confianca) || 60))),
+            justificacao: x?.justificacao ? String(x.justificacao).trim().slice(0, 200) : undefined,
           }))
           .filter((x) => x.termo.length > 0)
           .slice(0, TIPO_LIMIT)
