@@ -236,6 +236,14 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
     if (!espId) continue;
     const c = canonicalizar(r.termo as string);
     if (c) addToIdx(idx, c, espId, r.artigo_mestre_id as string);
+
+    // Para termos negativos, interessa também o vocabulário discriminante
+    // dentro de expressões positivas já curadas. Ex.: "argamassa de cimento"
+    // deve contribuir para "cimento" como termo de outra especialidade.
+    for (const tok of tokenize((r.termo as string) ?? "")) {
+      const t = lemaSingular(tok);
+      if (t && t !== c) addToIdx(idx, t, espId, r.artigo_mestre_id as string);
+    }
   }
 
   // FONTE 2: classificações reais (validadas ou auto) — único sinal de uso real.
@@ -262,13 +270,14 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
 }
 
 // Calcula termos negativos para um artigo a partir do índice global.
-// Critérios estatísticos cumulativos para evitar falsos negativos:
-//  - termo aparece em ≥ 5 artigos no total (suporte global)
-//  - ≥ 4 artigos numa especialidade dominante (suporte absoluto)
-//  - ≥ 50 % dos artigos dessa especialidade contêm o termo (dominância relativa)
-//  - ≥ 70 % de TODAS as ocorrências estão concentradas nessa especialidade (exclusividade)
-//  - ausente ou quase ausente neste artigo (presença ≤ 1 %, ≤ 1 artigo)
-//  - não é stopword nem vocabulário genérico de obra
+// Critérios estatísticos cumulativos para evitar falsos negativos sem bloquear
+// tudo quando a biblioteca ainda tem poucos exemplos reais:
+//  - termo aparece em ≥ 4 artigos no total e numa especialidade dominante
+//  - ≥ 75 % de TODAS as ocorrências estão concentradas nessa especialidade
+//  - existe algum sinal mínimo de dominância relativa nessa especialidade
+//  - ausente ou quase ausente na especialidade/artigo atual (≤ 1 artigo)
+//  - não é stopword, vocabulário genérico, termo positivo, histórico real
+//    do artigo atual, nem termo bloqueado pela família técnica
 function derivarNegativos(
   artigoEspId: string,
   vocPositivoCanonico: Set<string>,
@@ -278,7 +287,6 @@ function derivarNegativos(
   maxAlta = 6,
   maxMedia = 6
 ): GeneratedTermo[] {
-  const totalThisEsp = idx.totalPorEsp.get(artigoEspId) ?? 0;
   type Cand = {
     termo: string; espDom: string; domPct: number; exclusividade: number;
     suporte: number; totalAll: number; score: number;
@@ -294,8 +302,6 @@ function derivarNegativos(
     const thisEspSet = espMap.get(artigoEspId);
     const thisCount = thisEspSet?.size ?? 0;
     if (thisCount > 1) continue;
-    const presencaThis = totalThisEsp > 0 ? thisCount / totalThisEsp : 0;
-    if (presencaThis > 0.01) continue;
 
     let bestEsp = "", bestDom = 0, bestSize = 0;
     let totalAll = 0;
@@ -307,14 +313,19 @@ function derivarNegativos(
       const dom = artSet.size / total;
       if (dom > bestDom) { bestDom = dom; bestEsp = espId; bestSize = artSet.size; }
     }
-    if (totalAll < 3) continue;
-    if (bestSize < 3) continue;
-    if (bestDom < 0.40 || !bestEsp) continue;
+    if (totalAll < 4) continue;
+    if (bestSize < 4) continue;
+    if (bestDom < 0.03 || !bestEsp) continue;
     const exclusividade = totalAll > 0 ? bestSize / totalAll : 0;
-    if (exclusividade < 0.65) continue;
+    if (exclusividade < 0.75) continue;
 
-    const score = exclusividade * bestDom;
-    if (score < 0.30) continue;
+    // Muitas especialidades têm dezenas/centenas de artigos ativos, mas só
+    // parte deles com conhecimento curado. Se usarmos apenas bestSize/total,
+    // termos bons ficam artificialmente bloqueados. A confiança combina
+    // exclusividade com suporte absoluto observado; bestDom fica como gate.
+    const suporteScore = Math.min(1, Math.log2(bestSize + 1) / 4);
+    const score = exclusividade * suporteScore;
+    if (score < 0.50) continue;
 
     out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, score });
   }
@@ -324,7 +335,7 @@ function derivarNegativos(
   const altas: GeneratedTermo[] = [];
   const medias: GeneratedTermo[] = [];
   for (const n of out) {
-    const nivel: "alta" | "media" = n.score >= 0.55 ? "alta" : "media";
+    const nivel: "alta" | "media" = n.score >= 0.75 ? "alta" : "media";
     const just =
       `"${n.termo}" é específico de ${idx.nomeEsp.get(n.espDom) ?? ""} ` +
       `(${n.suporte} de ${n.totalAll} ocorrências; ${Math.round(n.exclusividade * 100)}% exclusividade, ` +
@@ -333,7 +344,7 @@ function derivarNegativos(
       altas.push({
         termo: n.termo,
         peso: 30,
-        confianca: Math.round(Math.min(95, 70 + n.score * 25)),
+        confianca: Math.round(Math.min(95, 80 + (n.score - 0.75) * 60)),
         fonte: "vizinhos",
         justificacao: just,
       });
@@ -341,7 +352,7 @@ function derivarNegativos(
       medias.push({
         termo: n.termo,
         peso: 0,
-        confianca: Math.round(Math.min(70, 45 + (n.score - 0.30) * 100)),
+        confianca: Math.round(Math.min(75, 55 + (n.score - 0.50) * 100)),
         fonte: "vizinhos",
         justificacao: `[sugestão] ${just}`,
       });
