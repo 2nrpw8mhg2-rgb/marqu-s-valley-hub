@@ -186,18 +186,47 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
     .select("id, subespecialidade_id, descricao")
     .eq("ativo", true);
 
+function addToIdx(idx: IndiceGlobal, termoCanon: string, espId: string, artigoId: string) {
+  if (tokenGenerico(termoCanon)) return;
+  let m = idx.termoEspArtigos.get(termoCanon);
+  if (!m) { m = new Map(); idx.termoEspArtigos.set(termoCanon, m); }
+  let s = m.get(espId);
+  if (!s) { s = new Set(); m.set(espId, s); }
+  s.add(artigoId);
+}
+
+async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
+  const idx: IndiceGlobal = {
+    termoEspArtigos: new Map(),
+    totalPorEsp: new Map(),
+    nomeEsp: new Map(),
+    artigoEsp: new Map(),
+  };
+
+  const { data: esps } = await sb.from("biblioteca_especialidades").select("id, nome");
+  for (const e of esps ?? []) idx.nomeEsp.set(e.id as string, (e.nome as string) ?? "");
+
+  const { data: subs } = await sb
+    .from("biblioteca_subespecialidades")
+    .select("id, especialidade_id");
+  const subEsp = new Map<string, string>();
+  for (const s of subs ?? []) subEsp.set(s.id as string, s.especialidade_id as string);
+
+  // Apenas mapeamento artigo→especialidade e total por especialidade.
+  // NÃO tokenizamos descrições mestras (contêm muito vocabulário genérico).
+  const { data: arts } = await sb
+    .from("biblioteca_artigos")
+    .select("id, subespecialidade_id")
+    .eq("ativo", true);
+
   for (const a of arts ?? []) {
     const espId = subEsp.get(a.subespecialidade_id as string);
     if (!espId) continue;
-    const aid = a.id as string;
-    idx.artigoEsp.set(aid, espId);
+    idx.artigoEsp.set(a.id as string, espId);
     idx.totalPorEsp.set(espId, (idx.totalPorEsp.get(espId) ?? 0) + 1);
-    for (const tok of tokenize((a.descricao as string) ?? "")) {
-      addToIdx(idx, lemaSingular(tok), espId, aid);
-    }
   }
 
-  // Termos positivos já gravados reforçam o índice
+  // FONTE 1: termos positivos já curados na biblioteca.
   const { data: conhec } = await sb
     .from("biblioteca_artigo_conhecimento")
     .select("artigo_mestre_id, tipo, termo")
@@ -210,12 +239,40 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
     if (c) addToIdx(idx, c, espId, r.artigo_mestre_id as string);
   }
 
+  // FONTE 2: classificações reais (validadas ou auto) — único sinal de uso real.
+  const { data: classifs } = await sb
+    .from("classificacao_artigos")
+    .select("descricao_original, descricao, artigo_origem_id, estado")
+    .in("estado", ["validado", "classificado_auto"])
+    .not("artigo_origem_id", "is", null);
+  for (const r of classifs ?? []) {
+    const aid = r.artigo_origem_id as string | null;
+    if (!aid) continue;
+    const espId = idx.artigoEsp.get(aid);
+    if (!espId) continue;
+    const textos = [(r.descricao as string) ?? "", (r.descricao_original as string) ?? ""];
+    const vistos = new Set<string>();
+    for (const txt of textos) {
+      for (const tok of tokenize(txt)) {
+        const c = lemaSingular(tok);
+        if (vistos.has(c)) continue;
+        vistos.add(c);
+        addToIdx(idx, c, espId, aid);
+      }
+    }
+  }
+
   return idx;
 }
 
 // Calcula termos negativos para um artigo a partir do índice global.
-// Critério: termo praticamente ausente nesta especialidade e
-// dominante (≥40% dos artigos) noutra especialidade.
+// Critérios estatísticos cumulativos para evitar falsos negativos:
+//  - termo aparece em ≥ 5 artigos no total (suporte global)
+//  - ≥ 4 artigos numa especialidade dominante (suporte absoluto)
+//  - ≥ 50 % dos artigos dessa especialidade contêm o termo (dominância relativa)
+//  - ≥ 70 % de TODAS as ocorrências estão concentradas nessa especialidade (exclusividade)
+//  - ausente ou quase ausente neste artigo (presença ≤ 1 %, ≤ 1 artigo)
+//  - não é stopword nem vocabulário genérico de obra
 function derivarNegativos(
   artigoEspId: string,
   vocPositivoCanonico: Set<string>,
@@ -223,37 +280,45 @@ function derivarNegativos(
   maxResultados = 12
 ): GeneratedTermo[] {
   const totalThisEsp = idx.totalPorEsp.get(artigoEspId) ?? 0;
-  type Cand = { termo: string; espDom: string; domPct: number };
+  type Cand = { termo: string; espDom: string; domPct: number; exclusividade: number; suporte: number; totalAll: number };
   const out: Cand[] = [];
 
   for (const [termoCanon, espMap] of idx.termoEspArtigos.entries()) {
-    if (termoCanon.length < 4) continue;
-    if (STOPWORDS.has(termoCanon)) continue;
+    if (tokenGenerico(termoCanon)) continue;
     if (vocPositivoCanonico.has(termoCanon)) continue;
-    // Termo já presente neste artigo via outro vocabulário
-    const thisEspSet = espMap.get(artigoEspId);
-    const presencaThis = totalThisEsp > 0 ? (thisEspSet?.size ?? 0) / totalThisEsp : 0;
-    if (presencaThis > 0.02) continue;
 
-    let bestEsp = "", bestDom = 0;
+    const thisEspSet = espMap.get(artigoEspId);
+    const thisCount = thisEspSet?.size ?? 0;
+    if (thisCount > 1) continue;
+    const presencaThis = totalThisEsp > 0 ? thisCount / totalThisEsp : 0;
+    if (presencaThis > 0.01) continue;
+
+    let bestEsp = "", bestDom = 0, bestSize = 0;
+    let totalAll = 0;
     for (const [espId, artSet] of espMap.entries()) {
+      totalAll += artSet.size;
       if (espId === artigoEspId) continue;
       const total = idx.totalPorEsp.get(espId) ?? 0;
       if (total < 3) continue;
       const dom = artSet.size / total;
-      if (dom > bestDom) { bestDom = dom; bestEsp = espId; }
+      if (dom > bestDom) { bestDom = dom; bestEsp = espId; bestSize = artSet.size; }
     }
-    if (bestDom < 0.40 || !bestEsp) continue;
-    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom });
+    if (totalAll < 5) continue;
+    if (bestSize < 4) continue;
+    if (bestDom < 0.50 || !bestEsp) continue;
+    const exclusividade = totalAll > 0 ? bestSize / totalAll : 0;
+    if (exclusividade < 0.70) continue;
+
+    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll });
   }
 
-  out.sort((a, b) => b.domPct - a.domPct);
+  out.sort((a, b) => (b.exclusividade * b.domPct) - (a.exclusividade * a.domPct));
   return out.slice(0, maxResultados).map((n) => ({
     termo: n.termo,
     peso: 30,
-    confianca: Math.round(Math.min(95, 55 + n.domPct * 40)),
+    confianca: Math.round(Math.min(95, 55 + n.exclusividade * n.domPct * 45)),
     fonte: "vizinhos",
-    justificacao: `Predominante em ${idx.nomeEsp.get(n.espDom) ?? ""} (${Math.round(n.domPct * 100)}%) e ausente neste artigo.`,
+    justificacao: `Específico de ${idx.nomeEsp.get(n.espDom) ?? ""} (${n.suporte} de ${n.totalAll} ocorrências, ${Math.round(n.exclusividade * 100)}%) e ausente neste artigo.`,
   }));
 }
 
