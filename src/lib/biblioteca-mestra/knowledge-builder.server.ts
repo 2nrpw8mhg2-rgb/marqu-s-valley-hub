@@ -27,6 +27,11 @@ type Generated = {
   termos_negativos: GeneratedTermo[];
 };
 
+type RemocaoNegativo = {
+  termo: string;
+  motivo: string;
+};
+
 const TIPO_MAP = {
   palavras_chave: { tipo: "palavra_chave", pesoDefault: 30, sign: 1 },
   sinonimos: { tipo: "sinonimo", pesoDefault: 10, sign: 1 },
@@ -81,159 +86,6 @@ function tokenGenerico(c: string): boolean {
   if (c.includes(" ")) return false;
   return STOPWORDS.has(c) || GENERICOS_OBRA.has(c);
 }
-
-// ============================================================
-// Bloqueio estrutural por família de especialidade.
-// Termos canónicos que NUNCA podem virar negativos para artigos cuja
-// especialidade pertença à família. São conceitos estruturais transversais
-// a toda a obra (betão, laje, viga, pilar, sapata, muro, perfil, ferro, aço,
-// estrutura, demolição, corte, desmontagem, metálica) — gerá-los como
-// negativos destruiria o score dos artigos onde são centrais.
-// ============================================================
-const BLOQUEIO_DEMOLICOES_ESTRUTURA = new Set<string>(
-  [
-    "betao", "laje", "viga", "pilar", "sapata", "muro", "estrutura",
-    "estrutural", "metalica", "metalico", "perfil", "ferro", "aco",
-    "corte", "desmontagem", "demolicao", "armadura", "cofragem",
-    "betonagem", "fundacao", "parede", "alvenaria", "tijolo",
-  ].map((t) => canonicalizar(t)).filter(Boolean)
-);
-
-// ============================================================
-// Materiais / produtos / elementos construtivos — NUNCA podem virar
-// termo negativo em nenhuma especialidade. Identificam o objecto sobre
-// o qual o trabalho é executado, não o tipo de trabalho. Tratá-los como
-// negativos destruiria o score de artigos legítimos (ex.: "demolição de
-// parede em bloco de betão" pertence a Demolições, mas contém "bloco",
-// "betão", "parede").
-// ============================================================
-const MATERIAIS_CONSTRUCAO = new Set<string>(
-  [
-    // Massas e ligantes
-    "betao", "bloco", "tijolo", "cimento", "cimenticio", "argamassa",
-    "areia", "brita", "gravilha", "agregado", "inerte", "cal",
-    // Pedra e madeira
-    "pedra", "granito", "marmore", "ardosia", "calcario",
-    "madeira", "contraplacado", "mdf", "osb",
-    // Metais
-    "aco", "ferro", "aluminio", "cobre", "latao", "inox", "zinco", "chumbo",
-    // Plásticos / tubagens
-    "pvc", "ppr", "peex", "multicamada", "polietileno", "polipropileno",
-    // Cerâmicos e revestimentos
-    "ceramica", "ceramico", "mosaico", "azulejo", "porcelanico", "gres",
-    "terracota",
-    // Acabamentos e bases
-    "reboco", "estuque", "betonilha", "gesso", "pladur",
-    // Isolamentos
-    "la mineral", "la de rocha", "la de vidro", "xps", "eps", "poliuretano",
-    "cortica",
-    // Outros materiais
-    "argila", "fibra", "junta", "selante", "mastique", "vidro", "espelho",
-    "tela", "geotextil", "membrana", "papel", "tinta", "primario", "verniz",
-    "esmalte", "asfalto", "betume",
-    // Elementos construtivos comuns
-    "parede", "pavimento", "tecto", "teto", "laje", "viga", "pilar",
-    "calcada", "lajeta", "lajeado", "pave", "cubo", "paralelo",
-    // Sistemas / produtos / componentes que descrevem o objecto, não a acção
-    "alvenaria", "revestimento", "isolamento", "produto", "sistema",
-    "componente", "elemento", "material", "materiais",
-  ].map((t) => canonicalizar(t)).filter(Boolean)
-);
-
-const OBJETOS_NEUTROS_DEMOLICOES = new Set<string>(
-  [
-    ...MATERIAIS_CONSTRUCAO,
-    "argamassa", "cimento", "areia", "junta", "tijolo", "ceramico",
-    "fibra", "polipropileno", "betonilha", "alvenaria", "reboco",
-    "revestimento", "revestimentos", "isolamento", "isolamentos",
-    "agregado", "agregados", "betao", "produto", "produtos", "sistema",
-    "sistemas", "componente", "componentes", "elemento", "elementos",
-  ].map((t) => canonicalizar(t)).filter(Boolean)
-);
-
-// Operações / acções / verbos que identificam trabalho. Quando um candidato
-// a negativo pertence a este conjunto, recebe bónus de score (ainda tem de
-// passar os gates estatísticos — não é injectado do nada).
-const OPERACOES_ALVO = new Set<string>(
-  [
-    "fornecimento", "aplicacao", "execucao", "assentamento", "montagem",
-    "instalacao", "colocacao", "fabrico", "betonagem", "pintura",
-    "impermeabilizacao", "regularizacao", "acabamento", "afagamento",
-    "polimento", "envernizamento", "construcao",
-    "fornecimento e aplicacao", "fornecimento e assentamento",
-  ].map((t) => canonicalizar(t)).filter(Boolean)
-);
-
-const OPERACOES_INCOMPATIVEIS_DEMOLICOES: Array<{ re: RegExp; termo: string }> = [
-  { re: /\bfornecimento e aplicacao\b/, termo: "fornecimento e aplicação" },
-  { re: /\bfornecimento e assentamento\b/, termo: "fornecimento e assentamento" },
-  { re: /\bexecucao\b/, termo: "execução" },
-  { re: /\bconstrucao\b/, termo: "construção" },
-  { re: /\bassentamento\b/, termo: "assentamento" },
-  { re: /\bmontagem\b/, termo: "montagem" },
-  { re: /\binstalacao\b/, termo: "instalação" },
-  { re: /\baplicacao\b/, termo: "aplicação" },
-  { re: /\bcolocacao\b/, termo: "colocação" },
-  { re: /\bfabrico\b/, termo: "fabrico" },
-  { re: /\bbetonagem\b/, termo: "betonagem" },
-  { re: /\bregularizacao\b/, termo: "regularização" },
-  { re: /\bacabamento\b/, termo: "acabamento" },
-  { re: /\bpintura\b/, termo: "pintura" },
-  { re: /\bimpermeabilizacao\b/, termo: "impermeabilização" },
-];
-
-function contemTermoCanonico(canon: string, termos: Set<string>): boolean {
-  if (!canon) return false;
-  if (termos.has(canon)) return true;
-  for (const t of canon.split(" ").filter(Boolean)) {
-    if (termos.has(lemaSingular(t))) return true;
-  }
-  for (const termo of termos) {
-    if (termo.includes(" ") && new RegExp(`(^| )${termo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( |$)`).test(canon)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function artigoEhDemolicao(...partes: Array<string | null | undefined>): boolean {
-  return /\bdemoli/.test(normalize(partes.filter(Boolean).join(" ")));
-}
-
-function extrairOperacaoIncompativelDemolicoes(termoCanon: string): string | null {
-  for (const op of OPERACOES_INCOMPATIVEIS_DEMOLICOES) {
-    if (op.re.test(termoCanon)) return op.termo;
-  }
-  return null;
-}
-
-function sanearNegativoDemolicoes(termo: string): string | null {
-  const c = canonicalizar(termo);
-  if (!c) return null;
-
-  const operacao = extrairOperacaoIncompativelDemolicoes(c);
-  if (operacao) return operacao;
-
-  // Em Demolições, materiais/produtos/sistemas/componentes são neutros: podem
-  // ser o objecto demolido, mas nunca o motivo de exclusão.
-  if (contemTermoCanonico(c, OBJETOS_NEUTROS_DEMOLICOES)) return null;
-
-  // Regra conservadora: sem operação incompatível clara, não há negativo seguro.
-  return null;
-}
-
-// Inferir família a partir do nome/código da especialidade.
-function familiaEspecialidade(nomeEsp: string, codigoEsp?: string | null): string | null {
-  const n = normalize(`${codigoEsp ?? ""} ${nomeEsp}`);
-  if (/demoli|estrutur|betao|bet[aã]o|fundac|alvenaria/.test(n)) return "demolicoes_estrutura";
-  return null;
-}
-
-function bloqueioParaFamilia(familia: string | null): Set<string> {
-  if (familia === "demolicoes_estrutura") return BLOQUEIO_DEMOLICOES_ESTRUTURA;
-  return new Set();
-}
-
 
 function admin(): Sb {
   return createClient<Database>(
@@ -300,6 +152,8 @@ function canonicalizar(s: string): string {
 type IndiceGlobal = {
   // termoCanonico -> espId -> conjunto de artigos onde aparece
   termoEspArtigos: Map<string, Map<string, Set<string>>>;
+  // artigoId -> conjunto de termos canónicos que descrevem o artigo
+  artigoTermos: Map<string, Set<string>>;
   // espId -> nº de artigos ativos
   totalPorEsp: Map<string, number>;
   // espId -> nome legível
@@ -316,11 +170,27 @@ function addToIdx(idx: IndiceGlobal, termoCanon: string, espId: string, artigoId
   let s = m.get(espId);
   if (!s) { s = new Set(); m.set(espId, s); }
   s.add(artigoId);
+
+  let art = idx.artigoTermos.get(artigoId);
+  if (!art) { art = new Set(); idx.artigoTermos.set(artigoId, art); }
+  art.add(termoCanon);
+}
+
+function addTextoAoIdx(idx: IndiceGlobal, texto: string, espId: string, artigoId: string, incluirExpressaoCompleta = false) {
+  const full = canonicalizar(texto);
+  if (incluirExpressaoCompleta && full && full.includes(" ") && full.split(" ").length <= 6) {
+    addToIdx(idx, full, espId, artigoId);
+  }
+  for (const tok of tokenize(texto)) {
+    const c = lemaSingular(tok);
+    if (c) addToIdx(idx, c, espId, artigoId);
+  }
 }
 
 async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
   const idx: IndiceGlobal = {
     termoEspArtigos: new Map(),
+    artigoTermos: new Map(),
     totalPorEsp: new Map(),
     nomeEsp: new Map(),
     artigoEsp: new Map(),
@@ -331,22 +201,33 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
 
   const { data: subs } = await sb
     .from("biblioteca_subespecialidades")
-    .select("id, especialidade_id");
+    .select("id, nome, especialidade_id");
   const subEsp = new Map<string, string>();
-  for (const s of subs ?? []) subEsp.set(s.id as string, s.especialidade_id as string);
+  const subNome = new Map<string, string>();
+  for (const s of subs ?? []) {
+    subEsp.set(s.id as string, s.especialidade_id as string);
+    subNome.set(s.id as string, (s.nome as string) ?? "");
+  }
 
-  // Apenas mapeamento artigo→especialidade e total por especialidade.
-  // NÃO tokenizamos descrições mestras (contêm muito vocabulário genérico).
+  // Mapeamento artigo→especialidade e vocabulário técnico de toda a Biblioteca.
+  // O índice é universal: usa Artigos Mestre, Especialidades, Subespecialidades,
+  // Categorias, conhecimento curado e Mapas de Quantidades já classificados.
   const { data: arts } = await sb
     .from("biblioteca_artigos")
-    .select("id, subespecialidade_id")
+    .select("id, codigo, descricao, observacoes, subespecialidade_id, biblioteca_categorias(nome)")
     .eq("ativo", true);
 
-  for (const a of arts ?? []) {
+  for (const a of (arts ?? []) as any[]) {
     const espId = subEsp.get(a.subespecialidade_id as string);
     if (!espId) continue;
     idx.artigoEsp.set(a.id as string, espId);
     idx.totalPorEsp.set(espId, (idx.totalPorEsp.get(espId) ?? 0) + 1);
+    const artigoId = a.id as string;
+    addTextoAoIdx(idx, a.descricao ?? "", espId, artigoId);
+    addTextoAoIdx(idx, a.observacoes ?? "", espId, artigoId);
+    addTextoAoIdx(idx, subNome.get(a.subespecialidade_id as string) ?? "", espId, artigoId);
+    addTextoAoIdx(idx, idx.nomeEsp.get(espId) ?? "", espId, artigoId);
+    addTextoAoIdx(idx, a?.biblioteca_categorias?.nome ?? "", espId, artigoId);
   }
 
   // FONTE 1: termos positivos já curados na biblioteca.
@@ -360,6 +241,7 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
     if (!espId) continue;
     const c = canonicalizar(r.termo as string);
     if (c) addToIdx(idx, c, espId, r.artigo_mestre_id as string);
+    addTextoAoIdx(idx, r.termo as string, espId, r.artigo_mestre_id as string, true);
   }
 
 
@@ -386,46 +268,51 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
   return idx;
 }
 
-// Calcula termos negativos para um artigo a partir do índice global.
-// Critérios estatísticos cumulativos para evitar falsos negativos sem bloquear
-// tudo quando a biblioteca ainda tem poucos exemplos reais:
-//  - termo aparece em ≥ 4 artigos no total e numa especialidade dominante
-//  - ≥ 75 % de TODAS as ocorrências estão concentradas nessa especialidade
-//  - existe algum sinal mínimo de dominância relativa nessa especialidade
-//  - ausente ou quase ausente na especialidade/artigo atual (≤ 1 artigo)
-//  - não é stopword, vocabulário genérico, termo positivo, histórico real
-//    do artigo atual, nem termo bloqueado pela família técnica
+function setTemConflito(termoCanon: string, termos: Set<string>): boolean {
+  for (const t of termos) {
+    if (canonicosConflituam(termoCanon, t)) return true;
+  }
+  return false;
+}
+
+// Calcula termos negativos para um artigo a partir do índice global universal.
+// Filosofia: negativos são exceções de alta confiança para afastar falsos
+// positivos de outras especialidades. Não há quota: se nada for seguro, fica [].
+// Gates obrigatórios:
+//  - termo não aparece como positivo, contexto, histórico real ou vocabulário do
+//    Artigo Mestre atual;
+//  - termo não aparece na especialidade atual;
+//  - termo é fortemente característico de outra especialidade;
+//  - confiança automática >= limiarAutoConfianca.
 function derivarNegativos(
+  artigoId: string,
   artigoEspId: string,
   vocPositivoCanonico: Set<string>,
   vocReaisDoArtigo: Set<string>,
-  bloqueioFamilia: Set<string>,
   idx: IndiceGlobal,
-  apenasOperacoesDemolicao = false,
-  maxAlta = 6,
-  maxMedia = 6
-): GeneratedTermo[] {
+  maxAlta = 8,
+  limiarAutoConfianca = 90
+): { termos: GeneratedTermo[]; rejeicoes: RemocaoNegativo[] } {
   type Cand = {
     termo: string; espDom: string; domPct: number; exclusividade: number;
-    suporte: number; totalAll: number; score: number;
+    suporte: number; totalAll: number; confianca: number;
   };
   const out: Cand[] = [];
+  const rejeicoes: RemocaoNegativo[] = [];
+  const vocArtigoAtual = idx.artigoTermos.get(artigoId) ?? new Set<string>();
+  const rejeitar = (termo: string, motivo: string) => {
+    if (rejeicoes.length < 40) rejeicoes.push({ termo, motivo });
+  };
 
   for (const [termoCanon, espMap] of idx.termoEspArtigos.entries()) {
-    if (tokenGenerico(termoCanon) && !(apenasOperacoesDemolicao && extrairOperacaoIncompativelDemolicoes(termoCanon))) continue;
-    const termoSaneado = apenasOperacoesDemolicao ? sanearNegativoDemolicoes(termoCanon) : termoCanon;
-    if (!termoSaneado) continue;
-    const termoSaneadoCanon = canonicalizar(termoSaneado);
-    if (!termoSaneadoCanon) continue;
-    if (vocPositivoCanonico.has(termoCanon) || vocPositivoCanonico.has(termoSaneadoCanon)) continue;
-    if (vocReaisDoArtigo.has(termoCanon) || vocReaisDoArtigo.has(termoSaneadoCanon)) continue;
-    if (bloqueioFamilia.has(termoCanon)) continue;
-    if (MATERIAIS_CONSTRUCAO.has(termoCanon)) continue;
-
+    if (tokenGenerico(termoCanon)) { rejeitar(termoCanon, "vocabulário genérico"); continue; }
+    if (setTemConflito(termoCanon, vocPositivoCanonico)) { rejeitar(termoCanon, "existe nas listas positivas/contexto do artigo"); continue; }
+    if (setTemConflito(termoCanon, vocReaisDoArtigo)) { rejeitar(termoCanon, "aparece no histórico real deste artigo"); continue; }
+    if (setTemConflito(termoCanon, vocArtigoAtual)) { rejeitar(termoCanon, "semanticamente próximo do Artigo Mestre atual"); continue; }
 
     const thisEspSet = espMap.get(artigoEspId);
     const thisCount = thisEspSet?.size ?? 0;
-    if (thisCount > 1) continue;
+    if (thisCount > 0) { rejeitar(termoCanon, "aparece na especialidade atual"); continue; }
 
     let bestEsp = "", bestDom = 0, bestSize = 0;
     let totalAll = 0;
@@ -437,58 +324,139 @@ function derivarNegativos(
       const dom = artSet.size / total;
       if (dom > bestDom) { bestDom = dom; bestEsp = espId; bestSize = artSet.size; }
     }
-    if (totalAll < 4) continue;
-    if (bestSize < 4) continue;
-    if (bestDom < 0.03 || !bestEsp) continue;
+    if (totalAll < 8) { rejeitar(termoCanon, "suporte global insuficiente"); continue; }
+    if (bestSize < 8) { rejeitar(termoCanon, "suporte noutra especialidade insuficiente"); continue; }
+    if (bestDom < 0.08 || !bestEsp) { rejeitar(termoCanon, "sem especialidade dominante clara"); continue; }
     const exclusividade = totalAll > 0 ? bestSize / totalAll : 0;
-    if (exclusividade < 0.75) continue;
+    if (exclusividade < 0.90) { rejeitar(termoCanon, `exclusividade baixa (${Math.round(exclusividade * 100)}%)`); continue; }
 
-    // Muitas especialidades têm dezenas/centenas de artigos ativos, mas só
-    // parte deles com conhecimento curado. Se usarmos apenas bestSize/total,
-    // termos bons ficam artificialmente bloqueados. A confiança combina
-    // exclusividade com suporte absoluto observado; bestDom fica como gate.
-    const suporteScore = Math.min(1, Math.log2(bestSize + 1) / 4);
-    let score = exclusividade * suporteScore;
-    if (OPERACOES_ALVO.has(termoCanon) || OPERACOES_ALVO.has(termoSaneadoCanon)) score += 0.10;
-    if (score < 0.50) continue;
+    // Confiança combina exclusividade inter-especialidades e suporte absoluto.
+    // Só grava automaticamente termos quase inequívocos; os restantes são
+    // rejeitados em silêncio/log, porque negativo incorreto é pior que ausência.
+    const suporteScore = Math.min(1, Math.log2(bestSize + 1) / 6);
+    const confianca = Math.round(100 * ((0.70 * exclusividade) + (0.30 * suporteScore)));
+    if (confianca < limiarAutoConfianca) { rejeitar(termoCanon, `confiança ${confianca}% abaixo do limiar ${limiarAutoConfianca}%`); continue; }
 
-
-    out.push({ termo: termoSaneado, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, score });
+    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, confianca });
   }
 
-  out.sort((a, b) => b.score - a.score);
+  out.sort((a, b) => b.confianca - a.confianca);
 
   const altas: GeneratedTermo[] = [];
-  const medias: GeneratedTermo[] = [];
   const vistos = new Set<string>();
   for (const n of out) {
     const c = canonicalizar(n.termo);
     if (!c || vistos.has(c)) continue;
     vistos.add(c);
-    const nivel: "alta" | "media" = n.score >= 0.75 ? "alta" : "media";
     const just =
       `"${n.termo}" é específico de ${idx.nomeEsp.get(n.espDom) ?? ""} ` +
       `(${n.suporte} de ${n.totalAll} ocorrências; ${Math.round(n.exclusividade * 100)}% exclusividade, ` +
-      `${Math.round(n.domPct * 100)}% dominância) e nunca aparece no histórico real deste artigo.`;
-    if (nivel === "alta" && altas.length < maxAlta) {
-      altas.push({
-        termo: n.termo,
-        peso: 30,
-        confianca: Math.round(Math.min(95, 80 + (n.score - 0.75) * 60)),
-        fonte: "vizinhos",
-        justificacao: just,
-      });
-    } else if (nivel === "media" && medias.length < maxMedia) {
-      medias.push({
-        termo: n.termo,
-        peso: 0,
-        confianca: Math.round(Math.min(75, 55 + (n.score - 0.50) * 100)),
-        fonte: "vizinhos",
-        justificacao: `[sugestão] ${just}`,
-      });
-    }
+      `${Math.round(n.domPct * 100)}% dominância) e não aparece no artigo/especialidade atual.`;
+    if (altas.length < maxAlta) altas.push({
+      termo: n.termo,
+      peso: 30,
+      confianca: n.confianca,
+      fonte: "vizinhos",
+      justificacao: just,
+    });
   }
-  return [...altas, ...medias];
+  return { termos: altas, rejeicoes };
+}
+
+function canonicosComTokens(s: string): string[] {
+  const c = canonicalizar(s);
+  if (!c) return [];
+  const out = new Set<string>([c]);
+  for (const tok of c.split(" ").filter(Boolean)) {
+    const lema = lemaSingular(tok);
+    if (lema && !tokenGenerico(lema)) out.add(lema);
+  }
+  return [...out];
+}
+
+function canonicosConflituam(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const aParts = a.split(" ").filter(Boolean);
+  const bParts = b.split(" ").filter(Boolean);
+  if (aParts.length > 1 && new RegExp(`(^| )${a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( |$)`).test(b)) return true;
+  if (bParts.length > 1 && new RegExp(`(^| )${b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( |$)`).test(a)) return true;
+  if (aParts.length === 1 && bParts.includes(a)) return true;
+  if (bParts.length === 1 && aParts.includes(b)) return true;
+  return false;
+}
+
+function construirVocPositivoFinal(gen: Generated, fontes?: Fontes): Set<string> {
+  const positivos = new Set<string>();
+  const add = (s: string) => {
+    for (const c of canonicosComTokens(s)) positivos.add(c);
+  };
+
+  for (const k of ["palavras_chave", "sinonimos", "expressoes", "materiais"] as const) {
+    for (const t of gen[k]) add(t.termo);
+  }
+  for (const e of fontes?.existentes ?? []) {
+    if (e.tipo !== "termo_negativo") add(e.termo as string);
+  }
+  if (fontes) {
+    add(fontes.artigo.descricao);
+    add(fontes.contexto.especialidade);
+    add(fontes.contexto.subespecialidade);
+    add(fontes.contexto.categoria);
+    for (const h of fontes.historico) add(h.descricao);
+  }
+  return positivos;
+}
+
+function validarTermosNegativosFinais(
+  gen: Generated,
+  fontes?: Fontes
+): { removidos: RemocaoNegativo[]; removidosDup: number; mensagem?: string } {
+  const removidos: RemocaoNegativo[] = [];
+  let removidosDup = 0;
+  const positivos = construirVocPositivoFinal(gen, fontes);
+  const vistos = new Set<string>();
+  const out: GeneratedTermo[] = [];
+
+  for (const t of gen.termos_negativos) {
+    const c = canonicalizar(t.termo);
+    if (!c) {
+      removidos.push({ termo: t.termo, motivo: "termo vazio após normalização" });
+      continue;
+    }
+    if (vistos.has(c)) {
+      removidosDup++;
+      removidos.push({ termo: t.termo, motivo: "duplicado após normalização singular/plural" });
+      continue;
+    }
+    vistos.add(c);
+
+    let motivo: string | null = null;
+    for (const pos of positivos) {
+      if (canonicosConflituam(c, pos)) {
+        motivo = `conflito com termo positivo "${pos}"`;
+        break;
+      }
+    }
+    if (!motivo && t.confianca < 90) {
+      motivo = `confiança ${t.confianca}% abaixo do limiar automático de 90%`;
+    }
+    if (!motivo && tokenGenerico(c)) {
+      motivo = "vocabulário genérico de obra sem valor discriminativo";
+    }
+    if (motivo) {
+      removidos.push({ termo: t.termo, motivo });
+      continue;
+    }
+    out.push({ ...t, termo: c });
+  }
+
+  gen.termos_negativos = out;
+  return {
+    removidos,
+    removidosDup,
+    mensagem: out.length === 0 ? "Não foram encontrados termos negativos com confiança suficiente." : undefined,
+  };
 }
 
 // Garante que nenhum termo aparece em duas listas e que não há duplicados
@@ -790,7 +758,7 @@ function buildPrompt(fontes: Fontes, modo: Modo) {
 
   const avisoSemHist = semHistorico
     ? "\n⚠ ATENÇÃO: este artigo NÃO tem histórico validado. Sê conservador: confiança ≤ 65, " +
-      "prioriza FONTE B e usa FONTE C para discriminar termos negativos."
+      "prioriza FONTE B e usa FONTE C apenas para contexto técnico positivo."
     : "";
 
   return `És um engenheiro de conhecimento técnico de construção civil em Portugal.
@@ -1234,63 +1202,63 @@ export async function processRun(runId: string) {
       .eq("id", runId);
     await appendLog(sb, runId, `Início: ${ids.length} artigos no âmbito`);
 
-    // Limpeza inicial: apaga negativos antigos que sejam stopwords,
-    // vocabulário genérico de obra, ou termos estruturais bloqueados para
-    // artigos da família demolições/estrutura (resíduos de versões anteriores).
+    // Limpeza inicial universal: apaga negativos antigos que sejam genéricos
+    // ou que conflituem com vocabulário positivo/contexto do próprio artigo.
     try {
       const { data: antigos } = await sb
         .from("biblioteca_artigo_conhecimento")
         .select("id, termo, artigo_mestre_id")
         .eq("tipo", "termo_negativo");
 
-      // Família por artigo mestre, para aplicar bloqueio estrutural.
       const artIds = Array.from(new Set((antigos ?? []).map((r) => r.artigo_mestre_id as string)));
-      const familiaPorArtigo = new Map<string, string | null>();
-      const demolicaoPorArtigo = new Map<string, boolean>();
+      const positivosPorArtigo = new Map<string, Set<string>>();
+      const addPositivoAntigo = (artigoId: string, texto: string) => {
+        let set = positivosPorArtigo.get(artigoId);
+        if (!set) { set = new Set(); positivosPorArtigo.set(artigoId, set); }
+        for (const c of canonicosComTokens(texto)) set.add(c);
+      };
       if (artIds.length) {
-        const { data: artsFam } = await sb
+        const { data: artsCtx } = await sb
           .from("biblioteca_artigos")
-          .select("id, descricao, biblioteca_subespecialidades(nome, biblioteca_especialidades(nome)), biblioteca_categorias(nome)")
+          .select("id, descricao, observacoes, biblioteca_subespecialidades(nome, biblioteca_especialidades(nome)), biblioteca_categorias(nome)")
           .in("id", artIds);
-        for (const r of (artsFam ?? []) as any[]) {
+        for (const r of (artsCtx ?? []) as any[]) {
           const nomeEsp = r?.biblioteca_subespecialidades?.biblioteca_especialidades?.nome ?? "";
           const nomeSub = r?.biblioteca_subespecialidades?.nome ?? "";
           const nomeCat = r?.biblioteca_categorias?.nome ?? "";
-          const desc = r?.descricao ?? "";
-          familiaPorArtigo.set(r.id as string, familiaEspecialidade(nomeEsp, null));
-          demolicaoPorArtigo.set(r.id as string, artigoEhDemolicao(nomeEsp, nomeSub, nomeCat, desc));
+          addPositivoAntigo(r.id as string, r?.descricao ?? "");
+          addPositivoAntigo(r.id as string, r?.observacoes ?? "");
+          addPositivoAntigo(r.id as string, nomeEsp);
+          addPositivoAntigo(r.id as string, nomeSub);
+          addPositivoAntigo(r.id as string, nomeCat);
+        }
+        const { data: positivosAntigos } = await sb
+          .from("biblioteca_artigo_conhecimento")
+          .select("artigo_mestre_id, tipo, termo")
+          .in("artigo_mestre_id", artIds)
+          .in("tipo", ["palavra_chave", "sinonimo", "expressao", "material"]);
+        for (const r of positivosAntigos ?? []) {
+          addPositivoAntigo(r.artigo_mestre_id as string, r.termo as string);
         }
       }
 
-      let removidosMateriais = 0;
-      let removidosDemolicoes = 0;
+      let removidosConflito = 0;
+      let removidosGenericos = 0;
       const aRemover = (antigos ?? []).filter((r) => {
         const c = canonicalizar((r.termo as string) ?? "");
         if (!c) return false;
-        if (tokenGenerico(c)) return true;
-        if (MATERIAIS_CONSTRUCAO.has(c)) { removidosMateriais++; return true; }
-        const fam = familiaPorArtigo.get(r.artigo_mestre_id as string) ?? null;
-        const bloq = bloqueioParaFamilia(fam);
-        if (bloq.has(c)) return true;
-        if (demolicaoPorArtigo.get(r.artigo_mestre_id as string)) {
-          const saneado = sanearNegativoDemolicoes(c);
-          const saneadoCanon = saneado ? canonicalizar(saneado) : "";
-          if (!saneadoCanon || saneadoCanon !== c) {
-            removidosDemolicoes++;
-            return true;
-          }
+        if (tokenGenerico(c)) { removidosGenericos++; return true; }
+        if (setTemConflito(c, positivosPorArtigo.get(r.artigo_mestre_id as string) ?? new Set())) {
+          removidosConflito++;
+          return true;
         }
         return false;
       }).map((r) => r.id as string);
       if (aRemover.length) {
         await sb.from("biblioteca_artigo_conhecimento").delete().in("id", aRemover);
-        await appendLog(sb, runId, `Limpeza: removidos ${aRemover.length} negativos inválidos antigos (genéricos ou estruturais bloqueados)`);
-        if (removidosMateriais > 0) {
-          await appendLog(sb, runId, `Limpeza: negativos removidos por serem materiais: ${removidosMateriais}`);
-        }
-        if (removidosDemolicoes > 0) {
-          await appendLog(sb, runId, `Limpeza: negativos removidos em Demolições por não serem operações incompatíveis: ${removidosDemolicoes}`);
-        }
+        await appendLog(sb, runId, `Limpeza: removidos ${aRemover.length} negativos antigos inválidos`);
+        if (removidosGenericos > 0) await appendLog(sb, runId, `Limpeza: negativos removidos por serem genéricos: ${removidosGenericos}`);
+        if (removidosConflito > 0) await appendLog(sb, runId, `Limpeza: negativos removidos por conflito com positivos/contexto do artigo: ${removidosConflito}`);
       }
 
     } catch (e: any) {
@@ -1391,52 +1359,49 @@ export async function processRun(runId: string) {
         // Derivar termos negativos a partir do índice estatístico.
         if (fontes.especialidadeId) {
           const vocPositivo = new Set<string>();
+          const addVocPositivo = (s: string) => {
+            for (const c of canonicosComTokens(s)) vocPositivo.add(c);
+          };
           for (const k of ["palavras_chave", "sinonimos", "expressoes", "materiais"] as const) {
             for (const t of gen[k]) {
-              const c = canonicalizar(t.termo);
-              if (c) vocPositivo.add(c);
+              addVocPositivo(t.termo);
             }
           }
           // Termos já gravados (modo "novos") também contam como positivos.
           for (const e of fontes.existentes) {
             if (e.tipo !== "termo_negativo") {
-              const c = canonicalizar(e.termo as string);
-              if (c) vocPositivo.add(c);
+              addVocPositivo(e.termo as string);
             }
           }
           // Tokens da descrição do próprio artigo nunca podem virar negativos.
-          for (const tok of tokenize(fontes.artigo.descricao)) {
-            vocPositivo.add(lemaSingular(tok));
-          }
+          addVocPositivo(fontes.artigo.descricao);
+          addVocPositivo(fontes.artigo.observacoes);
+          addVocPositivo(fontes.contexto.especialidade);
+          addVocPositivo(fontes.contexto.subespecialidade);
+          addVocPositivo(fontes.contexto.categoria);
           // Vocabulário REAL deste artigo mestre (descrições já classificadas).
           // Se um termo candidato aparece aqui, NÃO pode ser negativo.
           const vocReais = new Set<string>();
+          const addVocReal = (s: string) => {
+            for (const c of canonicosComTokens(s)) vocReais.add(c);
+          };
           for (const h of fontes.historico) {
-            for (const tok of tokenize(h.descricao)) {
-              const c = lemaSingular(tok);
-              if (c) vocReais.add(c);
-            }
+            addVocReal(h.descricao);
           }
-          // Bloqueio estrutural por família de especialidade.
-          const familia = familiaEspecialidade(
-            fontes.contexto.especialidade,
-            null
-          );
-          const bloqueio = bloqueioParaFamilia(familia);
-          const apenasOperacoesDemolicao = artigoEhDemolicao(
-            fontes.contexto.especialidade,
-            fontes.contexto.subespecialidade,
-            fontes.contexto.categoria,
-            fontes.artigo.descricao
-          );
-          gen.termos_negativos = derivarNegativos(
+          const negativosDerivados = derivarNegativos(
+            artigoId,
             fontes.especialidadeId,
             vocPositivo,
             vocReais,
-            bloqueio,
-            indice,
-            apenasOperacoesDemolicao
+            indice
           );
+          gen.termos_negativos = negativosDerivados.termos;
+          for (const t of gen.termos_negativos.slice(0, 8)) {
+            await appendLog(sb, runId, `negativo aceite "${t.termo}" (${t.confianca}%): ${t.justificacao ?? "característico de outra especialidade"}`);
+          }
+          for (const r of negativosDerivados.rejeicoes.slice(0, 8)) {
+            await appendLog(sb, runId, `negativo rejeitado "${r.termo}": ${r.motivo}`);
+          }
           if (gen.termos_negativos.length === 0) {
             await appendLog(sb, runId, `negativos: não foram encontrados termos com confiança suficiente para ${fontes.artigo.codigo}`);
           }
@@ -1451,6 +1416,24 @@ export async function processRun(runId: string) {
             runId,
             `validação: -${conflitos.removidosNegativos} negativos em conflito, -${conflitos.removidosDup} duplicados`
           );
+        }
+
+        // Validação final antes de guardar: negativos são exceções, não quota.
+        // Se um negativo também for positivo, termo do próprio artigo/contexto
+        // ou vocabulário real já classificado para este artigo, é removido e explicado.
+        const validacaoNegativos = validarTermosNegativosFinais(gen, fontes);
+        if (validacaoNegativos.removidos.length || validacaoNegativos.removidosDup) {
+          await appendLog(
+            sb,
+            runId,
+            `negativos removidos antes de guardar: ${validacaoNegativos.removidos.length} termos, ${validacaoNegativos.removidosDup} duplicados`
+          );
+          for (const r of validacaoNegativos.removidos.slice(0, 12)) {
+            await appendLog(sb, runId, `negativo removido "${r.termo}": ${r.motivo}`);
+          }
+        }
+        if (validacaoNegativos.mensagem) {
+          await appendLog(sb, runId, validacaoNegativos.mensagem);
         }
 
         const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes);
@@ -1743,4 +1726,3 @@ export async function processRun(runId: string) {
       .eq("id", runId);
   }
 }
-
