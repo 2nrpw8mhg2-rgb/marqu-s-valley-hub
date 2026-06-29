@@ -35,7 +35,9 @@ import {
   X,
   ArrowRight,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react";
+
 import { toast } from "sonner";
 
 type Props = {
