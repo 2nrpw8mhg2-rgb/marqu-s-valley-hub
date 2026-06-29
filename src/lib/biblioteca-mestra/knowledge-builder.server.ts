@@ -412,7 +412,7 @@ function derivarNegativos(
   const out: Cand[] = [];
 
   for (const [termoCanon, espMap] of idx.termoEspArtigos.entries()) {
-    if (tokenGenerico(termoCanon)) continue;
+    if (tokenGenerico(termoCanon) && !(apenasOperacoesDemolicao && extrairOperacaoIncompativelDemolicoes(termoCanon))) continue;
     const termoSaneado = apenasOperacoesDemolicao ? sanearNegativoDemolicoes(termoCanon) : termoCanon;
     if (!termoSaneado) continue;
     const termoSaneadoCanon = canonicalizar(termoSaneado);
