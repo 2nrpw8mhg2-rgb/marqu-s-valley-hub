@@ -632,10 +632,14 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
 function TermosChips({
   lista,
   onPick,
+  onEdit,
+  onDelete,
   mostraArtigo,
 }: {
   lista: KnowledgeRunReportTermo[];
   onPick: (t: KnowledgeRunReportTermo) => void;
+  onEdit: (t: KnowledgeRunReportTermo) => void;
+  onDelete: (t: KnowledgeRunReportTermo) => void;
   mostraArtigo: boolean;
 }) {
   if (lista.length === 0) {
@@ -644,25 +648,48 @@ function TermosChips({
   return (
     <div className="flex flex-wrap gap-1.5">
       {lista.map((termo) => (
-        <button
+        <div
           key={termo.id}
-          onClick={() => onPick(termo)}
-          className={`text-xs px-2 py-1 rounded border transition-colors ${
+          className={`group inline-flex items-stretch text-xs rounded border overflow-hidden transition-colors ${
             termo.novo
-              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-              : "border-muted-foreground/20 bg-muted/40 hover:bg-muted"
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              : "border-muted-foreground/20 bg-muted/40"
           }`}
-          title={
-            termo.justificacao ??
-            (mostraArtigo && termo.artigoCodigo ? `${termo.artigoCodigo} — ${termo.artigoDescricao}` : undefined)
-          }
         >
-          {termo.novo ? <span className="mr-1">🟢</span> : <span className="mr-1 text-muted-foreground">⚪</span>}
-          {termo.termo}
-          {mostraArtigo && termo.artigoCodigo && (
-            <span className="ml-1 text-[10px] text-muted-foreground font-mono">· {termo.artigoCodigo}</span>
-          )}
-        </button>
+          <button
+            type="button"
+            onClick={() => onPick(termo)}
+            className="px-2 py-1 hover:bg-black/5 dark:hover:bg-white/5 text-left"
+            title={
+              termo.justificacao ??
+              (mostraArtigo && termo.artigoCodigo ? `${termo.artigoCodigo} — ${termo.artigoDescricao}` : undefined)
+            }
+          >
+            {termo.novo ? <span className="mr-1">🟢</span> : <span className="mr-1 text-muted-foreground">⚪</span>}
+            {termo.termo}
+            {mostraArtigo && termo.artigoCodigo && (
+              <span className="ml-1 text-[10px] text-muted-foreground font-mono">· {termo.artigoCodigo}</span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onEdit(termo); }}
+            className="px-1.5 border-l border-current/10 opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5"
+            title="Editar termo"
+            aria-label="Editar"
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(termo); }}
+            className="px-1.5 border-l border-current/10 opacity-60 hover:opacity-100 hover:bg-destructive/10 text-destructive"
+            title="Eliminar termo"
+            aria-label="Eliminar"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
       ))}
     </div>
   );
