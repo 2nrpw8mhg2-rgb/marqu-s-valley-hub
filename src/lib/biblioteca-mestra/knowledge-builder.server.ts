@@ -370,8 +370,10 @@ function derivarNegativos(
     // termos bons ficam artificialmente bloqueados. A confiança combina
     // exclusividade com suporte absoluto observado; bestDom fica como gate.
     const suporteScore = Math.min(1, Math.log2(bestSize + 1) / 4);
-    const score = exclusividade * suporteScore;
+    let score = exclusividade * suporteScore;
+    if (OPERACOES_ALVO.has(termoCanon)) score += 0.10;
     if (score < 0.50) continue;
+
 
     out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, score });
   }
