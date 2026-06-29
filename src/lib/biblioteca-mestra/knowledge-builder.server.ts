@@ -82,6 +82,35 @@ function tokenGenerico(c: string): boolean {
   return STOPWORDS.has(c) || GENERICOS_OBRA.has(c);
 }
 
+// ============================================================
+// Bloqueio estrutural por família de especialidade.
+// Termos canónicos que NUNCA podem virar negativos para artigos cuja
+// especialidade pertença à família. São conceitos estruturais transversais
+// a toda a obra (betão, laje, viga, pilar, sapata, muro, perfil, ferro, aço,
+// estrutura, demolição, corte, desmontagem, metálica) — gerá-los como
+// negativos destruiria o score dos artigos onde são centrais.
+// ============================================================
+const BLOQUEIO_DEMOLICOES_ESTRUTURA = new Set<string>(
+  [
+    "betao", "laje", "viga", "pilar", "sapata", "muro", "estrutura",
+    "estrutural", "metalica", "metalico", "perfil", "ferro", "aco",
+    "corte", "desmontagem", "demolicao", "armadura", "cofragem",
+    "betonagem", "fundacao", "parede", "alvenaria", "tijolo",
+  ].map((t) => canonicalizar(t)).filter(Boolean)
+);
+
+// Inferir família a partir do nome/código da especialidade.
+function familiaEspecialidade(nomeEsp: string, codigoEsp?: string | null): string | null {
+  const n = normalize(`${codigoEsp ?? ""} ${nomeEsp}`);
+  if (/demoli|estrutur|betao|bet[aã]o|fundac|alvenaria/.test(n)) return "demolicoes_estrutura";
+  return null;
+}
+
+function bloqueioParaFamilia(familia: string | null): Set<string> {
+  if (familia === "demolicoes_estrutura") return BLOQUEIO_DEMOLICOES_ESTRUTURA;
+  return new Set();
+}
+
 function admin(): Sb {
   return createClient<Database>(
     process.env.SUPABASE_URL!,
@@ -243,16 +272,24 @@ async function construirIndiceGlobal(sb: Sb): Promise<IndiceGlobal> {
 function derivarNegativos(
   artigoEspId: string,
   vocPositivoCanonico: Set<string>,
+  vocReaisDoArtigo: Set<string>,
+  bloqueioFamilia: Set<string>,
   idx: IndiceGlobal,
-  maxResultados = 12
+  maxAlta = 6,
+  maxMedia = 6
 ): GeneratedTermo[] {
   const totalThisEsp = idx.totalPorEsp.get(artigoEspId) ?? 0;
-  type Cand = { termo: string; espDom: string; domPct: number; exclusividade: number; suporte: number; totalAll: number };
+  type Cand = {
+    termo: string; espDom: string; domPct: number; exclusividade: number;
+    suporte: number; totalAll: number; score: number;
+  };
   const out: Cand[] = [];
 
   for (const [termoCanon, espMap] of idx.termoEspArtigos.entries()) {
     if (tokenGenerico(termoCanon)) continue;
     if (vocPositivoCanonico.has(termoCanon)) continue;
+    if (vocReaisDoArtigo.has(termoCanon)) continue;
+    if (bloqueioFamilia.has(termoCanon)) continue;
 
     const thisEspSet = espMap.get(artigoEspId);
     const thisCount = thisEspSet?.size ?? 0;
@@ -266,27 +303,51 @@ function derivarNegativos(
       totalAll += artSet.size;
       if (espId === artigoEspId) continue;
       const total = idx.totalPorEsp.get(espId) ?? 0;
-      if (total < 3) continue;
+      if (total < 6) continue;
       const dom = artSet.size / total;
       if (dom > bestDom) { bestDom = dom; bestEsp = espId; bestSize = artSet.size; }
     }
-    if (totalAll < 5) continue;
-    if (bestSize < 4) continue;
-    if (bestDom < 0.50 || !bestEsp) continue;
+    if (totalAll < 8) continue;
+    if (bestSize < 6) continue;
+    if (bestDom < 0.65 || !bestEsp) continue;
     const exclusividade = totalAll > 0 ? bestSize / totalAll : 0;
-    if (exclusividade < 0.70) continue;
+    if (exclusividade < 0.80) continue;
 
-    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll });
+    const score = exclusividade * bestDom;
+    if (score < 0.55) continue;
+
+    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, score });
   }
 
-  out.sort((a, b) => (b.exclusividade * b.domPct) - (a.exclusividade * a.domPct));
-  return out.slice(0, maxResultados).map((n) => ({
-    termo: n.termo,
-    peso: 30,
-    confianca: Math.round(Math.min(95, 55 + n.exclusividade * n.domPct * 45)),
-    fonte: "vizinhos",
-    justificacao: `Específico de ${idx.nomeEsp.get(n.espDom) ?? ""} (${n.suporte} de ${n.totalAll} ocorrências, ${Math.round(n.exclusividade * 100)}%) e ausente neste artigo.`,
-  }));
+  out.sort((a, b) => b.score - a.score);
+
+  const altas: GeneratedTermo[] = [];
+  const medias: GeneratedTermo[] = [];
+  for (const n of out) {
+    const nivel: "alta" | "media" = n.score >= 0.70 ? "alta" : "media";
+    const just =
+      `"${n.termo}" é específico de ${idx.nomeEsp.get(n.espDom) ?? ""} ` +
+      `(${n.suporte} de ${n.totalAll} ocorrências; ${Math.round(n.exclusividade * 100)}% exclusividade, ` +
+      `${Math.round(n.domPct * 100)}% dominância) e nunca aparece no histórico real deste artigo.`;
+    if (nivel === "alta" && altas.length < maxAlta) {
+      altas.push({
+        termo: n.termo,
+        peso: 30, // será sinalizado negativo em persistir()
+        confianca: Math.round(Math.min(95, 80 + n.score * 15)),
+        fonte: "vizinhos",
+        justificacao: just,
+      });
+    } else if (nivel === "media" && medias.length < maxMedia) {
+      medias.push({
+        termo: n.termo,
+        peso: 0, // sugestão: motor ignora; utilizador valida e edita o peso
+        confianca: Math.round(Math.min(75, 55 + (n.score - 0.55) * 130)),
+        fonte: "vizinhos",
+        justificacao: `[sugestão] ${just}`,
+      });
+    }
+  }
+  return [...altas, ...medias];
 }
 
 // Garante que nenhum termo aparece em duas listas e que não há duplicados
@@ -919,8 +980,8 @@ async function persistir(
       const key = `${meta.tipo}::${t.termo.toLowerCase()}`;
       if (setExist.has(key)) continue;
       setExist.add(key);
-      const peso = Number.isFinite(t.peso) && t.peso !== 0 ? t.peso : meta.pesoDefault;
-      const pesoFinal = meta.sign < 0 ? -Math.abs(peso) : Math.abs(peso);
+      const pesoBruto = Number.isFinite(t.peso) ? t.peso : meta.pesoDefault;
+      const pesoFinal = pesoBruto === 0 ? 0 : (meta.sign < 0 ? -Math.abs(pesoBruto) : Math.abs(pesoBruto));
       const { ocorrencias, exemplos } = calcOcorrenciasEExemplos(t.termo, fontes.historico, fontes.candidatos);
       // Prefer reported fonte; auto-promote to historico if termo really aparece no histórico.
       let fonte: FonteOrigem = t.fonte ?? "inferido";
@@ -1032,20 +1093,40 @@ export async function processRun(runId: string) {
       .eq("id", runId);
     await appendLog(sb, runId, `Início: ${ids.length} artigos no âmbito`);
 
-    // Limpeza inicial: apaga negativos antigos que sejam stopwords ou
-    // vocabulário genérico de obra (resíduos de versões anteriores).
+    // Limpeza inicial: apaga negativos antigos que sejam stopwords,
+    // vocabulário genérico de obra, ou termos estruturais bloqueados para
+    // artigos da família demolições/estrutura (resíduos de versões anteriores).
     try {
       const { data: antigos } = await sb
         .from("biblioteca_artigo_conhecimento")
-        .select("id, termo")
+        .select("id, termo, artigo_mestre_id")
         .eq("tipo", "termo_negativo");
+
+      // Família por artigo mestre, para aplicar bloqueio estrutural.
+      const artIds = Array.from(new Set((antigos ?? []).map((r) => r.artigo_mestre_id as string)));
+      const familiaPorArtigo = new Map<string, string | null>();
+      if (artIds.length) {
+        const { data: artsFam } = await sb
+          .from("biblioteca_artigos")
+          .select("id, biblioteca_subespecialidades(biblioteca_especialidades(nome))")
+          .in("id", artIds);
+        for (const r of (artsFam ?? []) as any[]) {
+          const nomeEsp = r?.biblioteca_subespecialidades?.biblioteca_especialidades?.nome ?? "";
+          familiaPorArtigo.set(r.id as string, familiaEspecialidade(nomeEsp, null));
+        }
+      }
+
       const aRemover = (antigos ?? []).filter((r) => {
         const c = canonicalizar((r.termo as string) ?? "");
-        return c && tokenGenerico(c);
+        if (!c) return false;
+        if (tokenGenerico(c)) return true;
+        const fam = familiaPorArtigo.get(r.artigo_mestre_id as string) ?? null;
+        const bloq = bloqueioParaFamilia(fam);
+        return bloq.has(c);
       }).map((r) => r.id as string);
       if (aRemover.length) {
         await sb.from("biblioteca_artigo_conhecimento").delete().in("id", aRemover);
-        await appendLog(sb, runId, `Limpeza: removidos ${aRemover.length} negativos genéricos antigos`);
+        await appendLog(sb, runId, `Limpeza: removidos ${aRemover.length} negativos inválidos antigos (genéricos ou estruturais bloqueados)`);
       }
     } catch (e: any) {
       await appendLog(sb, runId, `Limpeza falhou (ignorado): ${e?.message ?? e}`);
@@ -1162,8 +1243,33 @@ export async function processRun(runId: string) {
           for (const tok of tokenize(fontes.artigo.descricao)) {
             vocPositivo.add(lemaSingular(tok));
           }
-          gen.termos_negativos = derivarNegativos(fontes.especialidadeId, vocPositivo, indice);
+          // Vocabulário REAL deste artigo mestre (descrições já classificadas).
+          // Se um termo candidato aparece aqui, NÃO pode ser negativo.
+          const vocReais = new Set<string>();
+          for (const h of fontes.historico) {
+            for (const tok of tokenize(h.descricao)) {
+              const c = lemaSingular(tok);
+              if (c) vocReais.add(c);
+            }
+          }
+          // Bloqueio estrutural por família de especialidade.
+          const familia = familiaEspecialidade(
+            fontes.contexto.especialidade,
+            null
+          );
+          const bloqueio = bloqueioParaFamilia(familia);
+          gen.termos_negativos = derivarNegativos(
+            fontes.especialidadeId,
+            vocPositivo,
+            vocReais,
+            bloqueio,
+            indice
+          );
+          if (gen.termos_negativos.length === 0) {
+            await appendLog(sb, runId, `negativos: não foram encontrados termos com confiança suficiente para ${fontes.artigo.codigo}`);
+          }
         }
+
 
         // Validação cruzada: elimina conflitos positivo/negativo e duplicados.
         const conflitos = resolverConflitos(gen);
