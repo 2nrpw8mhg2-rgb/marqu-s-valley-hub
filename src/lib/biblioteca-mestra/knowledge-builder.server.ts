@@ -1175,10 +1175,12 @@ export async function processRun(runId: string) {
         }
       }
 
+      let removidosMateriais = 0;
       const aRemover = (antigos ?? []).filter((r) => {
         const c = canonicalizar((r.termo as string) ?? "");
         if (!c) return false;
         if (tokenGenerico(c)) return true;
+        if (MATERIAIS_CONSTRUCAO.has(c)) { removidosMateriais++; return true; }
         const fam = familiaPorArtigo.get(r.artigo_mestre_id as string) ?? null;
         const bloq = bloqueioParaFamilia(fam);
         return bloq.has(c);
@@ -1186,7 +1188,11 @@ export async function processRun(runId: string) {
       if (aRemover.length) {
         await sb.from("biblioteca_artigo_conhecimento").delete().in("id", aRemover);
         await appendLog(sb, runId, `Limpeza: removidos ${aRemover.length} negativos inválidos antigos (genéricos ou estruturais bloqueados)`);
+        if (removidosMateriais > 0) {
+          await appendLog(sb, runId, `Limpeza: negativos removidos por serem materiais: ${removidosMateriais}`);
+        }
       }
+
     } catch (e: any) {
       await appendLog(sb, runId, `Limpeza falhou (ignorado): ${e?.message ?? e}`);
     }
