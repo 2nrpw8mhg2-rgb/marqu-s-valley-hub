@@ -787,7 +787,9 @@ async function callAI(prompt: string): Promise<Generated> {
     sinonimos: norm(parsed.sinonimos),
     expressoes: norm(parsed.expressoes),
     materiais: norm(parsed.materiais),
-    termos_negativos: norm(parsed.termos_negativos),
+    // Negativos NUNCA vêm da IA — são derivados estatisticamente pelo sistema.
+    termos_negativos: [],
+
   };
 }
 
