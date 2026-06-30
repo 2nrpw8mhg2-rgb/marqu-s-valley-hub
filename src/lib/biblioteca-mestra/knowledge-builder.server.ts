@@ -99,12 +99,36 @@ function tokenGenerico(c: string): boolean {
   return STOPWORDS.has(c) || GENERICOS_OBRA.has(c);
 }
 
+function isNewSupabaseApiKey(value: string): boolean {
+  return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
+}
+
 function admin(): Sb {
-  return createClient<Database>(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  );
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error(
+      `Missing Supabase env var(s): ${[!url && "SUPABASE_URL", !key && "SUPABASE_SERVICE_ROLE_KEY"].filter(Boolean).join(", ")}`
+    );
+  }
+  // New-format Supabase API keys (sb_secret_*) are opaque, not JWTs.
+  // PostgREST rejects them when sent as `Authorization: Bearer <key>`
+  // ("Expected 3 parts in JWT; got 1"). Strip that header and keep only `apikey`.
+  const supabaseFetch: typeof fetch = (input, init) => {
+    const headers = new Headers(
+      typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined
+    );
+    if (init?.headers) new Headers(init.headers).forEach((v, k) => headers.set(k, v));
+    if (isNewSupabaseApiKey(key) && headers.get("Authorization") === `Bearer ${key}`) {
+      headers.delete("Authorization");
+    }
+    headers.set("apikey", key);
+    return fetch(input, { ...init, headers });
+  };
+  return createClient<Database>(url, key, {
+    global: { fetch: supabaseFetch },
+    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+  });
 }
 
 function normalize(s: string): string {
@@ -2221,13 +2245,19 @@ export async function processRun(runId: string) {
       .eq("id", runId);
     await appendLog(sb, runId, `Concluído: ${processados} processados, ${saltados} saltados, ${falhados} falhados`);
   } catch (e: any) {
-    await sb
-      .from("biblioteca_knowledge_run")
-      .update({
-        estado: "erro",
-        erro_msg: String(e?.message ?? e).slice(0, 500),
-        concluido_em: new Date().toISOString(),
-      })
-      .eq("id", runId);
+    console.error("[knowledge-builder] processRun failed", e);
+    try {
+      const sbErr = admin();
+      await sbErr
+        .from("biblioteca_knowledge_run")
+        .update({
+          estado: "erro",
+          erro_msg: String(e?.message ?? e).slice(0, 500),
+          concluido_em: new Date().toISOString(),
+        })
+        .eq("id", runId);
+    } catch (e2) {
+      console.error("[knowledge-builder] could not mark run as erro", e2);
+    }
   }
 }
