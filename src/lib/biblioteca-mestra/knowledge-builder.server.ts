@@ -1339,6 +1339,9 @@ function normalizarGenerated(gen: Generated): NormStats {
   gen.palavras_chave = aplicar(gen.palavras_chave);
   gen.expressoes = aplicar(gen.expressoes);
   gen.materiais = aplicar(gen.materiais);
+  gen.unidades = aplicar(gen.unidades);
+  gen.capitulos = aplicar(gen.capitulos);
+  gen.exemplos = aplicar(gen.exemplos);
   gen.termos_negativos = aplicar(gen.termos_negativos);
   gen.sinonimos = aplicar([...gen.sinonimos, ...sinonimosExtra]);
   return stats;
