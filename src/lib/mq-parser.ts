@@ -32,7 +32,7 @@ const HEADER_HINTS: Record<keyof ColumnMap, string[]> = {
   codigo: ["codigo", "cod", "ref", "referencia", "artigo", "item", "n", "numero"],
   descricao: ["descricao", "descric", "designacao", "designaca", "design", "desig", "desc", "natureza"],
   unidade: ["un", "und", "unid", "unidade", "uni"],
-  quantidade: ["qtd", "qtde", "quant", "quantidade", "qt"],
+  quantidade: ["qtd", "qtde", "quant", "quantidade", "qt", "medicao", "medição"],
   preco: ["preco", "pu", "p unit", "p unitario", "pvp", "valor", "unitario"],
 };
 
@@ -63,7 +63,11 @@ export function detectColumns(rows: any[][]): { headerRowIdx: number; map: Colum
         if (inferred.map.unidade != null && countUnitLike(rows, i + 1, map.unidade) < countUnitLike(rows, i + 1, inferred.map.unidade)) {
           map.unidade = inferred.map.unidade;
         }
-        if (inferred.map.quantidade != null && countNumberLike(rows, i + 1, map.quantidade) < countNumberLike(rows, i + 1, inferred.map.quantidade)) {
+        if (
+          inferred.map.quantidade != null &&
+          !hasQuantityHeader(rows, map.quantidade, i) &&
+          countNumberLike(rows, i + 1, map.quantidade) < countNumberLike(rows, i + 1, inferred.map.quantidade)
+        ) {
           map.quantidade = inferred.map.quantidade;
         }
         map.preco ??= inferred.map.preco;
@@ -137,6 +141,11 @@ function headerNear(rows: any[][], col: number, untilRow: number): string {
     if (value) parts.push(value);
   }
   return NORM(parts.join(" "));
+}
+
+function hasQuantityHeader(rows: any[][], col: number | null, untilRow: number): boolean {
+  if (col == null) return false;
+  return /\b(quantidade|qtd|qt|medicao|totais|total)\b/.test(headerNear(rows, col, untilRow));
 }
 
 function inferColumnsFromData(rows: any[][], startRow: number): { headerRowIdx: number; map: ColumnMap } | null {
