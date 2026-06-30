@@ -1289,6 +1289,7 @@ export type Database = {
           preco_unitario: number
           quantidade: number
           unidade: string | null
+          unidade_normalizada: string | null
         }
         Insert: {
           capitulo_id?: string | null
@@ -1312,6 +1313,7 @@ export type Database = {
           preco_unitario?: number
           quantidade?: number
           unidade?: string | null
+          unidade_normalizada?: string | null
         }
         Update: {
           capitulo_id?: string | null
@@ -1335,6 +1337,7 @@ export type Database = {
           preco_unitario?: number
           quantidade?: number
           unidade?: string | null
+          unidade_normalizada?: string | null
         }
         Relationships: [
           {
@@ -1454,12 +1457,16 @@ export type Database = {
           estado_mq: Database["public"]["Enums"]["estado_mq"]
           id: string
           margem_global_pct: number
+          mq_documento_id: string | null
+          mq_revisao: string | null
           nome: string
           obra_id: string
           observacoes: string | null
+          tipo: string
           updated_at: string
           versao: number
           versao_label: string
+          wizard_passo: number
         }
         Insert: {
           created_at?: string
@@ -1470,12 +1477,16 @@ export type Database = {
           estado_mq?: Database["public"]["Enums"]["estado_mq"]
           id?: string
           margem_global_pct?: number
+          mq_documento_id?: string | null
+          mq_revisao?: string | null
           nome: string
           obra_id: string
           observacoes?: string | null
+          tipo?: string
           updated_at?: string
           versao?: number
           versao_label?: string
+          wizard_passo?: number
         }
         Update: {
           created_at?: string
@@ -1486,14 +1497,25 @@ export type Database = {
           estado_mq?: Database["public"]["Enums"]["estado_mq"]
           id?: string
           margem_global_pct?: number
+          mq_documento_id?: string | null
+          mq_revisao?: string | null
           nome?: string
           obra_id?: string
           observacoes?: string | null
+          tipo?: string
           updated_at?: string
           versao?: number
           versao_label?: string
+          wizard_passo?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "orcamentos_mq_documento_id_fkey"
+            columns: ["mq_documento_id"]
+            isOneToOne: false
+            referencedRelation: "documentos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orcamentos_obra_id_fkey"
             columns: ["obra_id"]

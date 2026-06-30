@@ -1,19 +1,20 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, FileText, ListChecks, Calculator, ShoppingCart, CalendarDays, Wallet, Ruler, BarChart3, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, FileText, ClipboardList, ShoppingCart, FileCheck2, CalendarDays, Wallet, Ruler, BarChart3, LayoutDashboard } from "lucide-react";
 
 const TABS = [
   { to: "", label: "Resumo", icon: LayoutDashboard },
   { to: "/documentos", label: "Documentos", icon: FileText },
-  { to: "/mq", label: "Mapa de Quantidades", icon: ListChecks },
-  { to: "/orcamentacao", label: "Orçamentação", icon: Calculator },
+  { to: "/preparacao-orcamento", label: "Preparação de Orçamento", icon: ClipboardList },
   { to: "/procurement", label: "Procurement", icon: ShoppingCart },
+  { to: "/orcamento-final", label: "Orçamento Final", icon: FileCheck2, soon: true },
   { to: "/planeamento", label: "Planeamento", icon: CalendarDays, soon: true },
   { to: "/financeira", label: "Gestão Financeira", icon: Wallet, soon: true },
   { to: "/medicoes", label: "Medições", icon: Ruler, soon: true },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3, soon: true },
 ];
+
 
 export function ObraLayout({ obraId }: { obraId: string }) {
   const { pathname } = useLocation();
