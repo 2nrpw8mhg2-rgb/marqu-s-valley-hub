@@ -213,7 +213,8 @@ function PreparacaoOrcamentoWizard() {
             await refetchRascunho();
             await qc.invalidateQueries({ queryKey: ["prep-passo2"] });
             await qc.invalidateQueries({ queryKey: ["prep-passo3"] });
-            await qc.invalidateQueries({ queryKey: ["prep-passo4"] });
+            await qc.invalidateQueries({ queryKey: ["prep-passo4-rows"] });
+            await qc.invalidateQueries({ queryKey: ["prep-passo4-stats"] });
             await persistPasso(1);
             setPasso(2);
           }}
@@ -419,9 +420,12 @@ function Passo1({
         const mudouMQT = rascunho.mq_documento_id !== escolhido;
 
         if (mudouMQT) {
-          await supabase.from("classificacao_artigos").delete().eq("orcamento_id", rascunho.id);
-          await supabase.from("orcamento_artigos").delete().eq("orcamento_id", rascunho.id);
-          await supabase.from("orcamento_capitulos").delete().eq("orcamento_id", rascunho.id);
+          const { error: clsErr } = await supabase.from("classificacao_artigos").delete().eq("orcamento_id", rascunho.id);
+          if (clsErr) throw clsErr;
+          const { error: artsErr } = await supabase.from("orcamento_artigos").delete().eq("orcamento_id", rascunho.id);
+          if (artsErr) throw artsErr;
+          const { error: capsErr } = await supabase.from("orcamento_capitulos").delete().eq("orcamento_id", rascunho.id);
+          if (capsErr) throw capsErr;
         }
 
         // Atualiza rascunho existente
@@ -472,7 +476,8 @@ function Passo1({
       await qc.invalidateQueries({ queryKey: ["prep-orc", obraId] });
       await qc.invalidateQueries({ queryKey: ["prep-passo2"] });
       await qc.invalidateQueries({ queryKey: ["prep-passo3"] });
-      await qc.invalidateQueries({ queryKey: ["prep-passo4"] });
+      await qc.invalidateQueries({ queryKey: ["prep-passo4-rows"] });
+      await qc.invalidateQueries({ queryKey: ["prep-passo4-stats"] });
       await onSelecionado();
     } catch (e: any) {
       toast.error(e.message ?? "Erro");
