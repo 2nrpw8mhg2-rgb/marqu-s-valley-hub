@@ -533,7 +533,19 @@ function Passo1({
 // =========================================================================
 //  Passo 2 — Leitura IA do MQT (download + parse + insert imutável)
 // =========================================================================
-function Passo2({ rascunho, onConcluido }: { rascunho: any; onConcluido: () => Promise<void> }) {
+function Passo2({
+  rascunho,
+  mqAtivo,
+  obraId,
+  onVoltar,
+  onConcluido,
+}: {
+  rascunho: any;
+  mqAtivo: { id: string; nome: string; storage_path: string; created_at: string; tamanho: number | null } | null;
+  obraId: string;
+  onVoltar: () => void;
+  onConcluido: () => Promise<void>;
+}) {
   const [working, setWorking] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -550,6 +562,11 @@ function Passo2({ rascunho, onConcluido }: { rascunho: any; onConcluido: () => P
   });
 
   async function executar() {
+    if (!mqAtivo) {
+      toast.error("O MQT já não está disponível na pasta «Mapa de Quantidades» desta obra.");
+      onVoltar();
+      return;
+    }
     if (!status?.storagePath) return;
     setWorking(true);
     setErro(null);
