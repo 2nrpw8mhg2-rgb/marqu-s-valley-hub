@@ -1,96 +1,95 @@
-# Biblioteca Mestra como Base de Conhecimento Estruturada
 
-Transformar o atual campo único de "Termos Negativos" em seis secções distintas, cada uma com papel próprio no motor de classificação. Mantém-se a tabela existente `biblioteca_artigo_conhecimento` — apenas se acrescentam novos tipos.
+# Revisão profunda do Knowledge Builder
 
-## 1. Modelo de dados (migração)
+Mudança de filosofia: deixar de produzir listas curtas (≤8 por tipo) e passar a gerar enriquecimento profundo, com a IA a comportar-se como um engenheiro orçamentista sénior que cruza Artigo Mestre + Categoria + Subespecialidade + Especialidade + irmãos + mapas reais + histórico + correções + restante Biblioteca.
 
-Adicionar valores ao enum `biblioteca_conhecimento_tipo`:
+## 1. Remover limites artificiais
 
-- `negativo_concorrente` — termos da mesma especialidade/subespecialidade que distinguem artigos semelhantes (penalização média).
-- `negativo_incompativel` — termos de outras especialidades (penalização forte / eliminação).
-- `unidade_compativel` — códigos de unidades válidas para o artigo.
-- `capitulo_tipico` — nomes/normalizações de capítulos onde o artigo costuma aparecer.
-- `exemplo_real` — descrições reais validadas (fonte principal de aprendizagem).
+Em `src/lib/biblioteca-mestra/knowledge-builder.server.ts`:
 
-O tipo legado `termo_negativo` mantém-se para retro-compatibilidade. Migração de dados: converter os atuais `termo_negativo` em `negativo_incompativel` quando o termo pertence a outra especialidade, caso contrário em `negativo_concorrente` (heurística baseada no `IndiceGlobal` já calculado pelo knowledge-builder).
+- Substituir `TIPO_LIMIT = 8` por limites por tipo, mais generosos e usados apenas como guarda final, não como instrução à IA:
+  - palavras_chave: 40 · sinonimos: 30 · expressoes: 30 · materiais: 25
+- Em `callAI`/`norm()`: remover o `.slice(0, TIPO_LIMIT)` e passar a aceitar tudo o que vier; aplicar guarda só depois da validação de qualidade.
+- Em `melhorarPalavrasChave`: remover `.slice(0, TIPO_LIMIT)` final; ordenar e cortar apenas pelo novo limite por tipo.
+- Subir `MQ_TOP` (40 → 120), `CANDIDATOS_TOP` (60 → 150), `ORC_FETCH_PER_TOKEN` (80 → 200), `VIZINHOS_LIMIT` (15 → 40), `VIZINHO_EXEMPLOS` (5 → 12).
+- `callAI`: `max_tokens` 4000 → 12000 e `response_format` mantém-se `json_object`.
 
-Campo `peso` por defeito por tipo:
-- positivos (palavra_chave/sinonimo/expressao/material): +10 a +40 (como hoje)
-- negativo_concorrente: −15
-- negativo_incompativel: −60
-- unidade_compativel: 0 (gate, não pontua)
-- capitulo_tipico: +5 (bónus contextual)
-- exemplo_real: 0 (usado por similaridade textual)
+## 2. Mais contexto entregue à IA (`recolherFontes` + `buildPrompt`)
 
-## 2. Geração automática (knowledge-builder.server.ts)
+Acrescentar fontes que hoje a IA nem vê:
 
-Reestruturar a função `derivarNegativos` em três geradores:
+- **Irmãos diretos da Categoria** (não só da Subespecialidade): nova query a `biblioteca_artigos` filtrando por `categoria_id`, devolver descrição + 5 exemplos reais cada.
+- **Vocabulário reutilizado**: agregar os termos `palavra_chave/sinonimo/expressao/material` mais frequentes da própria Subespecialidade e Especialidade (top 50 cada) — guiam estilo e cobertura típica.
+- **Correções do utilizador**: ler `classificacao_aprendizagem` por `codigo_artigo` (top 30) para mostrar à IA o que costuma confundir-se com este artigo.
+- **Capítulos típicos pré-calculados**: já existe `derivarUnidadesCapitulosExemplos`; passar a executá-lo *antes* do prompt e injetar no contexto (unidades dominantes + 5 capítulos mais frequentes + 15 exemplos reais).
+- **Unidade do Artigo Mestre** (campo `unidade`): sempre incluída como unidade dominante default quando não houver histórico.
 
-- **`derivarNegativosConcorrentes(artigo, irmaos, historicoConfusoes)`** — usa os outros artigos da mesma subespecialidade + especialidade. Extrai tokens distintivos desses irmãos e do histórico de classificações em que o utilizador corrigiu para outro artigo da mesma área. Resultado típico: "manual", "rocha", "aterro" quando o artigo é "Escavação Mecânica".
-- **`derivarNegativosIncompativeis(artigo, indiceGlobal)`** — mantém a lógica atual (≥90% exclusividade noutras especialidades) + blocklist `GENERICOS_OBRA` já existente. Resultado: "pintura", "azulejo", "AVAC".
-- **`derivarUnidadesCompativeis(artigo, historico)`** — agrega `unidade` dos artigos classificados como este artigo mestre; mantém as com ≥5% de ocorrências.
-- **`derivarCapitulosTipicos(artigo, historico)`** — agrega `capitulo.titulo` normalizado dos MQs em que o artigo aparece; top-5 por frequência.
-- **`derivarExemplosReais(artigo, historico)`** — guarda até 50 descrições reais validadas (origem: `mapas_quantidades` ou `utilizador`), com deduplicação por `normalizar_descricao`.
-
-A opção "Regenerar tudo (apenas IA)" passa a popular todas as secções; "Adicionar apenas novos" preserva edições manuais.
-
-## 3. Motor de classificação (src/lib/classificacao/engine.ts)
-
-Nova sequência de scoring por candidato:
+Refazer `buildPrompt` com nova estrutura:
 
 ```
-1. Gate: capítulo do item ∈ capitulos_tipicos do artigo  → +bónus contextual
-2. Gate: unidade do item ∈ unidades_compativeis           → senão −20
-3. Penalização forte: cada negativo_incompativel presente → −60 (pode eliminar candidato se score < 0)
-4. Similaridade textual com exemplos_reais (trigram/cosine) → 0..+40
-5. Soma positivos (palavra_chave/sinonimo/expressao/material) → como hoje
-6. Penalização de concorrência: cada negativo_concorrente presente → −15
-7. Auto-classifica apenas se margem sobre 2º candidato ≥ X (configurável, default 15 pontos)
+PERFIL: és um engenheiro orçamentista sénior português com décadas de
+experiência. Vais enriquecer profundamente este Artigo Mestre cruzando
+TODAS as fontes. Não restrinjas o número de termos — quanto mais
+conhecimento útil e tecnicamente justificável, melhor.
+
+ARTIGO MESTRE / CATEGORIA / SUBESPECIALIDADE / ESPECIALIDADE
+HISTÓRICO REAL (até 120) / CANDIDATOS BRUTOS (até 150)
+IRMÃOS DE CATEGORIA / IRMÃOS DE SUBESPECIALIDADE
+VOCABULÁRIO REUTILIZADO NA SUBESPECIALIDADE / NA ESPECIALIDADE
+CORREÇÕES DOS UTILIZADORES
+UNIDADES, CAPÍTULOS E EXEMPLOS JÁ OBSERVADOS
 ```
 
-A função `pontuarCandidato` recebe agora os 6 conjuntos pré-carregados por artigo (lookup único por run). Manter os logs de auditoria por etapa para o painel de classificação.
+Pedir explicitamente:
+- Palavras-chave: gerar **todas** as palavras técnicas relevantes (sinais singulares/plurais, formas curtas e formas com adjetivo). Sem cota máxima; cota mínima 8 quando houver descrição suficiente.
+- Sinónimos: cobrir terminologia portuguesa habitual (reboco/estuque/argamassa/revestimento/emboço/regularização…), sem cota.
+- Expressões: extrair tudo o que seja frase técnica típica de MQ (2-6 palavras).
+- Materiais: explícitos e implícitos (betão C25/30, aço A500, argamassa M5, EPS, XPS, lã mineral…).
+- **Unidades**: nunca devolver vazio. Sugerir unidade dominante do artigo + todas as unidades plausíveis (m², m³, m, ml, un, kg, ton, vg, lote).
+- **Capítulos**: nunca devolver vazio. Sugerir capítulo provável com base em Especialidade/Subespecialidade/Categoria.
+- **Exemplos**: até 30 frases reais ou plausíveis ao estilo dos MQ portugueses.
+- Manter regras pt-PT já existentes.
 
-## 4. Interface (ArtigoConhecimentoTab.tsx)
+## 3. Fim dos negativos legacy
 
-Substituir as abas atuais por 6 secções acordeão/tabs:
+- Marcar `termo_negativo` como **deprecated** em `types.ts` (mantido só para leitura/migração; remover do array `CONHECIMENTO_TIPOS` para não aparecer na UI).
+- Migração SQL: `UPDATE biblioteca_artigo_conhecimento SET ativo = false WHERE tipo = 'termo_negativo';` (não apagar, para auditoria).
+- Remover toda a derivação heurística estatística (`derivarNegativos`, `IndiceGlobal`, `construirIndiceGlobal`, blocos de limpeza/validação correspondentes em `processRun`) — passa a existir apenas:
+  - **`negativo_concorrente`**: já calculado em `derivarConcorrentes` (irmãos), ampliar limite (10 → 50) e baixar threshold (`count >= 2` → `count >= 1`).
+  - **`negativo_incompativel`** (renomeado conceptualmente para "Especialidades Excluídas"): novo derivador `derivarIncompatibilidades` que percorre as restantes Especialidades e devolve termos técnicos centrais (palavras_chave/material já curados) que aparecem **só** noutras especialidades — sem o atual gate de 90% exclusividade, com confiança proporcional. Label na UI: "Especialidades Excluídas".
+- `TIPO_MAP`: deixar de gerar `termos_negativos` via IA (já não o fazia); remover a entrada do mapa.
 
-- ✅ Palavras-chave Positivas (agrega palavra_chave + sinonimo + expressao + material)
-- ⚠️ Negativos Concorrentes
-- 🚫 Negativos Incompatíveis
-- 📏 Unidades Compatíveis (chips ligados à tabela `biblioteca_unidades`)
-- 📂 Capítulos Típicos
-- 📝 Exemplos Reais (lista; cada exemplo com link para o MQ de origem quando exista)
+## 4. Dashboard reflete o enriquecimento
 
-Cada secção tem:
-- botão "Adicionar manualmente"
-- botão "Enriquecer com IA" (chama o knowledge-builder restrito àquela secção)
-- toggle ativo/inativo por item, edição inline, eliminação
+Em `src/routes/_app/biblioteca-mestra.knowledge-builder.tsx`:
 
-Adaptar `KnowledgeRunReport.tsx` para mostrar contadores por secção (6 cartões em vez de 5).
+- Substituir a grelha de 5 contadores por uma grelha de **8** com os tipos novos: Palavras-chave, Sinónimos, Expressões, Materiais, Unidades, Capítulos, Exemplos, Incompatibilidades + Concorrentes.
+- Cada cartão mostra `antes → depois` (ex.: `6 → 28`) usando `counts` actual e snapshot prévio (já calculado em `processRun` → `perTipo[t].antes/depois`). Expor estes campos no estado `s.counts` actual.
+- Remover o cartão "Negativos" antigo.
 
-## 5. Aprendizagem contínua
+Em `KnowledgeRunReport.tsx`: mesma alteração — 8 secções e usar `perTipo` do resumo.
 
-Quando o utilizador valida ou corrige uma classificação em `classificacao_artigos`:
-- a descrição original é inserida automaticamente como `exemplo_real` no artigo mestre escolhido (se ainda não existir);
-- se for uma correção dentro da mesma especialidade, os tokens distintivos do artigo errado vão para `negativo_concorrente` do artigo correto;
-- se for correção entre especialidades diferentes, tokens do artigo errado vão para `negativo_incompativel`.
+## 5. UI do Artigo (`ArtigoConhecimentoTab.tsx`)
 
-Implementado num trigger leve em pg ou, preferencialmente, num server function chamado após `aprovarClassificacao`/`corrigirClassificacao` (mais auditável).
+- Remover secção "Termo negativo (legacy)".
+- Renomear "Negativo incompatível" → "Especialidades Excluídas".
+- Garantir que as 8 secções aparecem mesmo quando vazias (com botão "Enriquecer com IA" por secção, que continua a chamar o run global — esse já popula todas).
 
 ## 6. Validação
 
-- `tsgo` limpo após mudanças de tipo (atualizar `types.ts` da Biblioteca Mestra).
-- Correr "Regenerar tudo (apenas IA)" numa subespecialidade e confirmar que cada artigo tem conteúdo nas 6 secções.
-- Comparar 2 artigos parecidos (ex.: Escavação Manual vs Escavação Mecânica) e confirmar que os negativos_concorrentes são distintos e relevantes.
-- Reclassificar um lote já existente e confirmar redução de falsos positivos.
+1. `tsgo` limpo.
+2. Correr "Regenerar tudo (apenas IA)" numa subespecialidade pequena e confirmar:
+   - palavras_chave ≥ 10, sinonimos ≥ 5, expressoes ≥ 5, materiais ≥ 3, unidades ≥ 1, capitulos ≥ 1, exemplos ≥ 1.
+3. Confirmar que o dashboard mostra os 8 cartões com `antes → depois` e que a secção "Negativos" desapareceu.
+4. Confirmar que nenhum termo `termo_negativo` ativo continua na base após a migração.
 
-## Sequência de implementação
+## Ficheiros tocados
 
-1. Migração: novos valores de enum + conversão dos atuais negativos.
-2. `knowledge-builder.server.ts`: novos geradores + integração no run.
-3. `engine.ts`: nova sequência de scoring + carregamento dos 6 conjuntos.
-4. UI: `ArtigoConhecimentoTab.tsx` com 6 secções + `KnowledgeRunReport.tsx`.
-5. Hook de aprendizagem em validar/corrigir classificação.
-6. Verificação manual com artigos reais.
+- `supabase/migrations/<timestamp>_deprecate_termo_negativo.sql` (novo)
+- `src/lib/biblioteca-mestra/knowledge-builder.server.ts` (limites, fontes, prompt, derivadores)
+- `src/lib/biblioteca-mestra/types.ts` (remover `termo_negativo` da lista visível, renomear `negativo_incompativel` → "Especialidades Excluídas")
+- `src/routes/_app/biblioteca-mestra.knowledge-builder.tsx` (grelha 8 com antes→depois)
+- `src/components/biblioteca-mestra/KnowledgeRunReport.tsx` (8 secções)
+- `src/components/biblioteca-mestra/ArtigoConhecimentoTab.tsx` (remover legacy, renomear)
 
-Sem alterações a `client.ts`, `auth-middleware.ts` ou ao schema `auth`. Sem novos secrets.
+Sem alterações a `client.ts`, `auth-middleware.ts`, schema `auth`. Sem novos secrets.
