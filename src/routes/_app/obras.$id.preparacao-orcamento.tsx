@@ -47,6 +47,38 @@ export const Route = createFileRoute("/_app/obras/$id/preparacao-orcamento")({
   component: PreparacaoOrcamentoWizard,
 });
 
+async function fetchClassificacaoRows(orcamentoId: string, estadoFilter = "all", search = "") {
+  const out: ClsRow[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    let q = supabase.from("classificacao_artigos").select("*, orcamento_artigos!inner(ordem)")
+      .eq("orcamento_id", orcamentoId)
+      .order("created_at", { ascending: true });
+    if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
+    if (search.trim()) q = q.ilike("descricao_original", `%${search.trim()}%`);
+    const { data, error } = await q.range(from, from + pageSize - 1);
+    if (error) throw error;
+    out.push(...((data ?? []) as ClsRow[]));
+    if (!data || data.length < pageSize) break;
+  }
+  return out.sort((a, b) => {
+    const ao = a.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
+    const bo = b.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
+    if (ao !== bo) return ao - bo;
+    return a.descricao_original.localeCompare(b.descricao_original, "pt-PT");
+  });
+}
+
+async function countClassificacoes(orcamentoId: string) {
+  const estados: EstadoCls[] = ["classificado_auto", "necessita_revisao", "sem_classificacao", "validado"];
+  const counts = await Promise.all([
+    supabase.from("classificacao_artigos").select("id", { count: "exact", head: true }).eq("orcamento_id", orcamentoId),
+    ...estados.map((estado) => supabase.from("classificacao_artigos").select("id", { count: "exact", head: true }).eq("orcamento_id", orcamentoId).eq("estado", estado)),
+  ]);
+  const [total, auto, rever, sem, validados] = counts.map((r) => r.count ?? 0);
+  return { total, auto, rever, sem, validados };
+}
+
 // ----- Tipos de documentação esperados na obra (para o checklist) -----
 const CHECKLIST = [
   { key: "arquitetura", label: "Arquitetura", folders: ["Arquitetura"], tipos: ["projeto"] },
@@ -703,19 +735,25 @@ function Passo2({
 
       // Capítulos
       const caps = parsed.filter((r) => r.isCapitulo);
-      const capIds = new Map<string, string>();
+      const capIds = new Map<number, string>();
       if (caps.length) {
-        const { data: insertedCaps, error: e1 } = await supabase
-          .from("orcamento_capitulos")
-          .insert(caps.map((c) => ({
+        const capPayload = caps.map((c) => {
+          const id = crypto.randomUUID();
+          capIds.set(c.sourceRow, id);
+          return {
+            id,
             orcamento_id: rascunho.id,
             codigo: c.codigo,
             descricao: c.descricao,
             ordem: (c.sourceRow + 1) * 10,
-          })))
-          .select("id, descricao");
+          };
+        });
+        const { data: insertedCaps, error: e1 } = await supabase
+          .from("orcamento_capitulos")
+          .insert(capPayload)
+          .select("id");
         if (e1) throw e1;
-        insertedCaps?.forEach((c) => capIds.set(c.descricao, c.id));
+        if (!insertedCaps?.length) throw new Error("Não foi possível guardar os capítulos do MQT.");
       }
 
       // Artigos (preço deliberadamente zero — esta fase é só estrutura/quantidades)
@@ -723,7 +761,7 @@ function Passo2({
       const payload = parsed
         .map((r, idx) => {
           if (r.isCapitulo) {
-            currentCap = capIds.get(r.descricao) ?? null;
+            currentCap = capIds.get(r.sourceRow) ?? null;
             return null;
           }
           return {
@@ -929,38 +967,14 @@ function Passo4({ rascunho, onAbrirValidacao, onConcluir }: { rascunho: any; onA
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["prep-passo4-rows", orcamentoId, estadoFilter, search],
-    queryFn: async () => {
-      let q = supabase.from("classificacao_artigos").select("*, orcamento_artigos!inner(ordem)")
-        .eq("orcamento_id", orcamentoId)
-        .order("created_at", { ascending: true });
-      if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
-      if (search.trim()) q = q.ilike("descricao_original", `%${search.trim()}%`);
-      const { data, error } = await q.limit(5000);
-      if (error) throw error;
-      return ((data ?? []) as ClsRow[]).sort((a, b) => {
-        const ao = a.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
-        const bo = b.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
-        return ao - bo;
-      });
-    },
+    queryFn: () => fetchClassificacaoRows(orcamentoId, estadoFilter, search),
   });
 
-  const { data: allRows = [] } = useQuery({
+  const { data: stats = { total: 0, validados: 0, auto: 0, rever: 0, sem: 0 } } = useQuery({
     queryKey: ["prep-passo4-stats", orcamentoId],
-    queryFn: async () => {
-      const { data } = await supabase.from("classificacao_artigos").select("estado").eq("orcamento_id", orcamentoId).limit(10000);
-      return (data ?? []) as { estado: EstadoCls }[];
-    },
+    queryFn: () => countClassificacoes(orcamentoId),
     refetchInterval: 8000,
   });
-
-  const stats = useMemo(() => ({
-    total: allRows.length,
-    validados: allRows.filter((x) => x.estado === "validado").length,
-    auto: allRows.filter((x) => x.estado === "classificado_auto").length,
-    rever: allRows.filter((x) => x.estado === "necessita_revisao").length,
-    sem: allRows.filter((x) => x.estado === "sem_classificacao").length,
-  }), [allRows]);
 
   const { data: esps = [] } = useQuery({
     queryKey: ["prep-esps"],

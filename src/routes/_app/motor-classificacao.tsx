@@ -35,6 +35,38 @@ type ClsRow = {
   metodo_match: Metodo; motivo: string | null; candidatos: Candidato[] | null;
 };
 
+async function fetchClassificacaoRows(orcamentoId: string, estadoFilter = "all", search = "") {
+  const out: ClsRow[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    let q = supabase.from("classificacao_artigos").select("*, orcamento_artigos!inner(ordem)")
+      .eq("orcamento_id", orcamentoId)
+      .order("created_at", { ascending: true });
+    if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
+    if (search.trim()) q = q.ilike("descricao_original", `%${search.trim()}%`);
+    const { data, error } = await q.range(from, from + pageSize - 1);
+    if (error) throw error;
+    out.push(...((data ?? []) as ClsRow[]));
+    if (!data || data.length < pageSize) break;
+  }
+  return out.sort((a, b) => {
+    const ao = a.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
+    const bo = b.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
+    if (ao !== bo) return ao - bo;
+    return a.descricao_original.localeCompare(b.descricao_original, "pt-PT");
+  });
+}
+
+async function countClassificacoes(orcamentoId: string) {
+  const estados: EstadoCls[] = ["classificado_auto", "necessita_revisao", "sem_classificacao", "validado"];
+  const counts = await Promise.all([
+    supabase.from("classificacao_artigos").select("id", { count: "exact", head: true }).eq("orcamento_id", orcamentoId),
+    ...estados.map((estado) => supabase.from("classificacao_artigos").select("id", { count: "exact", head: true }).eq("orcamento_id", orcamentoId).eq("estado", estado)),
+  ]);
+  const [total, auto, parcial, sem, validados] = counts.map((r) => r.count ?? 0);
+  return { total, auto, parcial, sem, validados };
+}
+
 const ESTADO_META: Record<EstadoCls, { label: string; cls: string }> = {
   validado: { label: "Validado", cls: "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/40" },
   classificado_auto: { label: "Auto", cls: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/40" },
@@ -96,20 +128,14 @@ function CentroClassificacao() {
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["cc-rows", orcamento, estadoFilter, search],
     enabled: !!orcamento && !!run && run.estado === "concluido",
-    queryFn: async () => {
-      let q = supabase.from("classificacao_artigos").select("*, orcamento_artigos!inner(ordem)")
-        .eq("orcamento_id", orcamento)
-        .order("created_at", { ascending: true });
-      if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
-      if (search.trim()) q = q.ilike("descricao_original", `%${search.trim()}%`);
-      const { data, error } = await q.limit(2000);
-      if (error) throw error;
-      return ((data ?? []) as ClsRow[]).sort((a, b) => {
-        const ao = a.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
-        const bo = b.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
-        return ao - bo;
-      });
-    },
+    queryFn: () => fetchClassificacaoRows(orcamento, estadoFilter, search),
+  });
+
+  const { data: classCounts } = useQuery({
+    queryKey: ["cc-classificacao-counts", orcamento],
+    enabled: !!orcamento && !!run && run.estado === "concluido",
+    queryFn: () => countClassificacoes(orcamento),
+    refetchInterval: 8000,
   });
 
   const { data: memoriaTotal = 0 } = useQuery({
@@ -155,6 +181,7 @@ function CentroClassificacao() {
       toast.success("Classificação concluída");
       qc.invalidateQueries({ queryKey: ["cc-run", orcamento] });
       qc.invalidateQueries({ queryKey: ["cc-rows", orcamento] });
+      qc.invalidateQueries({ queryKey: ["cc-classificacao-counts", orcamento] });
     } catch (e: any) {
       toast.error(e.message ?? "Erro");
     } finally {
@@ -183,6 +210,7 @@ function CentroClassificacao() {
     });
     toast.success("Validado e guardado na memória");
     qc.invalidateQueries({ queryKey: ["cc-rows"] });
+    qc.invalidateQueries({ queryKey: ["cc-classificacao-counts"] });
   };
 
   const remover = async (row: ClsRow) => {
@@ -203,6 +231,7 @@ function CentroClassificacao() {
     });
     toast.success("Classificação removida");
     qc.invalidateQueries({ queryKey: ["cc-rows"] });
+    qc.invalidateQueries({ queryKey: ["cc-classificacao-counts"] });
   };
 
   const atribuir = async (row: ClsRow, artigoMestreId: string) => {
@@ -231,21 +260,22 @@ function CentroClassificacao() {
     });
     toast.success("Artigo Mestre atribuído");
     qc.invalidateQueries({ queryKey: ["cc-rows"] });
+    qc.invalidateQueries({ queryKey: ["cc-classificacao-counts"] });
     setDialogRow(null);
   };
 
   const stats = useMemo(() => {
     if (!run) return null;
     return {
-      total: run.total_artigos as number,
-      auto: (run.auto_exato + run.auto_aprendido) as number,
+      total: classCounts?.total ?? (run.total_artigos as number),
+      auto: classCounts?.auto ?? ((run.auto_exato + run.auto_aprendido) as number),
       auto_exato: run.auto_exato as number,
       auto_aprendido: run.auto_aprendido as number,
-      parcial: run.parcial as number,
-      sem: run.sem_classificacao as number,
-      validados: rows.filter((r) => r.estado === "validado").length,
+      parcial: classCounts?.parcial ?? (run.parcial as number),
+      sem: classCounts?.sem ?? (run.sem_classificacao as number),
+      validados: classCounts?.validados ?? rows.filter((r) => r.estado === "validado").length,
     };
-  }, [run, rows]);
+  }, [classCounts, run, rows]);
 
   return (
     <>
