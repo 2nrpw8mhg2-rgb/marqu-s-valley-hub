@@ -56,6 +56,7 @@ export function detectColumns(rows: any[][]): { headerRowIdx: number; map: Colum
       map.descricao = descIdx;
       const inferred = inferColumnsFromData(rows, i + 1);
       if (inferred) {
+        if (countMeaningful(rows, i + 1, map.descricao) < 3) map.descricao = inferred.map.descricao;
         map.codigo ??= inferred.map.codigo;
         map.unidade ??= inferred.map.unidade;
         map.quantidade ??= inferred.map.quantidade;
@@ -182,6 +183,14 @@ function inferColumnsFromData(rows: any[][], startRow: number): { headerRowIdx: 
     headerRowIdx: Math.max(0, firstDataRow - 1),
     map: { codigo, descricao: desc.idx, unidade, quantidade, preco },
   };
+}
+
+function countMeaningful(rows: any[][], startRow: number, col: number): number {
+  let count = 0;
+  for (let ri = startRow; ri < Math.min(rows.length, startRow + 80); ri++) {
+    if (isMeaningfulDescription(rows[ri]?.[col])) count += 1;
+  }
+  return count;
 }
 
 export function parseRows(rows: any[][], headerRowIdx: number, map: ColumnMap): ParsedRow[] {
