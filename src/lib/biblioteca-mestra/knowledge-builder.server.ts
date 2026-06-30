@@ -42,7 +42,7 @@ const TIPO_MAP = {
   sinonimos: { tipo: "sinonimo", pesoDefault: 10, sign: 1 },
   expressoes: { tipo: "expressao", pesoDefault: 40, sign: 1 },
   materiais: { tipo: "material", pesoDefault: 8, sign: 1 },
-  termos_negativos: { tipo: "termo_negativo", pesoDefault: -30, sign: -1 },
+  termos_negativos: { tipo: "negativo_incompativel", pesoDefault: -60, sign: -1 },
 } as const;
 
 const FONTE_TO_ORIGEM: Record<FonteOrigem, "mapas_quantidades" | "orcamentos_brutos" | "artigos_vizinhos" | "ia"> = {
