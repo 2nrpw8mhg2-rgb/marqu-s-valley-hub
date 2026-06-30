@@ -55,13 +55,14 @@ const sections: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
-    title: "Fase 2 — Orçamentação",
+    title: "Fase 2 — Preparação de Orçamento",
     items: [
-      { to: "/orcamentos", label: "Orçamentos", icon: Calculator },
+      { to: "/orcamentos", label: "Rascunhos Técnicos", icon: Calculator },
       { to: "/decomposicao-precos", label: "Decomposição de Preços", icon: Layers },
       { to: "/biblioteca", label: "Histórico de Preços", icon: History },
     ],
   },
+
   {
     title: "Fase 3 — Procurement",
     items: [
