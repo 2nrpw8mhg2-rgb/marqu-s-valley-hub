@@ -1,62 +1,96 @@
-# Diferenciar termos negativos por Artigo Mestre
+# Biblioteca Mestra como Base de Conhecimento Estruturada
 
-## Causa da repetição (resumo)
+Transformar o atual campo único de "Termos Negativos" em seis secções distintas, cada uma com papel próprio no motor de classificação. Mantém-se a tabela existente `biblioteca_artigo_conhecimento` — apenas se acrescentam novos tipos.
 
-`derivarNegativos` em `src/lib/biblioteca-mestra/knowledge-builder.server.ts` (linhas 283–369) usa um índice global e devolve sempre os top 8 termos mais "exclusivos de outra especialidade". O ranking não depende do artigo — só remove o que já está nas listas positivas/contexto desse artigo. Por isso, todos os artigos da mesma especialidade recebem praticamente os mesmos negativos.
+## 1. Modelo de dados (migração)
 
-## Decisão
+Adicionar valores ao enum `biblioteca_conhecimento_tipo`:
 
-Manter o princípio: **negativos vêm sempre de outras especialidades** (nunca da mesma especialidade nem da subespecialidade vizinha). O que muda é **como se escolhem os negativos dentro desse pool**, para que cada Artigo Mestre receba um conjunto adaptado a si.
+- `negativo_concorrente` — termos da mesma especialidade/subespecialidade que distinguem artigos semelhantes (penalização média).
+- `negativo_incompativel` — termos de outras especialidades (penalização forte / eliminação).
+- `unidade_compativel` — códigos de unidades válidas para o artigo.
+- `capitulo_tipico` — nomes/normalizações de capítulos onde o artigo costuma aparecer.
+- `exemplo_real` — descrições reais validadas (fonte principal de aprendizagem).
 
-## Abordagem
+O tipo legado `termo_negativo` mantém-se para retro-compatibilidade. Migração de dados: converter os atuais `termo_negativo` em `negativo_incompativel` quando o termo pertence a outra especialidade, caso contrário em `negativo_concorrente` (heurística baseada no `IndiceGlobal` já calculado pelo knowledge-builder).
 
-Combinar duas fontes, mantendo o gate de confiança ≥90 %:
+Campo `peso` por defeito por tipo:
+- positivos (palavra_chave/sinonimo/expressao/material): +10 a +40 (como hoje)
+- negativo_concorrente: −15
+- negativo_incompativel: −60
+- unidade_compativel: 0 (gate, não pontua)
+- capitulo_tipico: +5 (bónus contextual)
+- exemplo_real: 0 (usado por similaridade textual)
 
-### 1. Negativos derivados de confundíveis reais (prioridade alta)
+## 2. Geração automática (knowledge-builder.server.ts)
 
-Para cada Artigo Mestre, consultar `classificacao_artigos` / `classificacao_aprendizagem`:
-- procurar descrições reais que **a IA propôs para este artigo** mas que foram corrigidas para um artigo de **outra especialidade**;
-- extrair os tokens dessas descrições rivais que **não aparecem em nenhum artigo da especialidade atual** (filtro inter-especialidade existente);
-- ranquear por frequência de confusão real → estes são os verdadeiros falsos positivos deste artigo.
+Reestruturar a função `derivarNegativos` em três geradores:
 
-Resultado: dois artigos diferentes da mesma especialidade vão ter conjuntos diferentes, porque os erros históricos diferem.
+- **`derivarNegativosConcorrentes(artigo, irmaos, historicoConfusoes)`** — usa os outros artigos da mesma subespecialidade + especialidade. Extrai tokens distintivos desses irmãos e do histórico de classificações em que o utilizador corrigiu para outro artigo da mesma área. Resultado típico: "manual", "rocha", "aterro" quando o artigo é "Escavação Mecânica".
+- **`derivarNegativosIncompativeis(artigo, indiceGlobal)`** — mantém a lógica atual (≥90% exclusividade noutras especialidades) + blocklist `GENERICOS_OBRA` já existente. Resultado: "pintura", "azulejo", "AVAC".
+- **`derivarUnidadesCompativeis(artigo, historico)`** — agrega `unidade` dos artigos classificados como este artigo mestre; mantém as com ≥5% de ocorrências.
+- **`derivarCapitulosTipicos(artigo, historico)`** — agrega `capitulo.titulo` normalizado dos MQs em que o artigo aparece; top-5 por frequência.
+- **`derivarExemplosReais(artigo, historico)`** — guarda até 50 descrições reais validadas (origem: `mapas_quantidades` ou `utilizador`), com deduplicação por `normalizar_descricao`.
 
-### 2. Negativos por proximidade semântica (fallback / complemento)
+A opção "Regenerar tudo (apenas IA)" passa a popular todas as secções; "Adicionar apenas novos" preserva edições manuais.
 
-Quando o histórico for insuficiente (< N classificações reais, ex.: N=5), usar o pool global atual mas **reordenar por proximidade ao artigo**:
-- calcular sobreposição de tokens entre o termo candidato e:
-  - a descrição do Artigo Mestre,
-  - os seus positivos atuais (palavras-chave, sinónimos, materiais),
-  - a descrição da subespecialidade;
-- escolher preferencialmente termos de outras especialidades cujos vizinhos lexicais se assemelhem ao vocabulário deste artigo (típicos confundíveis), em vez dos mais exclusivos em absoluto.
+## 3. Motor de classificação (src/lib/classificacao/engine.ts)
 
-### 3. Gates mantidos
+Nova sequência de scoring por candidato:
 
-- Termo nunca pode vir da mesma especialidade do artigo (filtro já existente).
-- Termo nunca pode estar em positivos/contexto/histórico desse artigo.
-- Confiança automática ≥90 %; abaixo disso, rejeitar em silêncio.
-- Quota máxima continua em 8 negativos.
+```
+1. Gate: capítulo do item ∈ capitulos_tipicos do artigo  → +bónus contextual
+2. Gate: unidade do item ∈ unidades_compativeis           → senão −20
+3. Penalização forte: cada negativo_incompativel presente → −60 (pode eliminar candidato se score < 0)
+4. Similaridade textual com exemplos_reais (trigram/cosine) → 0..+40
+5. Soma positivos (palavra_chave/sinonimo/expressao/material) → como hoje
+6. Penalização de concorrência: cada negativo_concorrente presente → −15
+7. Auto-classifica apenas se margem sobre 2º candidato ≥ X (configurável, default 15 pontos)
+```
 
-## Detalhes técnicos
+A função `pontuarCandidato` recebe agora os 6 conjuntos pré-carregados por artigo (lookup único por run). Manter os logs de auditoria por etapa para o painel de classificação.
 
-Ficheiro a alterar: `src/lib/biblioteca-mestra/knowledge-builder.server.ts`
+## 4. Interface (ArtigoConhecimentoTab.tsx)
 
-1. Adicionar uma nova função `derivarNegativosPorArtigo(artigoId, fontes, idx, historicoConfusoes)`:
-   - assinatura semelhante a `derivarNegativos` mas recebe também o histórico de confusões;
-   - implementa a lógica do ponto 1 acima.
-2. Adaptar `derivarNegativos` para aceitar um vetor de "termos âncora" do artigo (descrição + positivos) e reordenar candidatos por proximidade semântica (ponto 2).
-3. No pipeline principal (perto da linha 1518) substituir a chamada atual por:
-   - se `historicoConfusoes.length >= 5` → usa a nova função;
-   - senão → usa `derivarNegativos` melhorada com âncoras do artigo.
-4. Pré-carregar uma vez por corrida um mapa `artigoId → confusões observadas` lendo `classificacao_artigos` (proposta vs. corrigida) filtrado para corrigida noutra especialidade.
-5. Sem alterações de schema. Sem migrações.
+Substituir as abas atuais por 6 secções acordeão/tabs:
 
-## Modo de aplicação
+- ✅ Palavras-chave Positivas (agrega palavra_chave + sinonimo + expressao + material)
+- ⚠️ Negativos Concorrentes
+- 🚫 Negativos Incompatíveis
+- 📏 Unidades Compatíveis (chips ligados à tabela `biblioteca_unidades`)
+- 📂 Capítulos Típicos
+- 📝 Exemplos Reais (lista; cada exemplo com link para o MQ de origem quando exista)
 
-A correr `Knowledge Builder` em modo **Regenerar tudo (apenas IA)**, os negativos atuais (origem IA) são apagados e regenerados com a nova lógica. Os negativos editados pelo utilizador são preservados.
+Cada secção tem:
+- botão "Adicionar manualmente"
+- botão "Enriquecer com IA" (chama o knowledge-builder restrito àquela secção)
+- toggle ativo/inativo por item, edição inline, eliminação
 
-## Validação após implementação
+Adaptar `KnowledgeRunReport.tsx` para mostrar contadores por secção (6 cartões em vez de 5).
 
-- Comparar dois artigos da mesma especialidade: confirmar que os negativos diferem.
-- Confirmar que nenhum negativo pertence à mesma especialidade do artigo.
-- Verificar logs: rejeições devem mencionar "não tem proximidade ao artigo" ou "ausente do histórico de confusões".
+## 5. Aprendizagem contínua
+
+Quando o utilizador valida ou corrige uma classificação em `classificacao_artigos`:
+- a descrição original é inserida automaticamente como `exemplo_real` no artigo mestre escolhido (se ainda não existir);
+- se for uma correção dentro da mesma especialidade, os tokens distintivos do artigo errado vão para `negativo_concorrente` do artigo correto;
+- se for correção entre especialidades diferentes, tokens do artigo errado vão para `negativo_incompativel`.
+
+Implementado num trigger leve em pg ou, preferencialmente, num server function chamado após `aprovarClassificacao`/`corrigirClassificacao` (mais auditável).
+
+## 6. Validação
+
+- `tsgo` limpo após mudanças de tipo (atualizar `types.ts` da Biblioteca Mestra).
+- Correr "Regenerar tudo (apenas IA)" numa subespecialidade e confirmar que cada artigo tem conteúdo nas 6 secções.
+- Comparar 2 artigos parecidos (ex.: Escavação Manual vs Escavação Mecânica) e confirmar que os negativos_concorrentes são distintos e relevantes.
+- Reclassificar um lote já existente e confirmar redução de falsos positivos.
+
+## Sequência de implementação
+
+1. Migração: novos valores de enum + conversão dos atuais negativos.
+2. `knowledge-builder.server.ts`: novos geradores + integração no run.
+3. `engine.ts`: nova sequência de scoring + carregamento dos 6 conjuntos.
+4. UI: `ArtigoConhecimentoTab.tsx` com 6 secções + `KnowledgeRunReport.tsx`.
+5. Hook de aprendizagem em validar/corrigir classificação.
+6. Verificação manual com artigos reais.
+
+Sem alterações a `client.ts`, `auth-middleware.ts` ou ao schema `auth`. Sem novos secrets.
