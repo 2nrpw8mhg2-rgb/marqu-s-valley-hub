@@ -912,16 +912,136 @@ async function recolherFontes(sb: Sb, artigoId: string): Promise<Fontes> {
       }
     }
   }
+  // ===== Unidade canónica do Artigo Mestre =====
+  let artigoUnidade = "";
+  if (aAny?.unidade_id) {
+    const { data: u } = await sb
+      .from("biblioteca_unidades")
+      .select("codigo, simbolo")
+      .eq("id", aAny.unidade_id)
+      .maybeSingle();
+    artigoUnidade = (u?.simbolo ?? u?.codigo ?? "") as string;
+  }
+  if (!artigoUnidade && aAny?.unidade) artigoUnidade = String(aAny.unidade);
+
+  // ===== Irmãos diretos na mesma CATEGORIA (não só subesp) =====
+  const irmaosCategoria: { codigo: string; descricao: string }[] = [];
+  const categoriaId = (aAny?.categoria_id as string | null) ?? null;
+  if (categoriaId) {
+    const { data: irm } = await sb
+      .from("biblioteca_artigos")
+      .select("codigo, descricao")
+      .eq("categoria_id", categoriaId)
+      .eq("ativo", true)
+      .neq("id", artigoId)
+      .limit(IRMAOS_CATEGORIA_LIMIT);
+    for (const r of irm ?? []) {
+      irmaosCategoria.push({
+        codigo: (r.codigo as string) ?? "",
+        descricao: ((r.descricao as string) ?? "").slice(0, 180),
+      });
+    }
+  }
+
+  // ===== Vocabulário REUTILIZADO em outras fichas da mesma sub/esp =====
+  const espId = (subRel?.especialidade_id as string | null) ?? null;
+  const vocReutilizadoSub: string[] = [];
+  const vocReutilizadoEsp: string[] = [];
+  if (subespecialidadeId) {
+    const { data: irmaosIds } = await sb
+      .from("biblioteca_artigos")
+      .select("id")
+      .eq("subespecialidade_id", subespecialidadeId)
+      .eq("ativo", true)
+      .neq("id", artigoId);
+    const ids = (irmaosIds ?? []).map((r) => r.id as string);
+    if (ids.length) {
+      const { data: voc } = await sb
+        .from("biblioteca_artigo_conhecimento")
+        .select("termo")
+        .in("artigo_mestre_id", ids)
+        .in("tipo", ["palavra_chave", "sinonimo", "expressao", "material"])
+        .eq("ativo", true)
+        .limit(VOC_REUTILIZADO_TOP * 3);
+      const freqSub = new Map<string, number>();
+      for (const r of voc ?? []) {
+        const t = (r.termo as string).trim();
+        if (!t) continue;
+        freqSub.set(t, (freqSub.get(t) ?? 0) + 1);
+      }
+      [...freqSub.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, VOC_REUTILIZADO_TOP)
+        .forEach(([t]) => vocReutilizadoSub.push(t));
+    }
+  }
+  if (espId) {
+    const { data: subsEsp } = await sb
+      .from("biblioteca_subespecialidades")
+      .select("id")
+      .eq("especialidade_id", espId);
+    const subIdsEsp = (subsEsp ?? []).map((s) => s.id as string).filter((id) => id !== subespecialidadeId);
+    if (subIdsEsp.length) {
+      const { data: artsEsp } = await sb
+        .from("biblioteca_artigos")
+        .select("id")
+        .in("subespecialidade_id", subIdsEsp)
+        .eq("ativo", true);
+      const idsEsp = (artsEsp ?? []).map((r) => r.id as string);
+      if (idsEsp.length) {
+        const { data: voc } = await sb
+          .from("biblioteca_artigo_conhecimento")
+          .select("termo")
+          .in("artigo_mestre_id", idsEsp.slice(0, 400))
+          .in("tipo", ["palavra_chave", "expressao", "material"])
+          .eq("ativo", true)
+          .limit(VOC_REUTILIZADO_TOP * 3);
+        const freqEsp = new Map<string, number>();
+        for (const r of voc ?? []) {
+          const t = (r.termo as string).trim();
+          if (!t) continue;
+          freqEsp.set(t, (freqEsp.get(t) ?? 0) + 1);
+        }
+        [...freqEsp.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, VOC_REUTILIZADO_TOP)
+          .forEach(([t]) => vocReutilizadoEsp.push(t));
+      }
+    }
+  }
+
+  // ===== Correções do utilizador =====
+  const correcoes: string[] = [];
+  if (aAny?.codigo) {
+    const { data: corrRaw } = await sb
+      .from("classificacao_aprendizagem")
+      .select("descricao_original")
+      .eq("codigo_artigo", aAny.codigo as string)
+      .limit(CORRECOES_TOP);
+    for (const r of corrRaw ?? []) {
+      const d = ((r as any).descricao_original ?? "").toString().trim();
+      if (d) correcoes.push(d.slice(0, 200));
+    }
+  }
+
+  // ===== Unidades/Capítulos/Exemplos pré-calculados =====
+  const uce = await derivarUnidadesCapitulosExemplos(sb, artigoId);
+  const unidadesPreCalculadas = uce.unidades.map((u) => u.termo);
+  if (!unidadesPreCalculadas.length && artigoUnidade) unidadesPreCalculadas.push(artigoUnidade);
+  const capitulosPreCalculados = uce.capitulos.map((c) => c.termo);
+  const exemplosPreCalculados = uce.exemplos.slice(0, 15).map((e) => e.termo);
 
   return {
     artigo: {
       codigo: aAny?.codigo ?? "",
       descricao: artigoDescricao,
       observacoes: aAny?.observacoes ?? "",
+      unidade: artigoUnidade,
     },
     contexto: { especialidade: especialidadeNome, subespecialidade: subespecialidadeNome, categoria: categoriaNome },
-    especialidadeId: (subRel?.especialidade_id as string | null) ?? null,
+    especialidadeId: espId,
     subespecialidadeId: subespecialidadeId,
+    categoriaId,
 
     historico,
     totalHistorico: mqRaw?.length ?? 0,
@@ -931,6 +1051,13 @@ async function recolherFontes(sb: Sb, artigoId: string): Promise<Fontes> {
     totalCandidatos: brutoMap.size,
     vizinhos,
     vizinhosArtigos: vizinhos.length,
+    irmaosCategoria,
+    vocReutilizadoSub,
+    vocReutilizadoEsp,
+    correcoes,
+    unidadesPreCalculadas,
+    capitulosPreCalculados,
+    exemplosPreCalculados,
     existentes,
     semHistorico: (mqRaw?.length ?? 0) === 0,
   };
