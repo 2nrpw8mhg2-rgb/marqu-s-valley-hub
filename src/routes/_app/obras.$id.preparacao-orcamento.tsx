@@ -134,8 +134,10 @@ function PreparacaoOrcamentoWizard() {
       {passo === 0 && (
         <Passo0
           rows={checklistRows}
+          obraId={obraId}
           onAvancar={() => setPasso(1)}
         />
+
       )}
       {passo === 1 && (
         <Passo1
