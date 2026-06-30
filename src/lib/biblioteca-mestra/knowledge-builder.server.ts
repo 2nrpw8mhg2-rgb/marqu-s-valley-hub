@@ -1215,7 +1215,7 @@ async function callAI(prompt: string): Promise<Generated> {
   const content: string = json?.choices?.[0]?.message?.content ?? "{}";
   const parsed = parseJsonLoose(content);
   const validFontes: FonteOrigem[] = ["historico", "candidatos", "vizinhos", "inferido"];
-  const norm = (arr: any): GeneratedTermo[] =>
+  const normCom = (arr: any, limite: number): GeneratedTermo[] =>
     Array.isArray(arr)
       ? arr
           .map((x) => {
@@ -1227,21 +1227,23 @@ async function callAI(prompt: string): Promise<Generated> {
               termo: String(x?.termo ?? "").trim(),
               peso: Math.round(Number(x?.peso) || 0),
               confianca: Math.max(0, Math.min(100, Math.round(Number(x?.confianca) || 60))),
-              justificacao: x?.justificacao ? String(x.justificacao).trim().slice(0, 200) : undefined,
+              justificacao: x?.justificacao ? String(x.justificacao).trim().slice(0, 240) : undefined,
               fonte,
             };
           })
           .filter((x) => x.termo.length > 0)
-          .slice(0, TIPO_LIMIT)
+          .slice(0, limite)
       : [];
   return {
-    palavras_chave: norm(parsed.palavras_chave),
-    sinonimos: norm(parsed.sinonimos),
-    expressoes: norm(parsed.expressoes),
-    materiais: norm(parsed.materiais),
-    // Negativos NUNCA vêm da IA — são derivados estatisticamente pelo sistema.
+    palavras_chave: normCom(parsed.palavras_chave, LIMITES.palavras_chave),
+    sinonimos: normCom(parsed.sinonimos, LIMITES.sinonimos),
+    expressoes: normCom(parsed.expressoes, LIMITES.expressoes),
+    materiais: normCom(parsed.materiais, LIMITES.materiais),
+    unidades: normCom(parsed.unidades, LIMITES.unidades),
+    capitulos: normCom(parsed.capitulos, LIMITES.capitulos),
+    exemplos: normCom(parsed.exemplos, LIMITES.exemplos),
+    // Negativos NUNCA vêm da IA — são derivados automaticamente pelo sistema.
     termos_negativos: [],
-
   };
 }
 
