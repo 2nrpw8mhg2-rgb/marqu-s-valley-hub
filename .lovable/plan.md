@@ -1,42 +1,62 @@
-## Plano
+# Diferenciar termos negativos por Artigo Mestre
 
-1. **Tratar Demolições como regra especial obrigatória**
-   - Detetar artigos da família Demolições/Estrutura como já acontece hoje.
-   - Para estes artigos, aplicar um filtro mais restritivo antes de qualquer termo negativo ser guardado.
+## Causa da repetição (resumo)
 
-2. **Bloquear materiais, produtos, sistemas e componentes mesmo dentro de frases**
-   - A lista atual só bloqueia quando o termo completo é exatamente igual a um material, por isso deixa passar frases como `argamassa de cimento e areia`.
-   - Vou adicionar uma validação por tokens/expressões para rejeitar negativos que contenham materiais, produtos, elementos ou sistemas construtivos: `argamassa`, `cimento`, `areia`, `junta`, `tijolo`, `cerâmico`, `fibra`, `polipropileno`, `betonilha`, `alvenaria`, `reboco`, `isolamento`, `betão`, etc.
+`derivarNegativos` em `src/lib/biblioteca-mestra/knowledge-builder.server.ts` (linhas 283–369) usa um índice global e devolve sempre os top 8 termos mais "exclusivos de outra especialidade". O ranking não depende do artigo — só remove o que já está nas listas positivas/contexto desse artigo. Por isso, todos os artigos da mesma especialidade recebem praticamente os mesmos negativos.
 
-3. **Extrair só a operação incompatível**
-   - Quando um candidato de Demolições contiver uma ação de construção nova, guardar apenas a ação normalizada:
-     - `fornecimento e assentamento de alvenaria` → `fornecimento e assentamento`
-     - `fornecimento e aplicação de betonilha` → `fornecimento e aplicação`
-     - `execução de reboco` → `execução`
-     - `montagem de ...` → `montagem`
-   - A frase completa com o material deixa de ser persistida.
+## Decisão
 
-4. **Permitir negativos em Demolições apenas se forem operações novas**
-   - Para Demolições, um negativo só passa se corresponder a uma ação incompatível clara: `fornecimento e aplicação`, `fornecimento e assentamento`, `execução`, `construção`, `assentamento`, `montagem`, `instalação`, `aplicação`, `colocação`, `fabrico`, `betonagem`, `regularização`, `acabamento`, `pintura`, `impermeabilização`.
-   - Se não houver uma ação deste tipo, o termo é rejeitado como neutro, mesmo que tenha suporte estatístico noutra especialidade.
+Manter o princípio: **negativos vêm sempre de outras especialidades** (nunca da mesma especialidade nem da subespecialidade vizinha). O que muda é **como se escolhem os negativos dentro desse pool**, para que cada Artigo Mestre receba um conjunto adaptado a si.
 
-5. **Aplicar o mesmo saneamento na limpeza retroativa**
-   - Além de impedir novos erros, a limpeza inicial da run vai apagar negativos antigos de Demolições que sejam materiais/sistemas/frases completas inválidas.
-   - Também vai substituir, quando possível, expressões antigas por ações limpas apenas se respeitarem as regras e não duplicarem termos existentes.
+## Abordagem
 
-6. **Manter a geração por IA fora dos negativos**
-   - A IA continuará proibida de gerar `termos_negativos` diretamente.
-   - A correção será feita no algoritmo determinístico que deriva e valida os negativos antes de gravar.
+Combinar duas fontes, mantendo o gate de confiança ≥90 %:
 
-## Ficheiro a alterar
+### 1. Negativos derivados de confundíveis reais (prioridade alta)
 
-- `src/lib/biblioteca-mestra/knowledge-builder.server.ts`
+Para cada Artigo Mestre, consultar `classificacao_artigos` / `classificacao_aprendizagem`:
+- procurar descrições reais que **a IA propôs para este artigo** mas que foram corrigidas para um artigo de **outra especialidade**;
+- extrair os tokens dessas descrições rivais que **não aparecem em nenhum artigo da especialidade atual** (filtro inter-especialidade existente);
+- ranquear por frequência de confusão real → estes são os verdadeiros falsos positivos deste artigo.
 
-## Validação esperada
+Resultado: dois artigos diferentes da mesma especialidade vão ter conjuntos diferentes, porque os erros históricos diferem.
 
-Depois de executar novamente **Regenerar tudo (apenas IA)** em Demolições Gerais:
+### 2. Negativos por proximidade semântica (fallback / complemento)
 
-- Não devem aparecer negativos como `argamassa de cimento e areia`, `junta horizontal e vertical`, `cimento aluminoso`, `tijolo cerâmico`, `fibra de polipropileno`, `betonilha`, `alvenaria`.
-- Expressões como `fornecimento e assentamento de alvenaria` devem passar apenas como `fornecimento e assentamento`.
-- Expressões como `fornecimento e aplicação de betonilha` devem passar apenas como `fornecimento e aplicação`.
-- Se não houver operação incompatível segura, o sistema deve registar que não encontrou negativos com confiança suficiente.
+Quando o histórico for insuficiente (< N classificações reais, ex.: N=5), usar o pool global atual mas **reordenar por proximidade ao artigo**:
+- calcular sobreposição de tokens entre o termo candidato e:
+  - a descrição do Artigo Mestre,
+  - os seus positivos atuais (palavras-chave, sinónimos, materiais),
+  - a descrição da subespecialidade;
+- escolher preferencialmente termos de outras especialidades cujos vizinhos lexicais se assemelhem ao vocabulário deste artigo (típicos confundíveis), em vez dos mais exclusivos em absoluto.
+
+### 3. Gates mantidos
+
+- Termo nunca pode vir da mesma especialidade do artigo (filtro já existente).
+- Termo nunca pode estar em positivos/contexto/histórico desse artigo.
+- Confiança automática ≥90 %; abaixo disso, rejeitar em silêncio.
+- Quota máxima continua em 8 negativos.
+
+## Detalhes técnicos
+
+Ficheiro a alterar: `src/lib/biblioteca-mestra/knowledge-builder.server.ts`
+
+1. Adicionar uma nova função `derivarNegativosPorArtigo(artigoId, fontes, idx, historicoConfusoes)`:
+   - assinatura semelhante a `derivarNegativos` mas recebe também o histórico de confusões;
+   - implementa a lógica do ponto 1 acima.
+2. Adaptar `derivarNegativos` para aceitar um vetor de "termos âncora" do artigo (descrição + positivos) e reordenar candidatos por proximidade semântica (ponto 2).
+3. No pipeline principal (perto da linha 1518) substituir a chamada atual por:
+   - se `historicoConfusoes.length >= 5` → usa a nova função;
+   - senão → usa `derivarNegativos` melhorada com âncoras do artigo.
+4. Pré-carregar uma vez por corrida um mapa `artigoId → confusões observadas` lendo `classificacao_artigos` (proposta vs. corrigida) filtrado para corrigida noutra especialidade.
+5. Sem alterações de schema. Sem migrações.
+
+## Modo de aplicação
+
+A correr `Knowledge Builder` em modo **Regenerar tudo (apenas IA)**, os negativos atuais (origem IA) são apagados e regenerados com a nova lógica. Os negativos editados pelo utilizador são preservados.
+
+## Validação após implementação
+
+- Comparar dois artigos da mesma especialidade: confirmar que os negativos diferem.
+- Confirmar que nenhum negativo pertence à mesma especialidade do artigo.
+- Verificar logs: rejeições devem mencionar "não tem proximidade ao artigo" ou "ausente do histórico de confusões".
