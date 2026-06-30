@@ -142,7 +142,7 @@ function PreparacaoOrcamentoWizard() {
     return mqDocs.find((d) => d.id === rascunho.mq_documento_id) ?? null;
   }, [rascunho?.mq_documento_id, mqDocs]);
 
-  const origemInvalida = !!rascunho?.mq_documento_id && !mqAtivo && (doc?.docs?.length ?? 0) >= 0 && mqDocs.length >= 0 && doc !== undefined;
+  const origemInvalida = !!rascunho?.mq_documento_id && !!doc && !mqAtivo;
 
   // Se a origem ficou inválida (doc movido/apagado), forçar regresso ao Passo 1.
   useEffect(() => {
