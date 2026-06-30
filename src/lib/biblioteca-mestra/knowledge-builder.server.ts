@@ -1256,7 +1256,9 @@ async function persistir(
 
   const rows: any[] = [];
   const perTipo: Record<string, number> = {
-    palavra_chave: 0, sinonimo: 0, expressao: 0, material: 0, termo_negativo: 0,
+    palavra_chave: 0, sinonimo: 0, expressao: 0, material: 0,
+    negativo_incompativel: 0, negativo_concorrente: 0,
+    unidade_compativel: 0, capitulo_tipico: 0, exemplo_real: 0,
   };
 
   for (const k of Object.keys(TIPO_MAP) as (keyof typeof TIPO_MAP)[]) {
