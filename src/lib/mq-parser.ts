@@ -68,7 +68,7 @@ export function detectColumns(rows: any[][]): { headerRowIdx: number; map: Colum
         }
         map.preco ??= inferred.map.preco;
       }
-      return { headerRowIdx: inferred?.headerRowIdx ?? i, map };
+      return { headerRowIdx: i, map };
     }
   }
   return inferColumnsFromData(rows, 0);
@@ -260,6 +260,7 @@ export function parseRows(rows: any[][], headerRowIdx: number, map: ColumnMap): 
     const preco = map.preco != null ? toNum(r[map.preco]) : 0;
     const normDesc = NORM(descricao);
     if (!unidade && qtd === 0 && /^(total|subtotal|sub total|soma)\b/.test(normDesc)) continue;
+    if (!codigo && !unidade) continue;
 
     // Heurística capítulo: tem código tipo "1", "01", "1.1" sem unidade nem qtd
     const isCapitulo =
