@@ -589,11 +589,24 @@ function palavraChaveTemEvidencia(termoCanon: string, fontes: Fontes): boolean {
   if (textoContemTermo(fontes.artigo.observacoes, termoCanon)) return true;
   if (textoContemTermo(fontes.contexto.subespecialidade, termoCanon)) return true;
   if (textoContemTermo(fontes.contexto.categoria, termoCanon)) return true;
+  if (textoContemTermo(fontes.contexto.especialidade, termoCanon)) return true;
   for (const h of fontes.historico) {
     if (textoContemTermo(h.descricao, termoCanon)) return true;
   }
   for (const c of fontes.candidatos.slice(0, 20)) {
     if (c.score >= 0.35 && textoContemTermo(c.descricao, termoCanon)) return true;
+  }
+  // Evidência por irmãos da categoria e vocabulário já curado na sub/esp.
+  // Sem isto, qualquer termo legitimamente inferido a partir do contexto
+  // da família era descartado, deixando listas anémicas (3-4 palavras).
+  for (const i of fontes.irmaosCategoria ?? []) {
+    if (textoContemTermo(i.descricao, termoCanon)) return true;
+  }
+  for (const v of fontes.vocReutilizadoSub ?? []) {
+    if (textoContemTermo(v, termoCanon)) return true;
+  }
+  for (const v of fontes.vocReutilizadoEsp ?? []) {
+    if (textoContemTermo(v, termoCanon)) return true;
   }
   return false;
 }
@@ -607,14 +620,17 @@ function motivoPalavraChaveFraca(t: GeneratedTermo, fontes: Fontes): string | nu
   if (partes.every((p) => tokenGenerico(p) || PALAVRAS_CHAVE_FRACAS.has(p))) {
     return "todos os componentes são genéricos";
   }
-  if (Number(t.confianca) < 50) return `confiança ${t.confianca}% demasiado baixa`;
+  // Limiares deliberadamente baixos: esta passagem só elimina genéricos e
+  // duplicados, não estrangula o enriquecimento. A confiança é depois usada
+  // pelo motor de classificação para ponderar matches.
+  if (Number(t.confianca) < 40) return `confiança ${t.confianca}% demasiado baixa`;
 
   const temEvidencia = palavraChaveTemEvidencia(c, fontes);
-  if (!temEvidencia && t.fonte === "inferido" && t.confianca < 75) {
-    return "termo inferido sem evidência suficiente nas fontes";
+  if (!temEvidencia && t.fonte === "inferido" && t.confianca < 55) {
+    return "termo inferido sem evidência mínima nas fontes";
   }
-  if (fontes.semHistorico && !temEvidencia && t.confianca < 80) {
-    return "artigo sem histórico: termo sem evidência forte nas fontes";
+  if (fontes.semHistorico && !temEvidencia && t.confianca < 55) {
+    return "artigo sem histórico: termo sem evidência mínima nas fontes";
   }
   return null;
 }
@@ -1794,20 +1810,29 @@ async function derivarIncompatibilidades(
   // 1) IDs das subespecialidades da MESMA especialidade (proibido marcar como excluído)
   const { data: subsMesma } = await sb
     .from("biblioteca_subespecialidades")
-    .select("id")
+    .select("id, nome")
     .eq("especialidade_id", artigoEspId);
   const subIdsMesma = new Set((subsMesma ?? []).map((s) => s.id as string));
 
   // 2) IDs de artigos da MESMA especialidade
   const { data: artsMesma } = await sb
     .from("biblioteca_artigos")
-    .select("id")
+    .select("id, descricao")
     .in("subespecialidade_id", [...subIdsMesma])
     .eq("ativo", true);
   const artigosMesmaEsp = new Set((artsMesma ?? []).map((r) => r.id as string));
 
-  // 3) Termos curados da MESMA especialidade (devem ficar de fora dos excluídos)
+  // 3) Vocabulário central da MESMA especialidade (fica de fora dos excluídos).
+  //    Inclui termos curados E tokens das descrições dos artigos + nomes de subesp.
   const termosMesma = new Set<string>();
+  const addMesma = (s: string) => {
+    for (const tok of tokenize(s)) {
+      const c = lemaSingular(tok);
+      if (c && !tokenGenerico(c)) termosMesma.add(c);
+    }
+  };
+  for (const r of artsMesma ?? []) addMesma((r.descricao as string) ?? "");
+  for (const s of subsMesma ?? []) addMesma((s.nome as string) ?? "");
   if (artigosMesmaEsp.size) {
     const { data } = await sb
       .from("biblioteca_artigo_conhecimento")
@@ -1822,52 +1847,99 @@ async function derivarIncompatibilidades(
     }
   }
 
-  // 4) Termos curados das OUTRAS especialidades
+  // 4) Recolher artigos + esp/subesp das OUTRAS especialidades
+  const { data: outrasEsps } = await sb
+    .from("biblioteca_especialidades")
+    .select("id, nome")
+    .eq("ativa", true)
+    .neq("id", artigoEspId);
+  const nomeEspPorId = new Map<string, string>(
+    (outrasEsps ?? []).map((e) => [e.id as string, (e.nome as string) ?? ""])
+  );
+  if (!nomeEspPorId.size) return [];
+
+  const { data: outrasSubs } = await sb
+    .from("biblioteca_subespecialidades")
+    .select("id, nome, especialidade_id")
+    .in("especialidade_id", [...nomeEspPorId.keys()]);
+  const espPorSub = new Map<string, string>(
+    (outrasSubs ?? []).map((s) => [s.id as string, s.especialidade_id as string])
+  );
+
   const { data: outrosArts } = await sb
     .from("biblioteca_artigos")
-    .select("id, subespecialidade_id, biblioteca_subespecialidades(especialidade_id)")
-    .eq("ativo", true)
-    .limit(8000);
-  const outrosIds: string[] = [];
-  const espPorArtigo = new Map<string, string>();
-  for (const r of (outrosArts ?? []) as any[]) {
-    const espId = r.biblioteca_subespecialidades?.especialidade_id as string | undefined;
-    if (!espId || espId === artigoEspId) continue;
-    outrosIds.push(r.id as string);
-    espPorArtigo.set(r.id as string, espId);
-  }
-  if (!outrosIds.length) return [];
-
-  const { data: termosOutros } = await sb
-    .from("biblioteca_artigo_conhecimento")
-    .select("artigo_mestre_id, termo, tipo")
-    .in("artigo_mestre_id", outrosIds.slice(0, 800))
-    .in("tipo", ["palavra_chave", "expressao", "material"])
+    .select("id, descricao, subespecialidade_id")
+    .in("subespecialidade_id", [...espPorSub.keys()])
     .eq("ativo", true)
     .limit(8000);
 
-  const freq = new Map<string, { count: number; esps: Set<string> }>();
-  for (const r of termosOutros ?? []) {
-    const raw = (r.termo as string).trim().toLowerCase();
-    if (!raw) continue;
-    const c = r.tipo === "expressao" ? raw : lemaSingular(raw);
-    if (!c || tokenGenerico(c)) continue;
-    if (termosMesma.has(c)) continue;
-    if (ancoras.has(c)) continue;
-    const espId = espPorArtigo.get(r.artigo_mestre_id as string) ?? "";
-    const cur = freq.get(c) ?? { count: 0, esps: new Set() };
+  // Frequência por termo canónico em outras especialidades.
+  // FONTE 1 (forte): termos curados de OUTROS artigos.
+  // FONTE 2 (fallback): tokens das descrições + nomes de subesp/esp.
+  const freq = new Map<string, { count: number; esps: Set<string>; curado: boolean }>();
+  const bump = (termoCanon: string, espId: string, curado: boolean) => {
+    if (!termoCanon || tokenGenerico(termoCanon)) return;
+    if (termosMesma.has(termoCanon)) return;
+    if (ancoras.has(termoCanon)) return;
+    const cur = freq.get(termoCanon) ?? { count: 0, esps: new Set<string>(), curado: false };
     cur.count++;
     if (espId) cur.esps.add(espId);
-    freq.set(c, cur);
+    if (curado) cur.curado = true;
+    freq.set(termoCanon, cur);
+  };
+
+  // Fallback estrutural: descrições e nomes (sempre disponíveis, mesmo sem curadoria).
+  for (const r of outrosArts ?? []) {
+    const espId = espPorSub.get(r.subespecialidade_id as string) ?? "";
+    if (!espId) continue;
+    for (const tok of tokenize((r.descricao as string) ?? "")) {
+      bump(lemaSingular(tok), espId, false);
+    }
+  }
+  for (const s of outrasSubs ?? []) {
+    for (const tok of tokenize((s.nome as string) ?? "")) {
+      bump(lemaSingular(tok), s.especialidade_id as string, false);
+    }
+  }
+  for (const [espId, nome] of nomeEspPorId.entries()) {
+    for (const tok of tokenize(nome)) {
+      bump(lemaSingular(tok), espId, false);
+    }
+  }
+
+  // Camada forte: termos curados em OUTROS artigos.
+  const outrosIds = (outrosArts ?? []).map((r) => r.id as string);
+  if (outrosIds.length) {
+    const { data: termosOutros } = await sb
+      .from("biblioteca_artigo_conhecimento")
+      .select("artigo_mestre_id, termo, tipo")
+      .in("artigo_mestre_id", outrosIds.slice(0, 800))
+      .in("tipo", ["palavra_chave", "expressao", "material"])
+      .eq("ativo", true)
+      .limit(8000);
+    const espPorArtigo = new Map<string, string>();
+    for (const r of outrosArts ?? []) {
+      const espId = espPorSub.get(r.subespecialidade_id as string) ?? "";
+      if (espId) espPorArtigo.set(r.id as string, espId);
+    }
+    for (const r of termosOutros ?? []) {
+      const raw = (r.termo as string).trim().toLowerCase();
+      if (!raw) continue;
+      const c = r.tipo === "expressao" ? raw : lemaSingular(raw);
+      const espId = espPorArtigo.get(r.artigo_mestre_id as string) ?? "";
+      bump(c, espId, true);
+    }
   }
 
   return [...freq.entries()]
-    .filter(([, v]) => v.count >= 2)
+    .filter(([, v]) => (v.curado ? v.count >= 1 : v.count >= 3))
     .map(([termo, v]) => ({
       termo,
       peso: -60,
-      confianca: Math.min(95, 60 + v.count * 2),
-      justificacao: `Termo central de ${v.esps.size} outra(s) especialidade(s), ausente desta. Penaliza fortemente candidatos cruzados.`,
+      confianca: Math.min(95, (v.curado ? 70 : 55) + Math.min(20, v.count * 2)),
+      justificacao: v.curado
+        ? `Termo central de ${v.esps.size} outra(s) especialidade(s) (curado), ausente desta.`
+        : `Termo frequente em ${v.esps.size} outra(s) especialidade(s) (descrições), ausente desta.`,
       fonte: "vizinhos" as const,
     }))
     .sort((a, b) => b.confianca - a.confianca)
