@@ -3,12 +3,25 @@ import type { Database } from "@/integrations/supabase/types";
 
 type Sb = SupabaseClient<Database>;
 
-const TIPO_LIMIT = 8;
-const MQ_TOP = 40;
-const CANDIDATOS_TOP = 60;
-const ORC_FETCH_PER_TOKEN = 80;
-const VIZINHOS_LIMIT = 15;
-const VIZINHO_EXEMPLOS = 5;
+// Limites por tipo: guarda final, não cota da IA. Estão deliberadamente
+// generosos para permitir enriquecimento profundo.
+const LIMITES: Record<string, number> = {
+  palavras_chave: 40,
+  sinonimos: 30,
+  expressoes: 30,
+  materiais: 25,
+  unidades: 10,
+  capitulos: 10,
+  exemplos: 50,
+};
+const MQ_TOP = 120;
+const CANDIDATOS_TOP = 150;
+const ORC_FETCH_PER_TOKEN = 200;
+const VIZINHOS_LIMIT = 40;
+const VIZINHO_EXEMPLOS = 12;
+const IRMAOS_CATEGORIA_LIMIT = 25;
+const VOC_REUTILIZADO_TOP = 50;
+const CORRECOES_TOP = 30;
 
 type FonteOrigem = "historico" | "candidatos" | "vizinhos" | "inferido";
 
@@ -24,6 +37,9 @@ type Generated = {
   sinonimos: GeneratedTermo[];
   expressoes: GeneratedTermo[];
   materiais: GeneratedTermo[];
+  unidades: GeneratedTermo[];
+  capitulos: GeneratedTermo[];
+  exemplos: GeneratedTermo[];
   termos_negativos: GeneratedTermo[];
 };
 
@@ -42,7 +58,6 @@ const TIPO_MAP = {
   sinonimos: { tipo: "sinonimo", pesoDefault: 10, sign: 1 },
   expressoes: { tipo: "expressao", pesoDefault: 40, sign: 1 },
   materiais: { tipo: "material", pesoDefault: 8, sign: 1 },
-  termos_negativos: { tipo: "negativo_incompativel", pesoDefault: -60, sign: -1 },
 } as const;
 
 const FONTE_TO_ORIGEM: Record<FonteOrigem, "mapas_quantidades" | "orcamentos_brutos" | "artigos_vizinhos" | "ia"> = {
@@ -640,7 +655,7 @@ function melhorarPalavrasChave(gen: Generated, fontes: Fontes): { removidos: Rem
 
   gen.palavras_chave = palavrasBoas
     .sort((a, b) => (b.confianca - a.confianca) || (Math.abs(b.peso) - Math.abs(a.peso)))
-    .slice(0, TIPO_LIMIT);
+    .slice(0, LIMITES.palavras_chave);
   return { removidos, movidosParaExpressoes };
 }
 
@@ -746,10 +761,11 @@ type CandidatoEntry = { descricao: string; score: number };
 type VizinhoEntry = { codigo: string; descricao: string; exemplos: string[] };
 
 type Fontes = {
-  artigo: { codigo: string; descricao: string; observacoes: string };
+  artigo: { codigo: string; descricao: string; observacoes: string; unidade: string };
   contexto: { especialidade: string; subespecialidade: string; categoria: string };
   especialidadeId: string | null;
   subespecialidadeId: string | null;
+  categoriaId: string | null;
   historico: HistoricoEntry[];
   totalHistorico: number;
   historicoValidados: number;
@@ -758,6 +774,13 @@ type Fontes = {
   totalCandidatos: number;
   vizinhos: VizinhoEntry[];
   vizinhosArtigos: number;
+  irmaosCategoria: { codigo: string; descricao: string }[];
+  vocReutilizadoSub: string[];
+  vocReutilizadoEsp: string[];
+  correcoes: string[];
+  unidadesPreCalculadas: string[];
+  capitulosPreCalculados: string[];
+  exemplosPreCalculados: string[];
   existentes: { tipo: string; termo: string }[];
   semHistorico: boolean;
 };
@@ -889,16 +912,136 @@ async function recolherFontes(sb: Sb, artigoId: string): Promise<Fontes> {
       }
     }
   }
+  // ===== Unidade canónica do Artigo Mestre =====
+  let artigoUnidade = "";
+  if (aAny?.unidade_id) {
+    const { data: u } = await sb
+      .from("biblioteca_unidades")
+      .select("codigo, simbolo")
+      .eq("id", aAny.unidade_id)
+      .maybeSingle();
+    artigoUnidade = (u?.simbolo ?? u?.codigo ?? "") as string;
+  }
+  if (!artigoUnidade && aAny?.unidade) artigoUnidade = String(aAny.unidade);
+
+  // ===== Irmãos diretos na mesma CATEGORIA (não só subesp) =====
+  const irmaosCategoria: { codigo: string; descricao: string }[] = [];
+  const categoriaId = (aAny?.categoria_id as string | null) ?? null;
+  if (categoriaId) {
+    const { data: irm } = await sb
+      .from("biblioteca_artigos")
+      .select("codigo, descricao")
+      .eq("categoria_id", categoriaId)
+      .eq("ativo", true)
+      .neq("id", artigoId)
+      .limit(IRMAOS_CATEGORIA_LIMIT);
+    for (const r of irm ?? []) {
+      irmaosCategoria.push({
+        codigo: (r.codigo as string) ?? "",
+        descricao: ((r.descricao as string) ?? "").slice(0, 180),
+      });
+    }
+  }
+
+  // ===== Vocabulário REUTILIZADO em outras fichas da mesma sub/esp =====
+  const espId = (subRel?.especialidade_id as string | null) ?? null;
+  const vocReutilizadoSub: string[] = [];
+  const vocReutilizadoEsp: string[] = [];
+  if (subespecialidadeId) {
+    const { data: irmaosIds } = await sb
+      .from("biblioteca_artigos")
+      .select("id")
+      .eq("subespecialidade_id", subespecialidadeId)
+      .eq("ativo", true)
+      .neq("id", artigoId);
+    const ids = (irmaosIds ?? []).map((r) => r.id as string);
+    if (ids.length) {
+      const { data: voc } = await sb
+        .from("biblioteca_artigo_conhecimento")
+        .select("termo")
+        .in("artigo_mestre_id", ids)
+        .in("tipo", ["palavra_chave", "sinonimo", "expressao", "material"])
+        .eq("ativo", true)
+        .limit(VOC_REUTILIZADO_TOP * 3);
+      const freqSub = new Map<string, number>();
+      for (const r of voc ?? []) {
+        const t = (r.termo as string).trim();
+        if (!t) continue;
+        freqSub.set(t, (freqSub.get(t) ?? 0) + 1);
+      }
+      [...freqSub.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, VOC_REUTILIZADO_TOP)
+        .forEach(([t]) => vocReutilizadoSub.push(t));
+    }
+  }
+  if (espId) {
+    const { data: subsEsp } = await sb
+      .from("biblioteca_subespecialidades")
+      .select("id")
+      .eq("especialidade_id", espId);
+    const subIdsEsp = (subsEsp ?? []).map((s) => s.id as string).filter((id) => id !== subespecialidadeId);
+    if (subIdsEsp.length) {
+      const { data: artsEsp } = await sb
+        .from("biblioteca_artigos")
+        .select("id")
+        .in("subespecialidade_id", subIdsEsp)
+        .eq("ativo", true);
+      const idsEsp = (artsEsp ?? []).map((r) => r.id as string);
+      if (idsEsp.length) {
+        const { data: voc } = await sb
+          .from("biblioteca_artigo_conhecimento")
+          .select("termo")
+          .in("artigo_mestre_id", idsEsp.slice(0, 400))
+          .in("tipo", ["palavra_chave", "expressao", "material"])
+          .eq("ativo", true)
+          .limit(VOC_REUTILIZADO_TOP * 3);
+        const freqEsp = new Map<string, number>();
+        for (const r of voc ?? []) {
+          const t = (r.termo as string).trim();
+          if (!t) continue;
+          freqEsp.set(t, (freqEsp.get(t) ?? 0) + 1);
+        }
+        [...freqEsp.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, VOC_REUTILIZADO_TOP)
+          .forEach(([t]) => vocReutilizadoEsp.push(t));
+      }
+    }
+  }
+
+  // ===== Correções do utilizador =====
+  const correcoes: string[] = [];
+  if (aAny?.codigo) {
+    const { data: corrRaw } = await sb
+      .from("classificacao_aprendizagem")
+      .select("descricao_original")
+      .eq("codigo_artigo", aAny.codigo as string)
+      .limit(CORRECOES_TOP);
+    for (const r of corrRaw ?? []) {
+      const d = ((r as any).descricao_original ?? "").toString().trim();
+      if (d) correcoes.push(d.slice(0, 200));
+    }
+  }
+
+  // ===== Unidades/Capítulos/Exemplos pré-calculados =====
+  const uce = await derivarUnidadesCapitulosExemplos(sb, artigoId);
+  const unidadesPreCalculadas = uce.unidades.map((u) => u.termo);
+  if (!unidadesPreCalculadas.length && artigoUnidade) unidadesPreCalculadas.push(artigoUnidade);
+  const capitulosPreCalculados = uce.capitulos.map((c) => c.termo);
+  const exemplosPreCalculados = uce.exemplos.slice(0, 15).map((e) => e.termo);
 
   return {
     artigo: {
       codigo: aAny?.codigo ?? "",
       descricao: artigoDescricao,
       observacoes: aAny?.observacoes ?? "",
+      unidade: artigoUnidade,
     },
     contexto: { especialidade: especialidadeNome, subespecialidade: subespecialidadeNome, categoria: categoriaNome },
-    especialidadeId: (subRel?.especialidade_id as string | null) ?? null,
+    especialidadeId: espId,
     subespecialidadeId: subespecialidadeId,
+    categoriaId,
 
     historico,
     totalHistorico: mqRaw?.length ?? 0,
@@ -908,13 +1051,24 @@ async function recolherFontes(sb: Sb, artigoId: string): Promise<Fontes> {
     totalCandidatos: brutoMap.size,
     vizinhos,
     vizinhosArtigos: vizinhos.length,
+    irmaosCategoria,
+    vocReutilizadoSub,
+    vocReutilizadoEsp,
+    correcoes,
+    unidadesPreCalculadas,
+    capitulosPreCalculados,
+    exemplosPreCalculados,
     existentes,
     semHistorico: (mqRaw?.length ?? 0) === 0,
   };
 }
 
 function buildPrompt(fontes: Fontes, modo: Modo) {
-  const { artigo, contexto, historico, candidatos, vizinhos, existentes, semHistorico } = fontes;
+  const {
+    artigo, contexto, historico, candidatos, vizinhos, existentes, semHistorico,
+    irmaosCategoria, vocReutilizadoSub, vocReutilizadoEsp, correcoes,
+    unidadesPreCalculadas, capitulosPreCalculados, exemplosPreCalculados,
+  } = fontes;
 
   const linhasA = historico.length
     ? historico
@@ -935,6 +1089,29 @@ function buildPrompt(fontes: Fontes, modo: Modo) {
         .join("\n")
     : "  (nenhum)";
 
+  const linhasD = irmaosCategoria.length
+    ? irmaosCategoria.map((v) => `  • ${v.codigo} ${v.descricao}`).join("\n")
+    : "  (nenhum)";
+
+  const linhasVocSub = vocReutilizadoSub.length
+    ? vocReutilizadoSub.slice(0, 50).join(" · ")
+    : "(nenhum)";
+  const linhasVocEsp = vocReutilizadoEsp.length
+    ? vocReutilizadoEsp.slice(0, 50).join(" · ")
+    : "(nenhum)";
+  const linhasCorr = correcoes.length
+    ? correcoes.slice(0, 30).map((c) => `  • ${c}`).join("\n")
+    : "  (nenhuma)";
+  const linhasUnid = unidadesPreCalculadas.length
+    ? unidadesPreCalculadas.join(", ")
+    : "(nenhuma observada)";
+  const linhasCap = capitulosPreCalculados.length
+    ? capitulosPreCalculados.map((c) => `  • ${c}`).join("\n")
+    : "  (nenhum)";
+  const linhasEx = exemplosPreCalculados.length
+    ? exemplosPreCalculados.map((c) => `  • ${c}`).join("\n")
+    : "  (nenhum)";
+
   const existentesTxt =
     modo === "novos" && existentes.length
       ? `\nTermos já existentes (NÃO repetir):\n${existentes
@@ -944,18 +1121,25 @@ function buildPrompt(fontes: Fontes, modo: Modo) {
       : "";
 
   const avisoSemHist = semHistorico
-    ? "\n⚠ ATENÇÃO: este artigo NÃO tem histórico validado. Sê conservador: confiança ≤ 65, " +
-      "prioriza FONTE B e usa FONTE C apenas para contexto técnico positivo."
+    ? "\n⚠ Este artigo NÃO tem histórico validado. Mesmo assim, gera enriquecimento profundo: usa a descrição, " +
+      "irmãos da categoria, vocabulário reutilizado na subespecialidade e materiais técnicos plausíveis. Reduz confiança (≤ 70) mas NÃO reduzas a quantidade."
     : "";
 
-  return `És um engenheiro de conhecimento técnico de construção civil em Portugal.
-Constrói a base de conhecimento de UM artigo da Biblioteca Mestra, em português europeu,
-para um motor de classificação de mapas de quantidades.
+  return `És um ENGENHEIRO ORÇAMENTISTA SÉNIOR PORTUGUÊS com décadas de experiência em construção civil.
+Vais ENRIQUECER PROFUNDAMENTE um Artigo Mestre da Biblioteca Mestra, cruzando TODAS as fontes disponíveis,
+como se tivesses passado vários minutos a estudar este artigo, todos os artigos irmãos, milhares de mapas
+de quantidades, o caderno de encargos e o histórico real da aplicação.
+
+REGRA-OURO: quanto mais conhecimento útil, tecnicamente correto e justificável conseguires gerar, melhor.
+NÃO restrinjas artificialmente o número de termos. Listas curtas são FALHA do agente. O objetivo é cobrir
+todas as variantes técnicas, sinónimos, expressões típicas de MQ portugueses, materiais (explícitos e
+implícitos), unidades, capítulos e exemplos plausíveis.
 
 ARTIGO MESTRE
 - Código: ${artigo.codigo}
 - Descrição: ${artigo.descricao}
 - Observações: ${artigo.observacoes || "—"}
+- Unidade canónica do artigo: ${artigo.unidade || "—"}
 
 CONTEXTO ESTRUTURAL
 - Especialidade: ${contexto.especialidade}
@@ -963,73 +1147,99 @@ CONTEXTO ESTRUTURAL
 - Categoria: ${contexto.categoria}
 
 ═════ FONTES ═════
-FONTE A — Histórico classificado para ESTE artigo (peso ALTO, ${historico.length} entradas, ${fontes.totalHistorico} ocorrências totais):
+FONTE A — Histórico classificado (peso ALTO, ${historico.length} entradas, ${fontes.totalHistorico} ocorrências):
 ${linhasA}
 
-FONTE B — Descrições BRUTAS candidatas (peso MÉDIO, top ${candidatos.length} de ${fontes.totalCandidatos} encontradas em orçamentos importados ainda não classificados):
+FONTE B — Descrições BRUTAS candidatas em orçamentos importados (peso MÉDIO, top ${candidatos.length} de ${fontes.totalCandidatos}):
 ${linhasB}
 
 FONTE C — Artigos VIZINHOS na mesma subespecialidade (peso BAIXO, usar p/ diferenciação):
 ${linhasC}
+
+FONTE D — Artigos IRMÃOS da MESMA CATEGORIA (terminologia exata da família):
+${linhasD}
+
+FONTE E — Vocabulário REUTILIZADO em outras fichas da MESMA SUBESPECIALIDADE (já curado pelos utilizadores):
+${linhasVocSub}
+
+FONTE F — Vocabulário REUTILIZADO noutras fichas da MESMA ESPECIALIDADE:
+${linhasVocEsp}
+
+FONTE G — CORREÇÕES feitas por utilizadores (descrições que costumam confundir-se com este artigo):
+${linhasCorr}
+
+FONTE H — Unidades já observadas para este artigo: ${linhasUnid}
+
+FONTE I — Capítulos típicos onde este artigo apareceu:
+${linhasCap}
+
+FONTE J — Exemplos REAIS já validados para este artigo:
+${linhasEx}
 ${existentesTxt}${avisoSemHist}
 
-GERA até ${TIPO_LIMIT} elementos por tipo, em JSON estrito:
+═════ OUTPUT — JSON ESTRITO, SEM MARKDOWN ═════
 {
   "palavras_chave": [{"termo":"...","peso":<5..50>,"confianca":<0..100>,"fonte":"historico|candidatos|vizinhos|inferido","justificacao":"..."}],
   "sinonimos":      [{"termo":"...","peso":<5..30>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
   "expressoes":     [{"termo":"...","peso":<10..60>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
-  "materiais":      [{"termo":"...","peso":<3..20>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}]
+  "materiais":      [{"termo":"...","peso":<3..20>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
+  "unidades":       [{"termo":"m²|m³|m|ml|un|kg|ton|vg|lote|...","peso":0,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
+  "capitulos":      [{"termo":"...","peso":5,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
+  "exemplos":       [{"termo":"frase completa estilo MQ","peso":0,"confianca":<0..100>,"fonte":"...","justificacao":"..."}]
 }
 
-⚠ NÃO GERES termos_negativos. São derivados automaticamente pelo sistema a partir
-de análise estatística inter-especialidades. Qualquer "termos_negativos" no teu output
-será descartado.
+⚠ NÃO geres "termos_negativos" / "negativos". As Especialidades Excluídas e os Negativos Concorrentes
+são calculados automaticamente pelo sistema. Qualquer chave nesse sentido será descartada.
+
+QUOTAS MÍNIMAS (limite superior NÃO é uma instrução):
+- palavras_chave ≥ 10 (idealmente 15-30; cobre singulares, plurais e formas curtas/longas relevantes)
+- sinonimos     ≥ 5  (vocabulário pt-PT equivalente: reboco/estuque/argamassa, demolição/desmontagem/remoção…)
+- expressoes    ≥ 5  (frases típicas: "fornecimento e aplicação", "incluindo transporte", "carga, transporte e vazadouro"…)
+- materiais     ≥ 3  (incluindo implícitos: betão C25/30, aço A500, argamassa M5, EPS, XPS, lã mineral…)
+- unidades      ≥ 1  (se vazio, devolve pelo menos a unidade canónica do artigo: "${artigo.unidade || "un"}")
+- capitulos     ≥ 1  (sugere com base em Especialidade/Subespecialidade/Categoria mesmo que o histórico esteja vazio)
+- exemplos      ≥ 3  (frases reais ou plausíveis ao estilo dos MQ portugueses)
+
+REGRAS DE PALAVRAS-CHAVE
+- 1 a 3 palavras. Se for 4+, vai para "expressoes".
+- NÃO gerar genéricos: fornecimento, aplicação, execução, trabalhos, serviço, obra, material, equipamento, sistema, tipo, diversos, incluindo, necessário, completo, existente, novo.
+- Inclui singulares E plurais relevantes quando ambos forem usados na prática (ex.: "parede", "paredes"; "tubo", "tubos").
+- Peso: 40-50 para termo central recorrente; 25-39 para termo técnico forte; 10-24 para auxiliar.
+
+REGRAS DE EXPRESSÕES
+- Frases de 2 a 6 palavras, técnicas, típicas de MQ. Ex.: "fornecimento e aplicação", "carga, transporte e vazadouro a vazadouro autorizado", "acabamento areado fino", "betonagem por bomba", "incluindo cofragem e escoramento", "pronto a pintar", "fabricado em central".
+
+REGRAS DE MATERIAIS
+- Inclui materiais EXPLÍCITOS na descrição E materiais IMPLÍCITOS típicos da técnica (ex.: para reboco interior incluir cimento, areia, cal hidráulica, rede de fibra; para pavimento cerâmico incluir cimento-cola, betumação, junta).
+- Quando aplicável, especifica classes/grades portuguesas: betão C25/30, aço A500NR, argamassa M5/M10, EPS λ=0.036, lã mineral 40mm.
+
+REGRAS DE UNIDADES
+- Devolve TODAS as unidades plausíveis para este tipo de artigo. Codifica como símbolo curto pt-PT: m², m³, m, ml, un, kg, ton, vg, lote, conjunto, h, dia.
+- Se a unidade canónica do artigo for "${artigo.unidade || "—"}", inclui-a sempre como primeira.
+
+REGRAS DE CAPÍTULOS
+- Sugere o capítulo provável de MQ onde este artigo aparece (ex.: "Movimento de terras", "Estruturas em betão armado", "Revestimentos interiores", "Cobertura", "Águas e esgotos"). NÃO devolves lista vazia.
+
+REGRAS DE EXEMPLOS
+- Frases completas no estilo dos MQ portugueses. Mistura exemplos reais das FONTES com variantes plausíveis que cobrem casos típicos (interior/exterior, diferentes dimensões, com/sem transporte, etc.).
 
 REGRAS DE CONFIANÇA POR FONTE
-- fonte="historico" → 80-95 (95 se aparecer em descrições [validado])
-- fonte="candidatos" → 55-80 (proporcional à similaridade observada)
-- fonte="vizinhos" → 40-60 (usar para discriminar termos próprios deste artigo)
-- fonte="inferido" → 50-70 (terminologia técnica geral relacionada)
-
-REGRAS ESPECÍFICAS PARA PALAVRAS-CHAVE — QUALIDADE ALTA
-- Palavras-chave servem para CLASSIFICAR automaticamente mapas de quantidades. Devem ser poucos termos fortes, técnicos e discriminativos.
-- Cada palavra-chave deve identificar o objecto, técnica, material, sistema ou elemento construtivo central do Artigo Mestre.
-- Preferir termos que apareçam repetidamente na FONTE A ou em candidatos fortes da FONTE B.
-- Uma palavra-chave deve ter 1 a 3 palavras. Se tiver 4+ palavras, coloca-a em "expressoes", não em "palavras_chave".
-- NÃO gerar palavras-chave genéricas: fornecimento, aplicação, execução, trabalhos, serviço, obra, material, materiais, equipamento, sistema, tipo, diversos, incluindo, necessário, completo, existente, novo.
-- NÃO gerar verbos ou frases de medição como palavra-chave: "fornecimento e aplicação", "execução de", "incluindo todos os trabalhos". Isso pertence a "expressoes" apenas se for útil.
-- NÃO repetir palavras óbvias da especialidade se forem demasiado largas e não distinguirem o artigo dentro da subespecialidade.
-- Se não houver evidência suficiente para palavras-chave fortes, gera menos palavras-chave. É preferível devolver 2 boas do que 8 fracas.
-- Peso das palavras-chave:
-  - 40-50: termo central e recorrente no histórico validado;
-  - 25-39: termo técnico forte em candidatos ou histórico automático;
-  - 10-24: termo auxiliar, só se ajudar claramente a classificação.
+- "historico" → 80-95 (95 se for [validado])
+- "candidatos" → 55-80
+- "vizinhos" → 40-65
+- "inferido" → 50-75 (terminologia técnica generalizada)
 
 REGRAS DE IDIOMA — PORTUGUÊS DE PORTUGAL (OBRIGATÓRIO E NÃO NEGOCIÁVEL)
-- Todo o output (termos, sinónimos, expressões, materiais e justificações) DEVE estar em **Português de Portugal (pt-PT)**. Proibido pt-BR, inglês ou mistura.
-- A Biblioteca Mestra é referência de terminologia portuguesa da construção civil (mapas de quantidades, cadernos de encargos, medições). Usa sempre vocabulário praticado em Portugal por engenheiros, arquitetos, medidores e empreiteiros.
-- Normalização OBRIGATÓRIA — nunca gerar a forma pt-BR como termo principal:
-  concreto→betão · concreto armado→betão armado · concretagem→betonagem · concreto magro→betão de limpeza ·
-  laje de concreto→laje de betão · forma (de concreto)→cofragem · escora→escoramento ·
-  tubulação→tubagem · contrapiso→camada de regularização · piso cerâmico→pavimento cerâmico ·
-  rejunte→betumação de juntas · argamassa colante→cimento-cola ·
-  alvenaria de concreto→alvenaria de blocos de betão · bloco de concreto→bloco de betão ·
-  esquadria→caixilharia · forro de gesso→teto falso em gesso cartonado ·
-  chapisco→salpico · emboço→reboco de regularização ·
-  calçada→passeio · meio-fio→lancil · prefeitura→câmara municipal.
-- Termos EXCLUSIVAMENTE brasileiros sem equivalente em Portugal (ex.: "tijolo baiano", "cobogó") NÃO devem ser gerados. Se aparecerem nas fontes, ignora-os silenciosamente e procura terminologia portuguesa equivalente, ou omite.
-- Se um termo aparecer em pt-BR nas FONTES e existir equivalente pt-PT: gera o equivalente pt-PT como termo principal e regista a forma pt-BR como **sinónimo** (peso baixo 5-10, confiança 40-60) para reconhecimento de descrições importadas.
-- Sem anglicismos: "confiança" (não score), "geração/atualização" (não build/update), "conhecimento" (não knowledge), "guardar" (não salvar), "eliminar" (não deletar/excluir).
-- Antes de devolveres o JSON, revê CADA termo: se contiver pt-BR ou inglês, substitui ou remove.
+- Tudo em pt-PT. Proibido pt-BR, inglês ou mistura.
+- Normalização: concreto→betão · concretagem→betonagem · laje de concreto→laje de betão · tubulação→tubagem · contrapiso→camada de regularização · piso cerâmico→pavimento cerâmico · rejunte→betumação · argamassa colante→cimento-cola · esquadria→caixilharia · forro de gesso→teto falso em gesso cartonado · chapisco→salpico · emboço→reboco de regularização · meio-fio→lancil · calçada→passeio · prefeitura→câmara municipal.
+- Termos só-BR sem equivalente (ex.: tijolo baiano, cobogó) → ignora.
+- Sem anglicismos: usa "confiança", "geração", "guardar", "eliminar".
 
-REGRAS
-- Termos técnicos, minúsculas, sem pontuação supérflua, exclusivamente pt-PT.
-- Se um candidato for vago, administrativo ou comum a quase todos os artigos de obra, remove-o.
-- Expressões são frases curtas (2-6 palavras) típicas de MQ portugueses, ex: "fornecimento e aplicação de".
-- Nunca repitas o mesmo termo (mesma raiz/singular/plural) em listas diferentes.
-- "fonte" é OBRIGATÓRIO em cada termo.
-- justificacao = UMA frase curta (máx. 120 caracteres), em pt-PT.
-- NÃO inventes materiais sem evidência nas fontes.
+REGRAS GERAIS
+- Minúsculas, sem pontuação supérflua.
+- Nunca repitas o MESMO termo (mesma raiz singular/plural) em listas diferentes.
+- "fonte" obrigatório.
+- "justificacao" ≤ 160 caracteres, pt-PT.
 - Devolve APENAS o JSON, sem comentários, sem markdown.`;
 }
 
@@ -1129,6 +1339,9 @@ function normalizarGenerated(gen: Generated): NormStats {
   gen.palavras_chave = aplicar(gen.palavras_chave);
   gen.expressoes = aplicar(gen.expressoes);
   gen.materiais = aplicar(gen.materiais);
+  gen.unidades = aplicar(gen.unidades);
+  gen.capitulos = aplicar(gen.capitulos);
+  gen.exemplos = aplicar(gen.exemplos);
   gen.termos_negativos = aplicar(gen.termos_negativos);
   gen.sinonimos = aplicar([...gen.sinonimos, ...sinonimosExtra]);
   return stats;
@@ -1189,7 +1402,7 @@ async function callAI(prompt: string): Promise<Generated> {
         { role: "user", content: prompt },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 4000,
+      max_tokens: 16000,
     }),
   });
   if (!resp.ok) {
@@ -1200,7 +1413,7 @@ async function callAI(prompt: string): Promise<Generated> {
   const content: string = json?.choices?.[0]?.message?.content ?? "{}";
   const parsed = parseJsonLoose(content);
   const validFontes: FonteOrigem[] = ["historico", "candidatos", "vizinhos", "inferido"];
-  const norm = (arr: any): GeneratedTermo[] =>
+  const normCom = (arr: any, limite: number): GeneratedTermo[] =>
     Array.isArray(arr)
       ? arr
           .map((x) => {
@@ -1212,21 +1425,23 @@ async function callAI(prompt: string): Promise<Generated> {
               termo: String(x?.termo ?? "").trim(),
               peso: Math.round(Number(x?.peso) || 0),
               confianca: Math.max(0, Math.min(100, Math.round(Number(x?.confianca) || 60))),
-              justificacao: x?.justificacao ? String(x.justificacao).trim().slice(0, 200) : undefined,
+              justificacao: x?.justificacao ? String(x.justificacao).trim().slice(0, 240) : undefined,
               fonte,
             };
           })
           .filter((x) => x.termo.length > 0)
-          .slice(0, TIPO_LIMIT)
+          .slice(0, limite)
       : [];
   return {
-    palavras_chave: norm(parsed.palavras_chave),
-    sinonimos: norm(parsed.sinonimos),
-    expressoes: norm(parsed.expressoes),
-    materiais: norm(parsed.materiais),
-    // Negativos NUNCA vêm da IA — são derivados estatisticamente pelo sistema.
+    palavras_chave: normCom(parsed.palavras_chave, LIMITES.palavras_chave),
+    sinonimos: normCom(parsed.sinonimos, LIMITES.sinonimos),
+    expressoes: normCom(parsed.expressoes, LIMITES.expressoes),
+    materiais: normCom(parsed.materiais, LIMITES.materiais),
+    unidades: normCom(parsed.unidades, LIMITES.unidades),
+    capitulos: normCom(parsed.capitulos, LIMITES.capitulos),
+    exemplos: normCom(parsed.exemplos, LIMITES.exemplos),
+    // Negativos NUNCA vêm da IA — são derivados automaticamente pelo sistema.
     termos_negativos: [],
-
   };
 }
 
@@ -1388,6 +1603,7 @@ async function snapshotArtigo(sb: Sb, artigoId: string): Promise<AntesSnap> {
 
 type Extras = {
   concorrentes: GeneratedTermo[];
+  incompativeis: GeneratedTermo[];
   unidades: GeneratedTermo[];
   capitulos: GeneratedTermo[];
   exemplos: GeneratedTermo[];
@@ -1565,6 +1781,99 @@ async function derivarUnidadesCapitulosExemplos(
   return { unidades, capitulos, exemplos };
 }
 
+// Especialidades excluídas: termos centrais (palavras-chave/materiais curados)
+// que aparecem APENAS noutras especialidades. Geram penalização forte e podem
+// eliminar candidatos confundíveis entre especialidades distintas.
+async function derivarIncompatibilidades(
+  sb: Sb,
+  artigoEspId: string | null,
+  ancoras: Set<string>
+): Promise<GeneratedTermo[]> {
+  if (!artigoEspId) return [];
+
+  // 1) IDs das subespecialidades da MESMA especialidade (proibido marcar como excluído)
+  const { data: subsMesma } = await sb
+    .from("biblioteca_subespecialidades")
+    .select("id")
+    .eq("especialidade_id", artigoEspId);
+  const subIdsMesma = new Set((subsMesma ?? []).map((s) => s.id as string));
+
+  // 2) IDs de artigos da MESMA especialidade
+  const { data: artsMesma } = await sb
+    .from("biblioteca_artigos")
+    .select("id")
+    .in("subespecialidade_id", [...subIdsMesma])
+    .eq("ativo", true);
+  const artigosMesmaEsp = new Set((artsMesma ?? []).map((r) => r.id as string));
+
+  // 3) Termos curados da MESMA especialidade (devem ficar de fora dos excluídos)
+  const termosMesma = new Set<string>();
+  if (artigosMesmaEsp.size) {
+    const { data } = await sb
+      .from("biblioteca_artigo_conhecimento")
+      .select("termo")
+      .in("artigo_mestre_id", [...artigosMesmaEsp].slice(0, 500))
+      .in("tipo", ["palavra_chave", "expressao", "material", "sinonimo"])
+      .eq("ativo", true)
+      .limit(5000);
+    for (const r of data ?? []) {
+      const c = lemaSingular((r.termo as string).trim().toLowerCase());
+      if (c) termosMesma.add(c);
+    }
+  }
+
+  // 4) Termos curados das OUTRAS especialidades
+  const { data: outrosArts } = await sb
+    .from("biblioteca_artigos")
+    .select("id, subespecialidade_id, biblioteca_subespecialidades(especialidade_id)")
+    .eq("ativo", true)
+    .limit(8000);
+  const outrosIds: string[] = [];
+  const espPorArtigo = new Map<string, string>();
+  for (const r of (outrosArts ?? []) as any[]) {
+    const espId = r.biblioteca_subespecialidades?.especialidade_id as string | undefined;
+    if (!espId || espId === artigoEspId) continue;
+    outrosIds.push(r.id as string);
+    espPorArtigo.set(r.id as string, espId);
+  }
+  if (!outrosIds.length) return [];
+
+  const { data: termosOutros } = await sb
+    .from("biblioteca_artigo_conhecimento")
+    .select("artigo_mestre_id, termo, tipo")
+    .in("artigo_mestre_id", outrosIds.slice(0, 800))
+    .in("tipo", ["palavra_chave", "expressao", "material"])
+    .eq("ativo", true)
+    .limit(8000);
+
+  const freq = new Map<string, { count: number; esps: Set<string> }>();
+  for (const r of termosOutros ?? []) {
+    const raw = (r.termo as string).trim().toLowerCase();
+    if (!raw) continue;
+    const c = r.tipo === "expressao" ? raw : lemaSingular(raw);
+    if (!c || tokenGenerico(c)) continue;
+    if (termosMesma.has(c)) continue;
+    if (ancoras.has(c)) continue;
+    const espId = espPorArtigo.get(r.artigo_mestre_id as string) ?? "";
+    const cur = freq.get(c) ?? { count: 0, esps: new Set() };
+    cur.count++;
+    if (espId) cur.esps.add(espId);
+    freq.set(c, cur);
+  }
+
+  return [...freq.entries()]
+    .filter(([, v]) => v.count >= 2)
+    .map(([termo, v]) => ({
+      termo,
+      peso: -60,
+      confianca: Math.min(95, 60 + v.count * 2),
+      justificacao: `Termo central de ${v.esps.size} outra(s) especialidade(s), ausente desta. Penaliza fortemente candidatos cruzados.`,
+      fonte: "vizinhos" as const,
+    }))
+    .sort((a, b) => b.confianca - a.confianca)
+    .slice(0, 60);
+}
+
 async function gravarExtras(
   sb: Sb,
   artigoId: string,
@@ -1572,9 +1881,10 @@ async function gravarExtras(
   modo: Modo
 ): Promise<Record<string, number>> {
   const perTipo: Record<string, number> = {
-    negativo_concorrente: 0, unidade_compativel: 0, capitulo_tipico: 0, exemplo_real: 0,
+    negativo_concorrente: 0, negativo_incompativel: 0,
+    unidade_compativel: 0, capitulo_tipico: 0, exemplo_real: 0,
   };
-  const tiposNovos = ["negativo_concorrente", "unidade_compativel", "capitulo_tipico", "exemplo_real"];
+  const tiposNovos = ["negativo_concorrente", "negativo_incompativel", "unidade_compativel", "capitulo_tipico", "exemplo_real"];
 
   if (modo === "regenerar") {
     await sb
@@ -1593,7 +1903,7 @@ async function gravarExtras(
   const setExist = new Set((existentes ?? []).map((e) => `${e.tipo}::${(e.termo as string).toLowerCase()}`));
 
   const rows: any[] = [];
-  const push = (tipo: string, t: GeneratedTermo, origem: "mapas_quantidades" | "artigos_vizinhos") => {
+  const push = (tipo: string, t: GeneratedTermo, origem: "mapas_quantidades" | "artigos_vizinhos" | "ia") => {
     if (!t.termo) return;
     const key = `${tipo}::${t.termo.toLowerCase()}`;
     if (setExist.has(key)) return;
@@ -1614,9 +1924,10 @@ async function gravarExtras(
   };
 
   for (const t of extras.concorrentes) push("negativo_concorrente", t, "artigos_vizinhos");
-  for (const t of extras.unidades) push("unidade_compativel", t, "mapas_quantidades");
-  for (const t of extras.capitulos) push("capitulo_tipico", t, "mapas_quantidades");
-  for (const t of extras.exemplos) push("exemplo_real", t, "mapas_quantidades");
+  for (const t of extras.incompativeis) push("negativo_incompativel", t, "artigos_vizinhos");
+  for (const t of extras.unidades) push("unidade_compativel", t, t.fonte === "historico" ? "mapas_quantidades" : "ia");
+  for (const t of extras.capitulos) push("capitulo_tipico", t, t.fonte === "historico" ? "mapas_quantidades" : "ia");
+  for (const t of extras.exemplos) push("exemplo_real", t, t.fonte === "historico" ? "mapas_quantidades" : "ia");
 
   if (rows.length) {
     const { error } = await sb.from("biblioteca_artigo_conhecimento").insert(rows);
@@ -1715,14 +2026,9 @@ export async function processRun(runId: string) {
       await appendLog(sb, runId, `Limpeza falhou (ignorado): ${e?.message ?? e}`);
     }
 
-    // Índice estatístico inter-especialidades (calculado UMA vez por run).
-    await appendLog(sb, runId, "A construir índice estatístico inter-especialidades…");
-    const indice = await construirIndiceGlobal(sb);
-    await appendLog(
-      sb,
-      runId,
-      `Índice: ${indice.termoEspArtigos.size} termos × ${indice.totalPorEsp.size} especialidades`
-    );
+    // (Índice estatístico inter-especialidades descontinuado: as Especialidades
+    // Excluídas e Negativos Concorrentes são agora derivados directamente da
+    // Biblioteca Mestra curada, sem necessidade de pré-índice.)
 
 
     const counts: Record<string, number> = {
@@ -1822,105 +2128,21 @@ export async function processRun(runId: string) {
           }
         }
 
-        // Derivar termos negativos a partir do índice estatístico.
-        if (fontes.especialidadeId) {
-          const vocPositivo = new Set<string>();
-          const addVocPositivo = (s: string) => {
-            for (const c of canonicosComTokens(s)) vocPositivo.add(c);
-          };
-          for (const k of ["palavras_chave", "sinonimos", "expressoes", "materiais"] as const) {
-            for (const t of gen[k]) {
-              addVocPositivo(t.termo);
-            }
-          }
-          // Termos já gravados (modo "novos") também contam como positivos.
-          for (const e of fontes.existentes) {
-            if (e.tipo !== "termo_negativo") {
-              addVocPositivo(e.termo as string);
-            }
-          }
-          // Tokens da descrição do próprio artigo nunca podem virar negativos.
-          addVocPositivo(fontes.artigo.descricao);
-          addVocPositivo(fontes.artigo.observacoes);
-          addVocPositivo(fontes.contexto.especialidade);
-          addVocPositivo(fontes.contexto.subespecialidade);
-          addVocPositivo(fontes.contexto.categoria);
-          // Vocabulário REAL deste artigo mestre (descrições já classificadas).
-          // Se um termo candidato aparece aqui, NÃO pode ser negativo.
-          const vocReais = new Set<string>();
-          const addVocReal = (s: string) => {
-            for (const c of canonicosComTokens(s)) vocReais.add(c);
-          };
-          for (const h of fontes.historico) {
-            addVocReal(h.descricao);
-          }
-          // Âncoras = tokens canónicos que caracterizam este Artigo Mestre.
-          // Usados para preferir negativos confundíveis especificamente com
-          // este artigo (varia entre artigos da mesma especialidade).
-          const ancoras = new Set<string>();
-          const addAncora = (s: string) => {
-            for (const c of canonicosComTokens(s)) ancoras.add(c);
-          };
-          addAncora(fontes.artigo.descricao);
-          addAncora(fontes.artigo.observacoes);
-          addAncora(fontes.contexto.categoria);
-          for (const k of ["palavras_chave", "sinonimos", "expressoes", "materiais"] as const) {
-            for (const t of gen[k]) addAncora(t.termo);
-          }
-          for (const h of fontes.historico) addAncora(h.descricao);
+        // (Os negativos por análise estatística inter-especialidades foram
+        // descontinuados. Passam a existir apenas duas modalidades, geradas
+        // automaticamente mais abaixo: negativo_concorrente — irmãos da mesma
+        // especialidade — e negativo_incompativel — "Especialidades excluídas".)
+        gen.termos_negativos = [];
 
-          const negativosDerivados = derivarNegativos(
-            artigoId,
-            fontes.especialidadeId,
-            vocPositivo,
-            vocReais,
-            indice,
-            ancoras
-          );
-          gen.termos_negativos = negativosDerivados.termos;
-          for (const t of gen.termos_negativos.slice(0, 8)) {
-            await appendLog(sb, runId, `negativo aceite "${t.termo}" (${t.confianca}%): ${t.justificacao ?? "característico de outra especialidade"}`);
-          }
-          for (const r of negativosDerivados.rejeicoes.slice(0, 8)) {
-            await appendLog(sb, runId, `negativo rejeitado "${r.termo}": ${r.motivo}`);
-          }
-          if (gen.termos_negativos.length === 0) {
-            await appendLog(sb, runId, `negativos: não foram encontrados termos com confiança suficiente para ${fontes.artigo.codigo}`);
-          }
-        }
-
-
-        // Validação cruzada: elimina conflitos positivo/negativo e duplicados.
+        // Validação cruzada: remove duplicados entre listas positivas.
         const conflitos = resolverConflitos(gen);
-        if (conflitos.removidosNegativos || conflitos.removidosDup) {
-          await appendLog(
-            sb,
-            runId,
-            `validação: -${conflitos.removidosNegativos} negativos em conflito, -${conflitos.removidosDup} duplicados`
-          );
-        }
-
-        // Validação final antes de guardar: negativos são exceções, não quota.
-        // Se um negativo também for positivo, termo do próprio artigo/contexto
-        // ou vocabulário real já classificado para este artigo, é removido e explicado.
-        const validacaoNegativos = validarTermosNegativosFinais(gen, fontes);
-        if (validacaoNegativos.removidos.length || validacaoNegativos.removidosDup) {
-          await appendLog(
-            sb,
-            runId,
-            `negativos removidos antes de guardar: ${validacaoNegativos.removidos.length} termos, ${validacaoNegativos.removidosDup} duplicados`
-          );
-          for (const r of validacaoNegativos.removidos.slice(0, 12)) {
-            await appendLog(sb, runId, `negativo removido "${r.termo}": ${r.motivo}`);
-          }
-        }
-        if (validacaoNegativos.mensagem) {
-          await appendLog(sb, runId, validacaoNegativos.mensagem);
+        if (conflitos.removidosDup) {
+          await appendLog(sb, runId, `validação: -${conflitos.removidosDup} duplicados removidos`);
         }
 
         const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes);
 
-        // ===== Extras: concorrentes / unidades / capítulos / exemplos =====
+        // ===== Extras: concorrentes / incompatíveis / unidades / capítulos / exemplos =====
         try {
           const ancorasExtras = new Set<string>();
           const addAncoraExtra = (s: string) => {
@@ -1940,15 +2162,39 @@ export async function processRun(runId: string) {
             fontes.subespecialidadeId,
             ancorasExtras
           );
+          const incompativeis = await derivarIncompatibilidades(
+            sb,
+            fontes.especialidadeId,
+            ancorasExtras
+          );
           const uce = await derivarUnidadesCapitulosExemplos(sb, artigoId);
+
+          // Merge IA-generated unidades/capítulos/exemplos com os derivados
+          // do histórico real. Histórico tem precedência; IA preenche os vazios.
+          const mergeUnico = (a: GeneratedTermo[], b: GeneratedTermo[]) => {
+            const seen = new Set(a.map((x) => x.termo.toLowerCase().trim()));
+            const out = [...a];
+            for (const t of b) {
+              const k = t.termo.toLowerCase().trim();
+              if (!k || seen.has(k)) continue;
+              seen.add(k);
+              out.push(t);
+            }
+            return out;
+          };
+          const unidadesFinal = mergeUnico(uce.unidades, gen.unidades);
+          const capitulosFinal = mergeUnico(uce.capitulos, gen.capitulos);
+          const exemplosFinal = mergeUnico(uce.exemplos, gen.exemplos);
+
           const extrasTipos = await gravarExtras(
             sb,
             artigoId,
             {
               concorrentes,
-              unidades: uce.unidades,
-              capitulos: uce.capitulos,
-              exemplos: uce.exemplos,
+              incompativeis,
+              unidades: unidadesFinal,
+              capitulos: capitulosFinal,
+              exemplos: exemplosFinal,
             },
             run.modo as Modo
           );
@@ -1959,7 +2205,7 @@ export async function processRun(runId: string) {
           await appendLog(
             sb,
             runId,
-            `extras: ${extrasTipos.negativo_concorrente} concorrentes · ${extrasTipos.unidade_compativel} unidades · ${extrasTipos.capitulo_tipico} capítulos · ${extrasTipos.exemplo_real} exemplos`
+            `extras: ${extrasTipos.negativo_concorrente} concorrentes · ${extrasTipos.negativo_incompativel} incompatíveis · ${extrasTipos.unidade_compativel} unidades · ${extrasTipos.capitulo_tipico} capítulos · ${extrasTipos.exemplo_real} exemplos`
           );
         } catch (e: any) {
           await appendLog(sb, runId, `extras falhou (ignorado): ${String(e?.message ?? e).slice(0, 200)}`);

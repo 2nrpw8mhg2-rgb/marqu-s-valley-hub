@@ -389,7 +389,7 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
           {/* Antes vs Depois */}
           <section>
             <h3 className="text-sm font-medium mb-2">Totais gerados (antes vs depois)</h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
               {CONHECIMENTO_TIPOS.map((t) => {
                 const p = report.perTipo[t.value] ?? { antes: 0, depois: 0, delta: 0 };
                 return (
