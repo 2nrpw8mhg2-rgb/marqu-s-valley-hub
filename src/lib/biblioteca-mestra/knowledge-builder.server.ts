@@ -42,7 +42,7 @@ const TIPO_MAP = {
   sinonimos: { tipo: "sinonimo", pesoDefault: 10, sign: 1 },
   expressoes: { tipo: "expressao", pesoDefault: 40, sign: 1 },
   materiais: { tipo: "material", pesoDefault: 8, sign: 1 },
-  termos_negativos: { tipo: "termo_negativo", pesoDefault: -30, sign: -1 },
+  termos_negativos: { tipo: "negativo_incompativel", pesoDefault: -60, sign: -1 },
 } as const;
 
 const FONTE_TO_ORIGEM: Record<FonteOrigem, "mapas_quantidades" | "orcamentos_brutos" | "artigos_vizinhos" | "ia"> = {
@@ -725,6 +725,7 @@ type Fontes = {
   artigo: { codigo: string; descricao: string; observacoes: string };
   contexto: { especialidade: string; subespecialidade: string; categoria: string };
   especialidadeId: string | null;
+  subespecialidadeId: string | null;
   historico: HistoricoEntry[];
   totalHistorico: number;
   historicoValidados: number;
@@ -873,6 +874,7 @@ async function recolherFontes(sb: Sb, artigoId: string): Promise<Fontes> {
     },
     contexto: { especialidade: especialidadeNome, subespecialidade: subespecialidadeNome, categoria: categoriaNome },
     especialidadeId: (subRel?.especialidade_id as string | null) ?? null,
+    subespecialidadeId: subespecialidadeId,
 
     historico,
     totalHistorico: mqRaw?.length ?? 0,
@@ -1256,7 +1258,9 @@ async function persistir(
 
   const rows: any[] = [];
   const perTipo: Record<string, number> = {
-    palavra_chave: 0, sinonimo: 0, expressao: 0, material: 0, termo_negativo: 0,
+    palavra_chave: 0, sinonimo: 0, expressao: 0, material: 0,
+    negativo_incompativel: 0, negativo_concorrente: 0,
+    unidade_compativel: 0, capitulo_tipico: 0, exemplo_real: 0,
   };
 
   for (const k of Object.keys(TIPO_MAP) as (keyof typeof TIPO_MAP)[]) {
@@ -1352,6 +1356,252 @@ async function snapshotArtigo(sb: Sb, artigoId: string): Promise<AntesSnap> {
   snap.confiancaGlobal = sp > 0 ? Math.round(spc / sp) : 0;
   return snap;
 }
+
+// ============================================================
+// Derivadores das novas secções de conhecimento
+// (concorrentes, unidades, capítulos, exemplos reais)
+// ============================================================
+
+type Extras = {
+  concorrentes: GeneratedTermo[];
+  unidades: GeneratedTermo[];
+  capitulos: GeneratedTermo[];
+  exemplos: GeneratedTermo[];
+};
+
+// Termos de artigos irmãos da mesma especialidade que ajudam a distinguir
+// este artigo dos seus concorrentes diretos. NÃO eliminam — apenas penalizam
+// candidaturas confundíveis.
+async function derivarConcorrentes(
+  sb: Sb,
+  artigoId: string,
+  artigoEspId: string | null,
+  artigoSubespId: string | null,
+  ancoras: Set<string>
+): Promise<GeneratedTermo[]> {
+  if (!artigoEspId) return [];
+
+  const { data: subs } = await sb
+    .from("biblioteca_subespecialidades")
+    .select("id")
+    .eq("especialidade_id", artigoEspId);
+  const subIds = (subs ?? []).map((s) => s.id as string);
+  if (!subIds.length) return [];
+
+  const { data: irmaos } = await sb
+    .from("biblioteca_artigos")
+    .select("id, descricao, subespecialidade_id")
+    .in("subespecialidade_id", subIds)
+    .eq("ativo", true)
+    .neq("id", artigoId)
+    .limit(1000);
+
+  const freq = new Map<string, { count: number; mesmoSub: number }>();
+  for (const r of irmaos ?? []) {
+    const mesmoSub = r.subespecialidade_id === artigoSubespId;
+    const tokens = new Set<string>();
+    for (const tok of tokenize((r.descricao as string) ?? "")) {
+      const c = lemaSingular(tok);
+      if (!c || tokenGenerico(c)) continue;
+      if (ancoras.has(c)) continue;
+      tokens.add(c);
+    }
+    for (const t of tokens) {
+      const cur = freq.get(t) ?? { count: 0, mesmoSub: 0 };
+      cur.count++;
+      if (mesmoSub) cur.mesmoSub++;
+      freq.set(t, cur);
+    }
+  }
+
+  return [...freq.entries()]
+    .filter(([, v]) => v.count >= 2)
+    .map(([termo, v]) => ({
+      termo,
+      peso: -15,
+      confianca: Math.min(95, 55 + v.count * 3 + v.mesmoSub * 5),
+      justificacao:
+        `Aparece em ${v.count} artigo(s) irmãos da mesma especialidade` +
+        (v.mesmoSub ? ` (${v.mesmoSub} na mesma subespecialidade)` : "") +
+        ` e não em "${[...ancoras].slice(0, 3).join(", ")}".`,
+      fonte: "vizinhos" as const,
+    }))
+    .sort((a, b) => b.confianca - a.confianca)
+    .slice(0, 10);
+}
+
+// Unidades, capítulos e exemplos a partir do histórico real classificado.
+async function derivarUnidadesCapitulosExemplos(
+  sb: Sb,
+  artigoId: string
+): Promise<{ unidades: GeneratedTermo[]; capitulos: GeneratedTermo[]; exemplos: GeneratedTermo[] }> {
+  const { data: cls } = await sb
+    .from("classificacao_artigos")
+    .select("descricao_original, unidade_original, artigo_origem_id, estado")
+    .eq("artigo_mestre_id", artigoId)
+    .in("estado", ["validado", "classificado_auto"])
+    .limit(500);
+
+  const linhas = cls ?? [];
+  if (!linhas.length) return { unidades: [], capitulos: [], exemplos: [] };
+
+  // -------- Unidades --------
+  const unidadeFreq = new Map<string, { count: number; validados: number }>();
+  let totalUnid = 0;
+  for (const r of linhas) {
+    const u = ((r.unidade_original as string) ?? "").trim().toLowerCase();
+    if (!u) continue;
+    totalUnid++;
+    const cur = unidadeFreq.get(u) ?? { count: 0, validados: 0 };
+    cur.count++;
+    if (r.estado === "validado") cur.validados++;
+    unidadeFreq.set(u, cur);
+  }
+  const unidades: GeneratedTermo[] = [...unidadeFreq.entries()]
+    .map(([termo, v]) => ({
+      termo,
+      pct: totalUnid > 0 ? v.count / totalUnid : 0,
+      conf: Math.round(Math.min(99, 60 + v.validados * 3 + v.count * 1.5)),
+      count: v.count,
+    }))
+    .filter((u) => u.pct >= 0.05 || u.count >= 3)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6)
+    .map((u) => ({
+      termo: u.termo,
+      peso: 0,
+      confianca: u.conf,
+      justificacao: `Usada em ${u.count} classificação(ões) reais deste artigo (${Math.round(u.pct * 100)}%).`,
+      fonte: "historico" as const,
+    }));
+
+  // -------- Capítulos --------
+  const orcIds = [...new Set(linhas.map((r) => r.artigo_origem_id as string).filter(Boolean))];
+  let capitulos: GeneratedTermo[] = [];
+  if (orcIds.length) {
+    const { data: orcArts } = await sb
+      .from("orcamento_artigos")
+      .select("id, capitulo_id")
+      .in("id", orcIds);
+    const capIds = [...new Set((orcArts ?? []).map((r) => r.capitulo_id as string).filter(Boolean))];
+    if (capIds.length) {
+      const { data: caps } = await sb
+        .from("orcamento_capitulos")
+        .select("id, descricao")
+        .in("id", capIds);
+      const capById = new Map<string, string>((caps ?? []).map((c) => [c.id as string, (c.descricao as string) ?? ""]));
+      const capFreq = new Map<string, number>();
+      for (const o of orcArts ?? []) {
+        const desc = capById.get(o.capitulo_id as string) ?? "";
+        if (!desc) continue;
+        const k = desc.trim().slice(0, 120);
+        if (!k) continue;
+        capFreq.set(k, (capFreq.get(k) ?? 0) + 1);
+      }
+      capitulos = [...capFreq.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([termo, n]) => ({
+          termo,
+          peso: 5,
+          confianca: Math.min(95, 55 + n * 4),
+          justificacao: `Aparece em ${n} capítulo(s) de orçamento como contexto deste artigo.`,
+          fonte: "historico" as const,
+        }));
+    }
+  }
+
+  // -------- Exemplos reais --------
+  const exMap = new Map<string, { count: number; validado: boolean }>();
+  for (const r of linhas) {
+    const d = ((r.descricao_original as string) ?? "").trim();
+    if (!d || d.length < 8) continue;
+    const key = normalize(d).slice(0, 220);
+    const cur = exMap.get(key) ?? { count: 0, validado: false };
+    cur.count++;
+    if (r.estado === "validado") cur.validado = true;
+    exMap.set(key, cur);
+    // guardar versão original no termo do primeiro encontro
+    if (cur.count === 1) (cur as any).orig = d.slice(0, 240);
+  }
+  const exemplos: GeneratedTermo[] = [...exMap.entries()]
+    .sort((a, b) => (Number(b[1].validado) - Number(a[1].validado)) || (b[1].count - a[1].count))
+    .slice(0, 50)
+    .map(([, v]) => ({
+      termo: ((v as any).orig as string) ?? "",
+      peso: 0,
+      confianca: v.validado ? 95 : 75,
+      justificacao: v.validado
+        ? `Exemplo validado por utilizador (${v.count}x).`
+        : `Exemplo auto-classificado (${v.count}x).`,
+      fonte: "historico" as const,
+    }))
+    .filter((e) => e.termo);
+
+  return { unidades, capitulos, exemplos };
+}
+
+async function gravarExtras(
+  sb: Sb,
+  artigoId: string,
+  extras: Extras,
+  modo: Modo
+): Promise<Record<string, number>> {
+  const perTipo: Record<string, number> = {
+    negativo_concorrente: 0, unidade_compativel: 0, capitulo_tipico: 0, exemplo_real: 0,
+  };
+  const tiposNovos = ["negativo_concorrente", "unidade_compativel", "capitulo_tipico", "exemplo_real"];
+
+  if (modo === "regenerar") {
+    await sb
+      .from("biblioteca_artigo_conhecimento")
+      .delete()
+      .eq("artigo_mestre_id", artigoId)
+      .in("tipo", tiposNovos as any)
+      .in("origem", ["ia", "mapas_quantidades", "orcamentos_brutos", "artigos_vizinhos"]);
+  }
+
+  const { data: existentes } = await sb
+    .from("biblioteca_artigo_conhecimento")
+    .select("tipo, termo")
+    .eq("artigo_mestre_id", artigoId)
+    .in("tipo", tiposNovos as any);
+  const setExist = new Set((existentes ?? []).map((e) => `${e.tipo}::${(e.termo as string).toLowerCase()}`));
+
+  const rows: any[] = [];
+  const push = (tipo: string, t: GeneratedTermo, origem: "mapas_quantidades" | "artigos_vizinhos") => {
+    if (!t.termo) return;
+    const key = `${tipo}::${t.termo.toLowerCase()}`;
+    if (setExist.has(key)) return;
+    setExist.add(key);
+    rows.push({
+      artigo_mestre_id: artigoId,
+      tipo,
+      termo: t.termo,
+      peso: t.peso,
+      confianca: t.confianca,
+      origem,
+      ativo: true,
+      ocorrencias: 0,
+      justificacao: t.justificacao ?? null,
+      exemplos: [],
+    });
+    perTipo[tipo]++;
+  };
+
+  for (const t of extras.concorrentes) push("negativo_concorrente", t, "artigos_vizinhos");
+  for (const t of extras.unidades) push("unidade_compativel", t, "mapas_quantidades");
+  for (const t of extras.capitulos) push("capitulo_tipico", t, "mapas_quantidades");
+  for (const t of extras.exemplos) push("exemplo_real", t, "mapas_quantidades");
+
+  if (rows.length) {
+    const { error } = await sb.from("biblioteca_artigo_conhecimento").insert(rows);
+    if (error) throw error;
+  }
+  return perTipo;
+}
+
+
 
 export async function processRun(runId: string) {
   const sb = admin();
@@ -1452,7 +1702,9 @@ export async function processRun(runId: string) {
 
 
     const counts: Record<string, number> = {
-      palavra_chave: 0, sinonimo: 0, expressao: 0, material: 0, termo_negativo: 0,
+      palavra_chave: 0, sinonimo: 0, expressao: 0, material: 0,
+      negativo_incompativel: 0, negativo_concorrente: 0,
+      unidade_compativel: 0, capitulo_tipico: 0, exemplo_real: 0,
     };
     const fontesAgg = {
       historico_total: 0,
@@ -1643,6 +1895,53 @@ export async function processRun(runId: string) {
         }
 
         const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes);
+
+        // ===== Extras: concorrentes / unidades / capítulos / exemplos =====
+        try {
+          const ancorasExtras = new Set<string>();
+          const addAncoraExtra = (s: string) => {
+            for (const c of canonicosComTokens(s)) ancorasExtras.add(c);
+          };
+          addAncoraExtra(fontes.artigo.descricao);
+          addAncoraExtra(fontes.artigo.observacoes);
+          addAncoraExtra(fontes.contexto.categoria);
+          for (const k of ["palavras_chave", "sinonimos", "expressoes", "materiais"] as const) {
+            for (const t of gen[k]) addAncoraExtra(t.termo);
+          }
+
+          const concorrentes = await derivarConcorrentes(
+            sb,
+            artigoId,
+            fontes.especialidadeId,
+            fontes.subespecialidadeId,
+            ancorasExtras
+          );
+          const uce = await derivarUnidadesCapitulosExemplos(sb, artigoId);
+          const extrasTipos = await gravarExtras(
+            sb,
+            artigoId,
+            {
+              concorrentes,
+              unidades: uce.unidades,
+              capitulos: uce.capitulos,
+              exemplos: uce.exemplos,
+            },
+            run.modo as Modo
+          );
+          for (const k of Object.keys(extrasTipos)) {
+            (res.perTipo as any)[k] = ((res.perTipo as any)[k] ?? 0) + extrasTipos[k];
+            res.inseridos += extrasTipos[k];
+          }
+          await appendLog(
+            sb,
+            runId,
+            `extras: ${extrasTipos.negativo_concorrente} concorrentes · ${extrasTipos.unidade_compativel} unidades · ${extrasTipos.capitulo_tipico} capítulos · ${extrasTipos.exemplo_real} exemplos`
+          );
+        } catch (e: any) {
+          await appendLog(sb, runId, `extras falhou (ignorado): ${String(e?.message ?? e).slice(0, 200)}`);
+        }
+
+
 
 
         // correcoes do utilizador para este artigo

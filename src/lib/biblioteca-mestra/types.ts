@@ -99,7 +99,12 @@ export type ConhecimentoTipo =
   | "sinonimo"
   | "expressao"
   | "material"
-  | "termo_negativo";
+  | "termo_negativo"
+  | "negativo_concorrente"
+  | "negativo_incompativel"
+  | "unidade_compativel"
+  | "capitulo_tipico"
+  | "exemplo_real";
 
 export type ConhecimentoOrigem =
   | "ia"
@@ -209,11 +214,16 @@ export const CONHECIMENTO_TIPOS: {
   pesoDefault: number;
   className: string;
 }[] = [
-  { value: "palavra_chave", label: "Palavra-chave", labelShort: "Palavras-chave", pesoDefault: 30, className: "border-blue-500/40 text-blue-700 dark:text-blue-400" },
+  { value: "palavra_chave", label: "Palavra-chave positiva", labelShort: "Palavras-chave", pesoDefault: 30, className: "border-blue-500/40 text-blue-700 dark:text-blue-400" },
   { value: "sinonimo", label: "Sinónimo", labelShort: "Sinónimos", pesoDefault: 10, className: "border-violet-500/40 text-violet-700 dark:text-violet-400" },
   { value: "expressao", label: "Expressão", labelShort: "Expressões", pesoDefault: 40, className: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" },
   { value: "material", label: "Material", labelShort: "Materiais", pesoDefault: 8, className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
-  { value: "termo_negativo", label: "Termo negativo", labelShort: "Termos negativos", pesoDefault: -30, className: "border-destructive/40 text-destructive" },
+  { value: "negativo_concorrente", label: "Negativo concorrente", labelShort: "⚠️ Concorrentes", pesoDefault: -15, className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
+  { value: "negativo_incompativel", label: "Negativo incompatível", labelShort: "🚫 Incompatíveis", pesoDefault: -60, className: "border-destructive/40 text-destructive" },
+  { value: "unidade_compativel", label: "Unidade compatível", labelShort: "📏 Unidades", pesoDefault: 0, className: "border-cyan-500/40 text-cyan-700 dark:text-cyan-400" },
+  { value: "capitulo_tipico", label: "Capítulo típico", labelShort: "📂 Capítulos", pesoDefault: 5, className: "border-fuchsia-500/40 text-fuchsia-700 dark:text-fuchsia-400" },
+  { value: "exemplo_real", label: "Exemplo real", labelShort: "📝 Exemplos", pesoDefault: 0, className: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" },
+  { value: "termo_negativo", label: "Termo negativo (legacy)", labelShort: "Negativos (legacy)", pesoDefault: -30, className: "border-destructive/40 text-destructive" },
 ];
 
 export const CONHECIMENTO_ORIGENS: {

@@ -122,6 +122,13 @@ type ArtigoBib = {
   trigrams: string[];
 };
 
+type Conhecimento = {
+  negIncompat: Map<string, { termo: string; termo_norm: string; peso: number }[]>;
+  negConcorrente: Map<string, { termo: string; termo_norm: string; peso: number }[]>;
+  unidades: Map<string, Set<string>>;
+  exemplos: Map<string, { termo_norm: string; tokens: Set<string> }[]>;
+};
+
 type Bib = {
   artigos: ArtigoBib[];
   artKw: { artigo_id: string; termo: string; termo_norm: string; tipo: "positiva" | "negativa" }[];
@@ -132,6 +139,7 @@ type Bib = {
   cats: Map<string, { id: string; nome: string; subespecialidade_id: string }>;
   memoria: Map<string, string>;
   docFreq: Map<string, number>; // token -> nº de artigos mestres que o contêm
+  conhec: Conhecimento;
 };
 
 // ---- Unidades ------------------------------------------------------------
@@ -173,7 +181,7 @@ function ngrams(tokens: string[], n: number): string[] {
 // ---- Carregamento --------------------------------------------------------
 
 async function loadBib(): Promise<Bib> {
-  const [{ data: arts }, { data: artKw }, { data: subKw }, { data: espKw }, { data: subs }, { data: esps }, { data: cats }, { data: mem }] = await Promise.all([
+  const [{ data: arts }, { data: artKw }, { data: subKw }, { data: espKw }, { data: subs }, { data: esps }, { data: cats }, { data: mem }, { data: conhecRaw }] = await Promise.all([
     supabase.from("biblioteca_artigos").select("id, descricao, unidade, subespecialidade_id, categoria_id").eq("ativo", true),
     supabase.from("biblioteca_artigo_keywords").select("artigo_id, termo, tipo"),
     supabase.from("biblioteca_subespecialidade_keywords").select("subespecialidade_id, termo, tipo, peso").eq("ativo", true),
@@ -182,6 +190,7 @@ async function loadBib(): Promise<Bib> {
     supabase.from("biblioteca_especialidades").select("id, nome"),
     supabase.from("biblioteca_categorias").select("id, nome, subespecialidade_id"),
     supabase.from("classificacao_memoria").select("descricao_normalizada, artigo_mestre_id"),
+    supabase.from("biblioteca_artigo_conhecimento").select("artigo_mestre_id, tipo, termo, peso").eq("ativo", true).in("tipo", ["negativo_incompativel", "negativo_concorrente", "termo_negativo", "unidade_compativel", "exemplo_real"]),
   ]);
 
   const artigos: ArtigoBib[] = (arts ?? []).map((a: any) => {
@@ -208,6 +217,36 @@ async function loadBib(): Promise<Bib> {
     for (const t of a.token_set) docFreq.set(t, (docFreq.get(t) ?? 0) + 1);
   }
 
+  const conhec: Conhecimento = {
+    negIncompat: new Map(),
+    negConcorrente: new Map(),
+    unidades: new Map(),
+    exemplos: new Map(),
+  };
+  for (const r of (conhecRaw ?? []) as any[]) {
+    const aid = r.artigo_mestre_id as string;
+    const termo = (r.termo as string) ?? "";
+    if (!termo) continue;
+    if (r.tipo === "negativo_incompativel" || r.tipo === "termo_negativo") {
+      const arr = conhec.negIncompat.get(aid) ?? [];
+      arr.push({ termo, termo_norm: normalizar(termo), peso: Number(r.peso) || -60 });
+      conhec.negIncompat.set(aid, arr);
+    } else if (r.tipo === "negativo_concorrente") {
+      const arr = conhec.negConcorrente.get(aid) ?? [];
+      arr.push({ termo, termo_norm: normalizar(termo), peso: Number(r.peso) || -15 });
+      conhec.negConcorrente.set(aid, arr);
+    } else if (r.tipo === "unidade_compativel") {
+      const set = conhec.unidades.get(aid) ?? new Set<string>();
+      set.add(normalizarUnidade(termo));
+      conhec.unidades.set(aid, set);
+    } else if (r.tipo === "exemplo_real") {
+      const arr = conhec.exemplos.get(aid) ?? [];
+      const n = normalizar(termo);
+      arr.push({ termo_norm: n, tokens: new Set(tokenize(termo)) });
+      conhec.exemplos.set(aid, arr);
+    }
+  }
+
   return {
     artigos,
     artKw: (artKw ?? []).map((k: any) => ({ ...k, termo_norm: normalizar(k.termo) })),
@@ -218,6 +257,7 @@ async function loadBib(): Promise<Bib> {
     cats: new Map((cats ?? []).map((c: any) => [c.id, c])),
     memoria: new Map((mem ?? []).map((m: any) => [m.descricao_normalizada, m.artigo_mestre_id])),
     docFreq,
+    conhec,
   };
 }
 
@@ -289,8 +329,16 @@ function scoreCandidato(
   }
   bonusR = Math.min(bonusR, PESOS_CLASSIFICACAO.TOKEN_RARO_CAP);
 
-  // 4) Unidade
-  const unidadeCompat = compararUnidades(unidadeOrigem, art.unidade_norm);
+  // 4) Unidade — combina compatibilidade da unidade do artigo mestre
+  //    com a lista alargada "unidade_compativel" do conhecimento estruturado.
+  const unidadesCompat = bib.conhec.unidades.get(art.id);
+  let unidadeCompat = compararUnidades(unidadeOrigem, art.unidade_norm);
+  if (unidadeCompat !== 1 && unidadesCompat && unidadeOrigem && unidadesCompat.has(unidadeOrigem)) {
+    unidadeCompat = 1;
+  }
+  if (unidadeCompat !== 1 && unidadesCompat && unidadeOrigem && unidadesCompat.size > 0 && !unidadesCompat.has(unidadeOrigem)) {
+    unidadeCompat = -1;
+  }
   const bonusU = unidadeCompat === 1 ? PESOS_CLASSIFICACAO.UNIDADE_OK
                : unidadeCompat === -1 ? PESOS_CLASSIFICACAO.UNIDADE_BAD
                : 0;
@@ -299,16 +347,58 @@ function scoreCandidato(
   const bonusArtKw = artHitsForArt.reduce((s, h) => s + h.pontos, 0);
   const penalArtKw = artNegsForArt.reduce((s, h) => s + h.pontos, 0);
 
+  // 5b) Conhecimento estruturado: negativos incompatíveis e concorrentes
+  let penalIncompat = 0;
+  const incompatHits: KeywordHit[] = [];
+  for (const n of bib.conhec.negIncompat.get(art.id) ?? []) {
+    if (termMatches(origemNorm, origemTokenSet, n.termo_norm)) {
+      penalIncompat += n.peso < 0 ? n.peso : -Math.abs(n.peso);
+      incompatHits.push({
+        termo: n.termo, nivel: "artigo", entidade_id: art.id, entidade_nome: art.descricao,
+        peso: 1, pontos: n.peso < 0 ? n.peso : -Math.abs(n.peso),
+      });
+    }
+  }
+  let penalConcor = 0;
+  const concorHits: KeywordHit[] = [];
+  for (const n of bib.conhec.negConcorrente.get(art.id) ?? []) {
+    if (termMatches(origemNorm, origemTokenSet, n.termo_norm)) {
+      penalConcor += n.peso < 0 ? n.peso : -Math.abs(n.peso);
+      concorHits.push({
+        termo: n.termo, nivel: "artigo", entidade_id: art.id, entidade_nome: art.descricao,
+        peso: 1, pontos: n.peso < 0 ? n.peso : -Math.abs(n.peso),
+      });
+    }
+  }
+
+  // 5c) Exemplos reais — similaridade textual (Jaccard nos tokens)
+  let bonusExemplos = 0;
+  const exemplos = bib.conhec.exemplos.get(art.id) ?? [];
+  if (exemplos.length && origemTokenSet.size) {
+    let melhor = 0;
+    for (const ex of exemplos) {
+      if (!ex.tokens.size) continue;
+      let inter = 0;
+      for (const t of ex.tokens) if (origemTokenSet.has(t)) inter++;
+      const uni = ex.tokens.size + origemTokenSet.size - inter;
+      const sim = uni > 0 ? inter / uni : 0;
+      if (sim > melhor) melhor = sim;
+    }
+    bonusExemplos = Math.round(melhor * 40);
+  }
+
   // 6) Filtro de elegibilidade conservador
   const temArtKeywordPositiva = artHitsForArt.length > 0;
   const elegivel =
     temArtKeywordPositiva ||
     score_texto >= PESOS_CLASSIFICACAO.MIN_TEXTO ||
-    (score_texto >= PESOS_CLASSIFICACAO.MIN_TEXTO_UNIDADE && unidadeCompat === 1);
+    (score_texto >= PESOS_CLASSIFICACAO.MIN_TEXTO_UNIDADE && unidadeCompat === 1) ||
+    bonusExemplos >= 25;
   if (!elegivel) return null;
 
   const score_final =
     score_texto + bonusN + bonusR + espHitsCap + subespHitsCap + bonusU + bonusArtKw + penalArtKw +
+    penalIncompat + penalConcor + bonusExemplos +
     espNegs.reduce((s, h) => s + h.pontos, 0) +
     subespNegs.reduce((s, h) => s + h.pontos, 0);
 
@@ -325,13 +415,20 @@ function scoreCandidato(
     });
   }
   hits.push(...artHitsForArt);
+  if (bonusExemplos > 0) {
+    hits.push({
+      termo: `exemplo real similar (${bonusExemplos} pts)`,
+      nivel: "artigo", entidade_id: art.id, entidade_nome: art.descricao,
+      peso: 1, pontos: bonusExemplos,
+    });
+  }
 
   return {
     art,
     score_texto,
     score_final,
     hits,
-    negs: [...artNegsForArt],
+    negs: [...artNegsForArt, ...incompatHits, ...concorHits],
     unidadeCompat,
     tokensPartilhados: partilhados,
   };
