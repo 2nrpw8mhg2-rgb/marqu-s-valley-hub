@@ -455,14 +455,21 @@ function Passo1({
     return (
       <Card className="p-8 text-center space-y-3">
         <FileSpreadsheet className="h-10 w-10 mx-auto text-muted-foreground/60" />
-        <h3 className="font-semibold">Sem MQT na Gestão Documental</h3>
+        <h3 className="font-semibold">
+          {pastaExiste ? "Pasta «Mapa de Quantidades» vazia" : "Pasta «Mapa de Quantidades» não existe"}
+        </h3>
         <p className="text-sm text-muted-foreground">
-          Adiciona o Mapa de Quantidades à pasta «Mapa de Quantidades» (ou marca-o como tipo «MQ») no separador Documentos
-          desta obra. Esta fase não permite uploads diretos.
+          {pastaExiste
+            ? "A pasta «Mapa de Quantidades» desta obra está vazia. Adiciona o ficheiro MQT na Gestão Documental."
+            : "Cria a pasta «Mapa de Quantidades» na Gestão Documental desta obra e coloca lá o ficheiro MQT."}
         </p>
+        <Button asChild variant="outline" size="sm">
+          <a href={`/obras/${obraId}/documentos`}>Abrir Documentos da obra</a>
+        </Button>
       </Card>
     );
   }
+
 
   return (
     <Card className="p-6 space-y-5">
