@@ -1,0 +1,1 @@
+UPDATE public.biblioteca_artigo_conhecimento SET ativo = false WHERE tipo = 'termo_negativo';
