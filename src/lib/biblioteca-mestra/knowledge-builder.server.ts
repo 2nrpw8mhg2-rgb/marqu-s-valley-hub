@@ -82,6 +82,13 @@ const GENERICOS_OBRA = new Set([
   "novas", "existente", "existentes", "incluido", "incluidos", "incluindo",
   "necessario", "necessaria", "respetivo", "respetiva", "respetivos",
   "respetivas", "completo", "completa", "completos", "completas",
+  // Vocabulário transversal a várias especialidades de construção: nunca
+  // discrimina entre especialidades, por isso não pode virar termo negativo.
+  "civil", "construcao", "construcoes", "construir", "edificio", "edificios",
+  "edificacao", "edificacoes", "exterior", "exteriores", "interior", "interiores",
+  "arranjo", "arranjos", "residuo", "residuos", "entulho", "entulhos",
+  "movimento", "movimentos", "contencao", "contencoes", "jardim", "jardins",
+
 ]);
 
 function tokenGenerico(c: string): boolean {
