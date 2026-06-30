@@ -761,10 +761,11 @@ type CandidatoEntry = { descricao: string; score: number };
 type VizinhoEntry = { codigo: string; descricao: string; exemplos: string[] };
 
 type Fontes = {
-  artigo: { codigo: string; descricao: string; observacoes: string };
+  artigo: { codigo: string; descricao: string; observacoes: string; unidade: string };
   contexto: { especialidade: string; subespecialidade: string; categoria: string };
   especialidadeId: string | null;
   subespecialidadeId: string | null;
+  categoriaId: string | null;
   historico: HistoricoEntry[];
   totalHistorico: number;
   historicoValidados: number;
@@ -773,6 +774,13 @@ type Fontes = {
   totalCandidatos: number;
   vizinhos: VizinhoEntry[];
   vizinhosArtigos: number;
+  irmaosCategoria: { codigo: string; descricao: string }[];
+  vocReutilizadoSub: string[];
+  vocReutilizadoEsp: string[];
+  correcoes: string[];
+  unidadesPreCalculadas: string[];
+  capitulosPreCalculados: string[];
+  exemplosPreCalculados: string[];
   existentes: { tipo: string; termo: string }[];
   semHistorico: boolean;
 };
