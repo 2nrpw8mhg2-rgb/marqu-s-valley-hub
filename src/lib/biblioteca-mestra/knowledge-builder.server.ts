@@ -725,6 +725,7 @@ type Fontes = {
   artigo: { codigo: string; descricao: string; observacoes: string };
   contexto: { especialidade: string; subespecialidade: string; categoria: string };
   especialidadeId: string | null;
+  subespecialidadeId: string | null;
   historico: HistoricoEntry[];
   totalHistorico: number;
   historicoValidados: number;
