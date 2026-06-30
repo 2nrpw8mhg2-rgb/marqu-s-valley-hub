@@ -2037,100 +2037,16 @@ export async function processRun(runId: string) {
           }
         }
 
-        // Derivar termos negativos a partir do índice estatístico.
-        if (fontes.especialidadeId) {
-          const vocPositivo = new Set<string>();
-          const addVocPositivo = (s: string) => {
-            for (const c of canonicosComTokens(s)) vocPositivo.add(c);
-          };
-          for (const k of ["palavras_chave", "sinonimos", "expressoes", "materiais"] as const) {
-            for (const t of gen[k]) {
-              addVocPositivo(t.termo);
-            }
-          }
-          // Termos já gravados (modo "novos") também contam como positivos.
-          for (const e of fontes.existentes) {
-            if (e.tipo !== "termo_negativo") {
-              addVocPositivo(e.termo as string);
-            }
-          }
-          // Tokens da descrição do próprio artigo nunca podem virar negativos.
-          addVocPositivo(fontes.artigo.descricao);
-          addVocPositivo(fontes.artigo.observacoes);
-          addVocPositivo(fontes.contexto.especialidade);
-          addVocPositivo(fontes.contexto.subespecialidade);
-          addVocPositivo(fontes.contexto.categoria);
-          // Vocabulário REAL deste artigo mestre (descrições já classificadas).
-          // Se um termo candidato aparece aqui, NÃO pode ser negativo.
-          const vocReais = new Set<string>();
-          const addVocReal = (s: string) => {
-            for (const c of canonicosComTokens(s)) vocReais.add(c);
-          };
-          for (const h of fontes.historico) {
-            addVocReal(h.descricao);
-          }
-          // Âncoras = tokens canónicos que caracterizam este Artigo Mestre.
-          // Usados para preferir negativos confundíveis especificamente com
-          // este artigo (varia entre artigos da mesma especialidade).
-          const ancoras = new Set<string>();
-          const addAncora = (s: string) => {
-            for (const c of canonicosComTokens(s)) ancoras.add(c);
-          };
-          addAncora(fontes.artigo.descricao);
-          addAncora(fontes.artigo.observacoes);
-          addAncora(fontes.contexto.categoria);
-          for (const k of ["palavras_chave", "sinonimos", "expressoes", "materiais"] as const) {
-            for (const t of gen[k]) addAncora(t.termo);
-          }
-          for (const h of fontes.historico) addAncora(h.descricao);
+        // (Os negativos por análise estatística inter-especialidades foram
+        // descontinuados. Passam a existir apenas duas modalidades, geradas
+        // automaticamente mais abaixo: negativo_concorrente — irmãos da mesma
+        // especialidade — e negativo_incompativel — "Especialidades excluídas".)
+        gen.termos_negativos = [];
 
-          const negativosDerivados = derivarNegativos(
-            artigoId,
-            fontes.especialidadeId,
-            vocPositivo,
-            vocReais,
-            indice,
-            ancoras
-          );
-          gen.termos_negativos = negativosDerivados.termos;
-          for (const t of gen.termos_negativos.slice(0, 8)) {
-            await appendLog(sb, runId, `negativo aceite "${t.termo}" (${t.confianca}%): ${t.justificacao ?? "característico de outra especialidade"}`);
-          }
-          for (const r of negativosDerivados.rejeicoes.slice(0, 8)) {
-            await appendLog(sb, runId, `negativo rejeitado "${r.termo}": ${r.motivo}`);
-          }
-          if (gen.termos_negativos.length === 0) {
-            await appendLog(sb, runId, `negativos: não foram encontrados termos com confiança suficiente para ${fontes.artigo.codigo}`);
-          }
-        }
-
-
-        // Validação cruzada: elimina conflitos positivo/negativo e duplicados.
+        // Validação cruzada: remove duplicados entre listas positivas.
         const conflitos = resolverConflitos(gen);
-        if (conflitos.removidosNegativos || conflitos.removidosDup) {
-          await appendLog(
-            sb,
-            runId,
-            `validação: -${conflitos.removidosNegativos} negativos em conflito, -${conflitos.removidosDup} duplicados`
-          );
-        }
-
-        // Validação final antes de guardar: negativos são exceções, não quota.
-        // Se um negativo também for positivo, termo do próprio artigo/contexto
-        // ou vocabulário real já classificado para este artigo, é removido e explicado.
-        const validacaoNegativos = validarTermosNegativosFinais(gen, fontes);
-        if (validacaoNegativos.removidos.length || validacaoNegativos.removidosDup) {
-          await appendLog(
-            sb,
-            runId,
-            `negativos removidos antes de guardar: ${validacaoNegativos.removidos.length} termos, ${validacaoNegativos.removidosDup} duplicados`
-          );
-          for (const r of validacaoNegativos.removidos.slice(0, 12)) {
-            await appendLog(sb, runId, `negativo removido "${r.termo}": ${r.motivo}`);
-          }
-        }
-        if (validacaoNegativos.mensagem) {
-          await appendLog(sb, runId, validacaoNegativos.mensagem);
+        if (conflitos.removidosDup) {
+          await appendLog(sb, runId, `validação: -${conflitos.removidosDup} duplicados removidos`);
         }
 
         const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes);
