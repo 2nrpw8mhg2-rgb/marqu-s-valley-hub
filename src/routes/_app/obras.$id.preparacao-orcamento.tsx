@@ -88,17 +88,18 @@ function PreparacaoOrcamentoWizard() {
 
   const checklistRows = useMemo(() => {
     const pastas = (doc?.pastas ?? []) as { id: string; nome: string; parent_id: string | null }[];
-    const docs = (doc?.docs ?? []) as { id: string; nome: string; tipo: string; pasta_id: string | null }[];
+    const docs = (doc?.docs ?? []) as { id: string; nome: string; tipo: string; pasta_id: string | null; created_at: string; tamanho: number | null }[];
     return CHECKLIST.map((c) => {
       const pastaIds: string[] = pastas
         .filter((p) => c.folders.some((f) => p.nome?.toLowerCase() === f.toLowerCase()))
         .map((p) => p.id);
-      const matched = docs.filter(
-        (d) => (d.pasta_id && pastaIds.includes(d.pasta_id)) || (c.tipos as readonly string[]).includes(d.tipo),
-      );
-      return { ...c, count: matched.length, present: matched.length > 0 };
+      const matched = docs
+        .filter((d) => (d.pasta_id && pastaIds.includes(d.pasta_id)) || (c.tipos as readonly string[]).includes(d.tipo))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      return { ...c, count: matched.length, present: matched.length > 0, docs: matched };
     });
   }, [doc]);
+
 
 
   const mqDocs = useMemo(() => {
