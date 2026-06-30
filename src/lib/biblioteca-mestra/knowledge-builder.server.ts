@@ -1571,12 +1571,28 @@ export async function processRun(runId: string) {
           for (const h of fontes.historico) {
             addVocReal(h.descricao);
           }
+          // Âncoras = tokens canónicos que caracterizam este Artigo Mestre.
+          // Usados para preferir negativos confundíveis especificamente com
+          // este artigo (varia entre artigos da mesma especialidade).
+          const ancoras = new Set<string>();
+          const addAncora = (s: string) => {
+            for (const c of canonicosComTokens(s)) ancoras.add(c);
+          };
+          addAncora(fontes.artigo.descricao);
+          addAncora(fontes.artigo.observacoes);
+          addAncora(fontes.contexto.categoria);
+          for (const k of ["palavras_chave", "sinonimos", "expressoes", "materiais"] as const) {
+            for (const t of gen[k]) addAncora(t.termo);
+          }
+          for (const h of fontes.historico) addAncora(h.descricao);
+
           const negativosDerivados = derivarNegativos(
             artigoId,
             fontes.especialidadeId,
             vocPositivo,
             vocReais,
-            indice
+            indice,
+            ancoras
           );
           gen.termos_negativos = negativosDerivados.termos;
           for (const t of gen.termos_negativos.slice(0, 8)) {
