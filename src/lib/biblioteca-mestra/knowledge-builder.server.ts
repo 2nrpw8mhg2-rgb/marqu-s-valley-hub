@@ -1064,7 +1064,11 @@ async function recolherFontes(sb: Sb, artigoId: string): Promise<Fontes> {
 }
 
 function buildPrompt(fontes: Fontes, modo: Modo) {
-  const { artigo, contexto, historico, candidatos, vizinhos, existentes, semHistorico } = fontes;
+  const {
+    artigo, contexto, historico, candidatos, vizinhos, existentes, semHistorico,
+    irmaosCategoria, vocReutilizadoSub, vocReutilizadoEsp, correcoes,
+    unidadesPreCalculadas, capitulosPreCalculados, exemplosPreCalculados,
+  } = fontes;
 
   const linhasA = historico.length
     ? historico
@@ -1085,6 +1089,29 @@ function buildPrompt(fontes: Fontes, modo: Modo) {
         .join("\n")
     : "  (nenhum)";
 
+  const linhasD = irmaosCategoria.length
+    ? irmaosCategoria.map((v) => `  • ${v.codigo} ${v.descricao}`).join("\n")
+    : "  (nenhum)";
+
+  const linhasVocSub = vocReutilizadoSub.length
+    ? vocReutilizadoSub.slice(0, 50).join(" · ")
+    : "(nenhum)";
+  const linhasVocEsp = vocReutilizadoEsp.length
+    ? vocReutilizadoEsp.slice(0, 50).join(" · ")
+    : "(nenhum)";
+  const linhasCorr = correcoes.length
+    ? correcoes.slice(0, 30).map((c) => `  • ${c}`).join("\n")
+    : "  (nenhuma)";
+  const linhasUnid = unidadesPreCalculadas.length
+    ? unidadesPreCalculadas.join(", ")
+    : "(nenhuma observada)";
+  const linhasCap = capitulosPreCalculados.length
+    ? capitulosPreCalculados.map((c) => `  • ${c}`).join("\n")
+    : "  (nenhum)";
+  const linhasEx = exemplosPreCalculados.length
+    ? exemplosPreCalculados.map((c) => `  • ${c}`).join("\n")
+    : "  (nenhum)";
+
   const existentesTxt =
     modo === "novos" && existentes.length
       ? `\nTermos já existentes (NÃO repetir):\n${existentes
@@ -1094,18 +1121,25 @@ function buildPrompt(fontes: Fontes, modo: Modo) {
       : "";
 
   const avisoSemHist = semHistorico
-    ? "\n⚠ ATENÇÃO: este artigo NÃO tem histórico validado. Sê conservador: confiança ≤ 65, " +
-      "prioriza FONTE B e usa FONTE C apenas para contexto técnico positivo."
+    ? "\n⚠ Este artigo NÃO tem histórico validado. Mesmo assim, gera enriquecimento profundo: usa a descrição, " +
+      "irmãos da categoria, vocabulário reutilizado na subespecialidade e materiais técnicos plausíveis. Reduz confiança (≤ 70) mas NÃO reduzas a quantidade."
     : "";
 
-  return `És um engenheiro de conhecimento técnico de construção civil em Portugal.
-Constrói a base de conhecimento de UM artigo da Biblioteca Mestra, em português europeu,
-para um motor de classificação de mapas de quantidades.
+  return `És um ENGENHEIRO ORÇAMENTISTA SÉNIOR PORTUGUÊS com décadas de experiência em construção civil.
+Vais ENRIQUECER PROFUNDAMENTE um Artigo Mestre da Biblioteca Mestra, cruzando TODAS as fontes disponíveis,
+como se tivesses passado vários minutos a estudar este artigo, todos os artigos irmãos, milhares de mapas
+de quantidades, o caderno de encargos e o histórico real da aplicação.
+
+REGRA-OURO: quanto mais conhecimento útil, tecnicamente correto e justificável conseguires gerar, melhor.
+NÃO restrinjas artificialmente o número de termos. Listas curtas são FALHA do agente. O objetivo é cobrir
+todas as variantes técnicas, sinónimos, expressões típicas de MQ portugueses, materiais (explícitos e
+implícitos), unidades, capítulos e exemplos plausíveis.
 
 ARTIGO MESTRE
 - Código: ${artigo.codigo}
 - Descrição: ${artigo.descricao}
 - Observações: ${artigo.observacoes || "—"}
+- Unidade canónica do artigo: ${artigo.unidade || "—"}
 
 CONTEXTO ESTRUTURAL
 - Especialidade: ${contexto.especialidade}
@@ -1113,73 +1147,99 @@ CONTEXTO ESTRUTURAL
 - Categoria: ${contexto.categoria}
 
 ═════ FONTES ═════
-FONTE A — Histórico classificado para ESTE artigo (peso ALTO, ${historico.length} entradas, ${fontes.totalHistorico} ocorrências totais):
+FONTE A — Histórico classificado (peso ALTO, ${historico.length} entradas, ${fontes.totalHistorico} ocorrências):
 ${linhasA}
 
-FONTE B — Descrições BRUTAS candidatas (peso MÉDIO, top ${candidatos.length} de ${fontes.totalCandidatos} encontradas em orçamentos importados ainda não classificados):
+FONTE B — Descrições BRUTAS candidatas em orçamentos importados (peso MÉDIO, top ${candidatos.length} de ${fontes.totalCandidatos}):
 ${linhasB}
 
 FONTE C — Artigos VIZINHOS na mesma subespecialidade (peso BAIXO, usar p/ diferenciação):
 ${linhasC}
+
+FONTE D — Artigos IRMÃOS da MESMA CATEGORIA (terminologia exata da família):
+${linhasD}
+
+FONTE E — Vocabulário REUTILIZADO em outras fichas da MESMA SUBESPECIALIDADE (já curado pelos utilizadores):
+${linhasVocSub}
+
+FONTE F — Vocabulário REUTILIZADO noutras fichas da MESMA ESPECIALIDADE:
+${linhasVocEsp}
+
+FONTE G — CORREÇÕES feitas por utilizadores (descrições que costumam confundir-se com este artigo):
+${linhasCorr}
+
+FONTE H — Unidades já observadas para este artigo: ${linhasUnid}
+
+FONTE I — Capítulos típicos onde este artigo apareceu:
+${linhasCap}
+
+FONTE J — Exemplos REAIS já validados para este artigo:
+${linhasEx}
 ${existentesTxt}${avisoSemHist}
 
-GERA até ${TIPO_LIMIT} elementos por tipo, em JSON estrito:
+═════ OUTPUT — JSON ESTRITO, SEM MARKDOWN ═════
 {
   "palavras_chave": [{"termo":"...","peso":<5..50>,"confianca":<0..100>,"fonte":"historico|candidatos|vizinhos|inferido","justificacao":"..."}],
   "sinonimos":      [{"termo":"...","peso":<5..30>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
   "expressoes":     [{"termo":"...","peso":<10..60>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
-  "materiais":      [{"termo":"...","peso":<3..20>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}]
+  "materiais":      [{"termo":"...","peso":<3..20>,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
+  "unidades":       [{"termo":"m²|m³|m|ml|un|kg|ton|vg|lote|...","peso":0,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
+  "capitulos":      [{"termo":"...","peso":5,"confianca":<0..100>,"fonte":"...","justificacao":"..."}],
+  "exemplos":       [{"termo":"frase completa estilo MQ","peso":0,"confianca":<0..100>,"fonte":"...","justificacao":"..."}]
 }
 
-⚠ NÃO GERES termos_negativos. São derivados automaticamente pelo sistema a partir
-de análise estatística inter-especialidades. Qualquer "termos_negativos" no teu output
-será descartado.
+⚠ NÃO geres "termos_negativos" / "negativos". As Especialidades Excluídas e os Negativos Concorrentes
+são calculados automaticamente pelo sistema. Qualquer chave nesse sentido será descartada.
+
+QUOTAS MÍNIMAS (limite superior NÃO é uma instrução):
+- palavras_chave ≥ 10 (idealmente 15-30; cobre singulares, plurais e formas curtas/longas relevantes)
+- sinonimos     ≥ 5  (vocabulário pt-PT equivalente: reboco/estuque/argamassa, demolição/desmontagem/remoção…)
+- expressoes    ≥ 5  (frases típicas: "fornecimento e aplicação", "incluindo transporte", "carga, transporte e vazadouro"…)
+- materiais     ≥ 3  (incluindo implícitos: betão C25/30, aço A500, argamassa M5, EPS, XPS, lã mineral…)
+- unidades      ≥ 1  (se vazio, devolve pelo menos a unidade canónica do artigo: "${artigo.unidade || "un"}")
+- capitulos     ≥ 1  (sugere com base em Especialidade/Subespecialidade/Categoria mesmo que o histórico esteja vazio)
+- exemplos      ≥ 3  (frases reais ou plausíveis ao estilo dos MQ portugueses)
+
+REGRAS DE PALAVRAS-CHAVE
+- 1 a 3 palavras. Se for 4+, vai para "expressoes".
+- NÃO gerar genéricos: fornecimento, aplicação, execução, trabalhos, serviço, obra, material, equipamento, sistema, tipo, diversos, incluindo, necessário, completo, existente, novo.
+- Inclui singulares E plurais relevantes quando ambos forem usados na prática (ex.: "parede", "paredes"; "tubo", "tubos").
+- Peso: 40-50 para termo central recorrente; 25-39 para termo técnico forte; 10-24 para auxiliar.
+
+REGRAS DE EXPRESSÕES
+- Frases de 2 a 6 palavras, técnicas, típicas de MQ. Ex.: "fornecimento e aplicação", "carga, transporte e vazadouro a vazadouro autorizado", "acabamento areado fino", "betonagem por bomba", "incluindo cofragem e escoramento", "pronto a pintar", "fabricado em central".
+
+REGRAS DE MATERIAIS
+- Inclui materiais EXPLÍCITOS na descrição E materiais IMPLÍCITOS típicos da técnica (ex.: para reboco interior incluir cimento, areia, cal hidráulica, rede de fibra; para pavimento cerâmico incluir cimento-cola, betumação, junta).
+- Quando aplicável, especifica classes/grades portuguesas: betão C25/30, aço A500NR, argamassa M5/M10, EPS λ=0.036, lã mineral 40mm.
+
+REGRAS DE UNIDADES
+- Devolve TODAS as unidades plausíveis para este tipo de artigo. Codifica como símbolo curto pt-PT: m², m³, m, ml, un, kg, ton, vg, lote, conjunto, h, dia.
+- Se a unidade canónica do artigo for "${artigo.unidade || "—"}", inclui-a sempre como primeira.
+
+REGRAS DE CAPÍTULOS
+- Sugere o capítulo provável de MQ onde este artigo aparece (ex.: "Movimento de terras", "Estruturas em betão armado", "Revestimentos interiores", "Cobertura", "Águas e esgotos"). NÃO devolves lista vazia.
+
+REGRAS DE EXEMPLOS
+- Frases completas no estilo dos MQ portugueses. Mistura exemplos reais das FONTES com variantes plausíveis que cobrem casos típicos (interior/exterior, diferentes dimensões, com/sem transporte, etc.).
 
 REGRAS DE CONFIANÇA POR FONTE
-- fonte="historico" → 80-95 (95 se aparecer em descrições [validado])
-- fonte="candidatos" → 55-80 (proporcional à similaridade observada)
-- fonte="vizinhos" → 40-60 (usar para discriminar termos próprios deste artigo)
-- fonte="inferido" → 50-70 (terminologia técnica geral relacionada)
-
-REGRAS ESPECÍFICAS PARA PALAVRAS-CHAVE — QUALIDADE ALTA
-- Palavras-chave servem para CLASSIFICAR automaticamente mapas de quantidades. Devem ser poucos termos fortes, técnicos e discriminativos.
-- Cada palavra-chave deve identificar o objecto, técnica, material, sistema ou elemento construtivo central do Artigo Mestre.
-- Preferir termos que apareçam repetidamente na FONTE A ou em candidatos fortes da FONTE B.
-- Uma palavra-chave deve ter 1 a 3 palavras. Se tiver 4+ palavras, coloca-a em "expressoes", não em "palavras_chave".
-- NÃO gerar palavras-chave genéricas: fornecimento, aplicação, execução, trabalhos, serviço, obra, material, materiais, equipamento, sistema, tipo, diversos, incluindo, necessário, completo, existente, novo.
-- NÃO gerar verbos ou frases de medição como palavra-chave: "fornecimento e aplicação", "execução de", "incluindo todos os trabalhos". Isso pertence a "expressoes" apenas se for útil.
-- NÃO repetir palavras óbvias da especialidade se forem demasiado largas e não distinguirem o artigo dentro da subespecialidade.
-- Se não houver evidência suficiente para palavras-chave fortes, gera menos palavras-chave. É preferível devolver 2 boas do que 8 fracas.
-- Peso das palavras-chave:
-  - 40-50: termo central e recorrente no histórico validado;
-  - 25-39: termo técnico forte em candidatos ou histórico automático;
-  - 10-24: termo auxiliar, só se ajudar claramente a classificação.
+- "historico" → 80-95 (95 se for [validado])
+- "candidatos" → 55-80
+- "vizinhos" → 40-65
+- "inferido" → 50-75 (terminologia técnica generalizada)
 
 REGRAS DE IDIOMA — PORTUGUÊS DE PORTUGAL (OBRIGATÓRIO E NÃO NEGOCIÁVEL)
-- Todo o output (termos, sinónimos, expressões, materiais e justificações) DEVE estar em **Português de Portugal (pt-PT)**. Proibido pt-BR, inglês ou mistura.
-- A Biblioteca Mestra é referência de terminologia portuguesa da construção civil (mapas de quantidades, cadernos de encargos, medições). Usa sempre vocabulário praticado em Portugal por engenheiros, arquitetos, medidores e empreiteiros.
-- Normalização OBRIGATÓRIA — nunca gerar a forma pt-BR como termo principal:
-  concreto→betão · concreto armado→betão armado · concretagem→betonagem · concreto magro→betão de limpeza ·
-  laje de concreto→laje de betão · forma (de concreto)→cofragem · escora→escoramento ·
-  tubulação→tubagem · contrapiso→camada de regularização · piso cerâmico→pavimento cerâmico ·
-  rejunte→betumação de juntas · argamassa colante→cimento-cola ·
-  alvenaria de concreto→alvenaria de blocos de betão · bloco de concreto→bloco de betão ·
-  esquadria→caixilharia · forro de gesso→teto falso em gesso cartonado ·
-  chapisco→salpico · emboço→reboco de regularização ·
-  calçada→passeio · meio-fio→lancil · prefeitura→câmara municipal.
-- Termos EXCLUSIVAMENTE brasileiros sem equivalente em Portugal (ex.: "tijolo baiano", "cobogó") NÃO devem ser gerados. Se aparecerem nas fontes, ignora-os silenciosamente e procura terminologia portuguesa equivalente, ou omite.
-- Se um termo aparecer em pt-BR nas FONTES e existir equivalente pt-PT: gera o equivalente pt-PT como termo principal e regista a forma pt-BR como **sinónimo** (peso baixo 5-10, confiança 40-60) para reconhecimento de descrições importadas.
-- Sem anglicismos: "confiança" (não score), "geração/atualização" (não build/update), "conhecimento" (não knowledge), "guardar" (não salvar), "eliminar" (não deletar/excluir).
-- Antes de devolveres o JSON, revê CADA termo: se contiver pt-BR ou inglês, substitui ou remove.
+- Tudo em pt-PT. Proibido pt-BR, inglês ou mistura.
+- Normalização: concreto→betão · concretagem→betonagem · laje de concreto→laje de betão · tubulação→tubagem · contrapiso→camada de regularização · piso cerâmico→pavimento cerâmico · rejunte→betumação · argamassa colante→cimento-cola · esquadria→caixilharia · forro de gesso→teto falso em gesso cartonado · chapisco→salpico · emboço→reboco de regularização · meio-fio→lancil · calçada→passeio · prefeitura→câmara municipal.
+- Termos só-BR sem equivalente (ex.: tijolo baiano, cobogó) → ignora.
+- Sem anglicismos: usa "confiança", "geração", "guardar", "eliminar".
 
-REGRAS
-- Termos técnicos, minúsculas, sem pontuação supérflua, exclusivamente pt-PT.
-- Se um candidato for vago, administrativo ou comum a quase todos os artigos de obra, remove-o.
-- Expressões são frases curtas (2-6 palavras) típicas de MQ portugueses, ex: "fornecimento e aplicação de".
-- Nunca repitas o mesmo termo (mesma raiz/singular/plural) em listas diferentes.
-- "fonte" é OBRIGATÓRIO em cada termo.
-- justificacao = UMA frase curta (máx. 120 caracteres), em pt-PT.
-- NÃO inventes materiais sem evidência nas fontes.
+REGRAS GERAIS
+- Minúsculas, sem pontuação supérflua.
+- Nunca repitas o MESMO termo (mesma raiz singular/plural) em listas diferentes.
+- "fonte" obrigatório.
+- "justificacao" ≤ 160 caracteres, pt-PT.
 - Devolve APENAS o JSON, sem comentários, sem markdown.`;
 }
 
