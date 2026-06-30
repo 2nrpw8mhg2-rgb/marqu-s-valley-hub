@@ -2245,13 +2245,19 @@ export async function processRun(runId: string) {
       .eq("id", runId);
     await appendLog(sb, runId, `Concluído: ${processados} processados, ${saltados} saltados, ${falhados} falhados`);
   } catch (e: any) {
-    await sb
-      .from("biblioteca_knowledge_run")
-      .update({
-        estado: "erro",
-        erro_msg: String(e?.message ?? e).slice(0, 500),
-        concluido_em: new Date().toISOString(),
-      })
-      .eq("id", runId);
+    console.error("[knowledge-builder] processRun failed", e);
+    try {
+      const sbErr = admin();
+      await sbErr
+        .from("biblioteca_knowledge_run")
+        .update({
+          estado: "erro",
+          erro_msg: String(e?.message ?? e).slice(0, 500),
+          concluido_em: new Date().toISOString(),
+        })
+        .eq("id", runId);
+    } catch (e2) {
+      console.error("[knowledge-builder] could not mark run as erro", e2);
+    }
   }
 }
