@@ -852,7 +852,9 @@ function Passo3({ rascunho, onConcluido }: { rascunho: any; onConcluido: () => P
   }
 
   const classificados = (stats?.auto ?? 0) + (stats?.validados ?? 0);
-  const podeAvancar = classificados > 0;
+  const totalLinhas = stats?.total ?? 0;
+  const temClassificacao = ((stats?.auto ?? 0) + (stats?.validados ?? 0) + (stats?.rever ?? 0) + (stats?.sem ?? 0)) > 0;
+  const podeAvancar = temClassificacao || totalLinhas > 0;
 
   return (
     <Card className="p-6 space-y-5">
