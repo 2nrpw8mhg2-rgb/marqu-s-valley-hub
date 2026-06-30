@@ -311,13 +311,16 @@ function KnowledgeBuilderPage() {
             <div className="text-xs text-muted-foreground">
               {s.processados} / {s.total_artigos} artigos · {s.saltados} saltados · {s.falhados} falhados
             </div>
-            <div className="grid grid-cols-5 gap-2 text-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-sm">
               {[
                 ["Palavras-chave", "palavra_chave"],
                 ["Sinónimos", "sinonimo"],
                 ["Expressões", "expressao"],
                 ["Materiais", "material"],
-                ["Negativos", "termo_negativo"],
+                ["Unidades", "unidade_compativel"],
+                ["Capítulos", "capitulo_tipico"],
+                ["Exemplos", "exemplo_real"],
+                ["Excluídas", "negativo_incompativel"],
               ].map(([label, key]) => (
                 <div key={key} className="rounded border p-2 text-center">
                   <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
