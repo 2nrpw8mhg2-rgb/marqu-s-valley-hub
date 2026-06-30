@@ -89,6 +89,7 @@ function PreparacaoOrcamentoWizard() {
   });
 
   const [passo, setPasso] = useState<number>(0);
+  const [forcarReleituraMQT, setForcarReleituraMQT] = useState(false);
   useEffect(() => {
     if (rascunho) setPasso((p) => Math.max(p, rascunho.wizard_passo ?? 0));
   }, [rascunho]);
@@ -181,7 +182,7 @@ function PreparacaoOrcamentoWizard() {
               </div>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setPasso(1)}>Trocar MQT</Button>
+          <Button variant="outline" size="sm" onClick={() => { setForcarReleituraMQT(true); setPasso(1); }}>Trocar MQT</Button>
         </Card>
       ) : origemInvalida ? (
         <Card className="p-3 border-destructive/40 bg-destructive/10 text-sm text-destructive flex items-start gap-2">
@@ -209,12 +210,18 @@ function PreparacaoOrcamentoWizard() {
           rascunho={rascunho}
           mqDocs={mqDocs}
           pastaExiste={mqPastaInfo.existe}
+          forcarReleitura={forcarReleituraMQT}
           onSelecionado={async () => {
-            await refetchRascunho();
             await qc.invalidateQueries({ queryKey: ["prep-passo2"] });
             await qc.invalidateQueries({ queryKey: ["prep-passo3"] });
             await qc.invalidateQueries({ queryKey: ["prep-passo4-rows"] });
             await qc.invalidateQueries({ queryKey: ["prep-passo4-stats"] });
+            await qc.invalidateQueries({ queryKey: ["artigo-original"] });
+            await qc.invalidateQueries({ queryKey: ["cc-run"] });
+            await qc.invalidateQueries({ queryKey: ["cc-rows"] });
+            await qc.invalidateQueries({ queryKey: ["cc-artigos-count"] });
+            await refetchRascunho();
+            setForcarReleituraMQT(false);
             await persistPasso(1);
             setPasso(2);
           }}
@@ -398,12 +405,14 @@ function Passo1({
   rascunho,
   mqDocs,
   pastaExiste,
+  forcarReleitura,
   onSelecionado,
 }: {
   obraId: string;
   rascunho: any;
   mqDocs: { id: string; nome: string; storage_path: string; created_at: string; tamanho: number | null }[];
   pastaExiste: boolean;
+  forcarReleitura: boolean;
   onSelecionado: () => Promise<void>;
 }) {
   const [escolhido, setEscolhido] = useState<string | null>(rascunho?.mq_documento_id ?? null);
@@ -411,41 +420,60 @@ function Passo1({
   const [working, setWorking] = useState(false);
   const qc = useQueryClient();
 
+  useEffect(() => {
+    setEscolhido(rascunho?.mq_documento_id ?? null);
+    setRevisao(rascunho?.mq_revisao ?? "");
+  }, [rascunho?.mq_documento_id, rascunho?.mq_revisao]);
+
+  const selecionarDoc = (docId: string) => {
+    setEscolhido(docId);
+    if (docId !== rascunho?.mq_documento_id) setRevisao("");
+  };
+
   async function confirmar() {
     if (!escolhido) return;
     setWorking(true);
     try {
       const { data: u } = await supabase.auth.getUser();
+      const docNome = mqDocs.find((m) => m.id === escolhido)?.nome ?? "MQT";
+      const revisaoLimpa = revisao.trim() || null;
       if (rascunho) {
         const mudouMQT = rascunho.mq_documento_id !== escolhido;
+        const deveReiniciarMQT = mudouMQT || forcarReleitura;
 
-        if (mudouMQT) {
+        if (deveReiniciarMQT) {
           const { error: clsErr } = await supabase.from("classificacao_artigos").delete().eq("orcamento_id", rascunho.id);
           if (clsErr) throw clsErr;
           const { error: artsErr } = await supabase.from("orcamento_artigos").delete().eq("orcamento_id", rascunho.id);
           if (artsErr) throw artsErr;
           const { error: capsErr } = await supabase.from("orcamento_capitulos").delete().eq("orcamento_id", rascunho.id);
           if (capsErr) throw capsErr;
+          const { error: runsErr } = await supabase.from("orcamento_classificacao_run").delete().eq("orcamento_id", rascunho.id);
+          if (runsErr) throw runsErr;
+          const { error: alertasErr } = await supabase.from("orcamento_alertas_tecnicos").delete().eq("orcamento_id", rascunho.id);
+          if (alertasErr) throw alertasErr;
         }
 
         // Atualiza rascunho existente
         const { error } = await supabase
           .from("orcamentos")
           .update({
+            nome: `Rascunho técnico — ${docNome}`,
             mq_documento_id: escolhido,
-            mq_revisao: revisao || null,
+            mq_revisao: revisaoLimpa,
             wizard_passo: 1,
-            estado_mq: mudouMQT ? "importado" : rascunho.estado_mq,
+            estado_mq: deveReiniciarMQT ? "importado" : rascunho.estado_mq,
           })
           .eq("id", rascunho.id);
         if (error) throw error;
 
         qc.setQueryData(["prep-orc", obraId], {
           ...rascunho,
+          nome: `Rascunho técnico — ${docNome}`,
           mq_documento_id: escolhido,
-          mq_revisao: revisao || null,
+          mq_revisao: revisaoLimpa,
           wizard_passo: 1,
-          estado_mq: mudouMQT ? "importado" : rascunho.estado_mq,
+          estado_mq: deveReiniciarMQT ? "importado" : rascunho.estado_mq,
         });
       } else {
         // Cria rascunho técnico
@@ -457,7 +485,6 @@ function Passo1({
           .limit(1);
         const proxVersao = ((existentes?.[0]?.versao as number | undefined) ?? 0) + 1;
         const versaoLabel = `v${proxVersao}`;
-        const docNome = mqDocs.find((m) => m.id === escolhido)?.nome ?? "MQT";
         const { error } = await supabase.from("orcamentos").insert({
           obra_id: obraId,
           nome: `Rascunho técnico ${versaoLabel} — ${docNome}`,
@@ -468,7 +495,7 @@ function Passo1({
           tipo: "rascunho_tecnico",
           wizard_passo: 1,
           mq_documento_id: escolhido,
-          mq_revisao: revisao || null,
+          mq_revisao: revisaoLimpa,
           created_by: u.user?.id ?? null,
         });
         if (error) throw error;
@@ -524,7 +551,7 @@ function Passo1({
           return (
             <li key={d.id}>
               <button
-                onClick={() => setEscolhido(d.id)}
+                onClick={() => selecionarDoc(d.id)}
                 className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
                   sel ? "bg-primary/10 border-l-2 border-primary" : "bg-background hover:bg-muted/40"
                 }`}
