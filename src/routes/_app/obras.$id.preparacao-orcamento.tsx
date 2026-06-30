@@ -707,11 +707,11 @@ function Passo2({
       if (caps.length) {
         const { data: insertedCaps, error: e1 } = await supabase
           .from("orcamento_capitulos")
-          .insert(caps.map((c, i) => ({
+          .insert(caps.map((c) => ({
             orcamento_id: rascunho.id,
             codigo: c.codigo,
             descricao: c.descricao,
-            ordem: (i + 1) * 10,
+            ordem: (c.sourceRow + 1) * 10,
           })))
           .select("id, descricao");
         if (e1) throw e1;
@@ -736,7 +736,7 @@ function Passo2({
             quantidade: r.quantidade,
             preco_unitario: 0,
             margem_pct: 0,
-            ordem: (idx + 1) * 10,
+            ordem: (r.sourceRow + 1) * 10,
           };
         })
         .filter(Boolean) as any[];
@@ -929,8 +929,10 @@ function Passo4({ rascunho, onAbrirValidacao, onConcluir }: { rascunho: any; onA
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["prep-passo4-rows", orcamentoId, estadoFilter, search],
     queryFn: async () => {
-      let q = supabase.from("classificacao_artigos").select("*")
-        .eq("orcamento_id", orcamentoId).order("created_at", { ascending: true });
+      let q = supabase.from("classificacao_artigos").select("*, orcamento_artigos!inner(ordem)")
+        .eq("orcamento_id", orcamentoId)
+        .order("ordem", { referencedTable: "orcamento_artigos", ascending: true })
+        .order("created_at", { ascending: true });
       if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
       if (search.trim()) q = q.ilike("descricao_original", `%${search.trim()}%`);
       const { data, error } = await q.limit(5000);
