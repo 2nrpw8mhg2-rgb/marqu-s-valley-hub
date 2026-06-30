@@ -87,17 +87,19 @@ function PreparacaoOrcamentoWizard() {
   });
 
   const checklistRows = useMemo(() => {
-    const pastas = doc?.pastas ?? [];
-    const docs = doc?.docs ?? [];
+    const pastas = (doc?.pastas ?? []) as { id: string; nome: string; parent_id: string | null }[];
+    const docs = (doc?.docs ?? []) as { id: string; nome: string; tipo: string; pasta_id: string | null }[];
     return CHECKLIST.map((c) => {
-      const pastaIds = pastas.filter((p) => c.folders.some((f) => p.nome?.toLowerCase() === f.toLowerCase())).map((p) => p.id);
+      const pastaIds: string[] = pastas
+        .filter((p) => c.folders.some((f) => p.nome?.toLowerCase() === f.toLowerCase()))
+        .map((p) => p.id);
       const matched = docs.filter(
-        (d) =>
-          (pastaIds.includes(d.pasta_id as any) || c.tipos.includes(d.tipo as any)),
+        (d) => (d.pasta_id && pastaIds.includes(d.pasta_id)) || (c.tipos as readonly string[]).includes(d.tipo),
       );
       return { ...c, count: matched.length, present: matched.length > 0 };
     });
   }, [doc]);
+
 
   const mqDocs = useMemo(() => {
     const pastas = doc?.pastas ?? [];

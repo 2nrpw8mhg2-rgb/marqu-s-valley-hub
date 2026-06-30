@@ -40,6 +40,7 @@ import { Route as AppProcurementPacotesIdRouteImport } from './routes/_app/procu
 import { Route as AppOrcamentosIdDecomposicaoRouteImport } from './routes/_app/orcamentos.$id.decomposicao'
 import { Route as AppObrasIdRelatoriosRouteImport } from './routes/_app/obras.$id.relatorios'
 import { Route as AppObrasIdProcurementRouteImport } from './routes/_app/obras.$id.procurement'
+import { Route as AppObrasIdPreparacaoOrcamentoRouteImport } from './routes/_app/obras.$id.preparacao-orcamento'
 import { Route as AppObrasIdPlaneamentoRouteImport } from './routes/_app/obras.$id.planeamento'
 import { Route as AppObrasIdOrcamentacaoRouteImport } from './routes/_app/obras.$id.orcamentacao'
 import { Route as AppObrasIdMqRouteImport } from './routes/_app/obras.$id.mq'
@@ -213,6 +214,12 @@ const AppObrasIdProcurementRoute = AppObrasIdProcurementRouteImport.update({
   path: '/procurement',
   getParentRoute: () => AppObrasIdRoute,
 } as any)
+const AppObrasIdPreparacaoOrcamentoRoute =
+  AppObrasIdPreparacaoOrcamentoRouteImport.update({
+    id: '/preparacao-orcamento',
+    path: '/preparacao-orcamento',
+    getParentRoute: () => AppObrasIdRoute,
+  } as any)
 const AppObrasIdPlaneamentoRoute = AppObrasIdPlaneamentoRouteImport.update({
   id: '/planeamento',
   path: '/planeamento',
@@ -275,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/obras/$id/mq': typeof AppObrasIdMqRoute
   '/obras/$id/orcamentacao': typeof AppObrasIdOrcamentacaoRoute
   '/obras/$id/planeamento': typeof AppObrasIdPlaneamentoRoute
+  '/obras/$id/preparacao-orcamento': typeof AppObrasIdPreparacaoOrcamentoRoute
   '/obras/$id/procurement': typeof AppObrasIdProcurementRoute
   '/obras/$id/relatorios': typeof AppObrasIdRelatoriosRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
@@ -311,6 +319,7 @@ export interface FileRoutesByTo {
   '/obras/$id/mq': typeof AppObrasIdMqRoute
   '/obras/$id/orcamentacao': typeof AppObrasIdOrcamentacaoRoute
   '/obras/$id/planeamento': typeof AppObrasIdPlaneamentoRoute
+  '/obras/$id/preparacao-orcamento': typeof AppObrasIdPreparacaoOrcamentoRoute
   '/obras/$id/procurement': typeof AppObrasIdProcurementRoute
   '/obras/$id/relatorios': typeof AppObrasIdRelatoriosRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
@@ -351,6 +360,7 @@ export interface FileRoutesById {
   '/_app/obras/$id/mq': typeof AppObrasIdMqRoute
   '/_app/obras/$id/orcamentacao': typeof AppObrasIdOrcamentacaoRoute
   '/_app/obras/$id/planeamento': typeof AppObrasIdPlaneamentoRoute
+  '/_app/obras/$id/preparacao-orcamento': typeof AppObrasIdPreparacaoOrcamentoRoute
   '/_app/obras/$id/procurement': typeof AppObrasIdProcurementRoute
   '/_app/obras/$id/relatorios': typeof AppObrasIdRelatoriosRoute
   '/_app/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
@@ -391,6 +401,7 @@ export interface FileRouteTypes {
     | '/obras/$id/mq'
     | '/obras/$id/orcamentacao'
     | '/obras/$id/planeamento'
+    | '/obras/$id/preparacao-orcamento'
     | '/obras/$id/procurement'
     | '/obras/$id/relatorios'
     | '/orcamentos/$id/decomposicao'
@@ -427,6 +438,7 @@ export interface FileRouteTypes {
     | '/obras/$id/mq'
     | '/obras/$id/orcamentacao'
     | '/obras/$id/planeamento'
+    | '/obras/$id/preparacao-orcamento'
     | '/obras/$id/procurement'
     | '/obras/$id/relatorios'
     | '/orcamentos/$id/decomposicao'
@@ -466,6 +478,7 @@ export interface FileRouteTypes {
     | '/_app/obras/$id/mq'
     | '/_app/obras/$id/orcamentacao'
     | '/_app/obras/$id/planeamento'
+    | '/_app/obras/$id/preparacao-orcamento'
     | '/_app/obras/$id/procurement'
     | '/_app/obras/$id/relatorios'
     | '/_app/orcamentos/$id/decomposicao'
@@ -699,6 +712,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppObrasIdProcurementRouteImport
       parentRoute: typeof AppObrasIdRoute
     }
+    '/_app/obras/$id/preparacao-orcamento': {
+      id: '/_app/obras/$id/preparacao-orcamento'
+      path: '/preparacao-orcamento'
+      fullPath: '/obras/$id/preparacao-orcamento'
+      preLoaderRoute: typeof AppObrasIdPreparacaoOrcamentoRouteImport
+      parentRoute: typeof AppObrasIdRoute
+    }
     '/_app/obras/$id/planeamento': {
       id: '/_app/obras/$id/planeamento'
       path: '/planeamento'
@@ -783,6 +803,7 @@ interface AppObrasIdRouteChildren {
   AppObrasIdMqRoute: typeof AppObrasIdMqRoute
   AppObrasIdOrcamentacaoRoute: typeof AppObrasIdOrcamentacaoRoute
   AppObrasIdPlaneamentoRoute: typeof AppObrasIdPlaneamentoRoute
+  AppObrasIdPreparacaoOrcamentoRoute: typeof AppObrasIdPreparacaoOrcamentoRoute
   AppObrasIdProcurementRoute: typeof AppObrasIdProcurementRoute
   AppObrasIdRelatoriosRoute: typeof AppObrasIdRelatoriosRoute
   AppObrasIdIndexRoute: typeof AppObrasIdIndexRoute
@@ -795,6 +816,7 @@ const AppObrasIdRouteChildren: AppObrasIdRouteChildren = {
   AppObrasIdMqRoute: AppObrasIdMqRoute,
   AppObrasIdOrcamentacaoRoute: AppObrasIdOrcamentacaoRoute,
   AppObrasIdPlaneamentoRoute: AppObrasIdPlaneamentoRoute,
+  AppObrasIdPreparacaoOrcamentoRoute: AppObrasIdPreparacaoOrcamentoRoute,
   AppObrasIdProcurementRoute: AppObrasIdProcurementRoute,
   AppObrasIdRelatoriosRoute: AppObrasIdRelatoriosRoute,
   AppObrasIdIndexRoute: AppObrasIdIndexRoute,
