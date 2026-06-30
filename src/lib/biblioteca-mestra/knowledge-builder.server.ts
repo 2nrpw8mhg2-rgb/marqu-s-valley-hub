@@ -1894,6 +1894,53 @@ export async function processRun(runId: string) {
 
         const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes);
 
+        // ===== Extras: concorrentes / unidades / capítulos / exemplos =====
+        try {
+          const ancorasExtras = new Set<string>();
+          const addAncoraExtra = (s: string) => {
+            for (const c of canonicosComTokens(s)) ancorasExtras.add(c);
+          };
+          addAncoraExtra(fontes.artigo.descricao);
+          addAncoraExtra(fontes.artigo.observacoes);
+          addAncoraExtra(fontes.contexto.categoria);
+          for (const k of ["palavras_chave", "sinonimos", "expressoes", "materiais"] as const) {
+            for (const t of gen[k]) addAncoraExtra(t.termo);
+          }
+
+          const concorrentes = await derivarConcorrentes(
+            sb,
+            artigoId,
+            fontes.especialidadeId,
+            (fontes as any).subespecialidadeId ?? null,
+            ancorasExtras
+          );
+          const uce = await derivarUnidadesCapitulosExemplos(sb, artigoId);
+          const extrasTipos = await gravarExtras(
+            sb,
+            artigoId,
+            {
+              concorrentes,
+              unidades: uce.unidades,
+              capitulos: uce.capitulos,
+              exemplos: uce.exemplos,
+            },
+            run.modo as Modo
+          );
+          for (const k of Object.keys(extrasTipos)) {
+            (res.perTipo as any)[k] = ((res.perTipo as any)[k] ?? 0) + extrasTipos[k];
+            res.inseridos += extrasTipos[k];
+          }
+          await appendLog(
+            sb,
+            runId,
+            `extras: ${extrasTipos.negativo_concorrente} concorrentes · ${extrasTipos.unidade_compativel} unidades · ${extrasTipos.capitulo_tipico} capítulos · ${extrasTipos.exemplo_real} exemplos`
+          );
+        } catch (e: any) {
+          await appendLog(sb, runId, `extras falhou (ignorado): ${String(e?.message ?? e).slice(0, 200)}`);
+        }
+
+
+
 
         // correcoes do utilizador para este artigo
         if (fontes.artigo.codigo) {
