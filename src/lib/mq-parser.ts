@@ -57,12 +57,18 @@ export function detectColumns(rows: any[][]): { headerRowIdx: number; map: Colum
       const inferred = inferColumnsFromData(rows, i + 1);
       if (inferred) {
         if (countMeaningful(rows, i + 1, map.descricao) < 3) map.descricao = inferred.map.descricao;
-        map.codigo ??= inferred.map.codigo;
-        map.unidade ??= inferred.map.unidade;
-        map.quantidade ??= inferred.map.quantidade;
+        if (inferred.map.codigo != null && countCodeLike(rows, i + 1, map.codigo) < countCodeLike(rows, i + 1, inferred.map.codigo)) {
+          map.codigo = inferred.map.codigo;
+        }
+        if (inferred.map.unidade != null && countUnitLike(rows, i + 1, map.unidade) < countUnitLike(rows, i + 1, inferred.map.unidade)) {
+          map.unidade = inferred.map.unidade;
+        }
+        if (inferred.map.quantidade != null && countNumberLike(rows, i + 1, map.quantidade) < countNumberLike(rows, i + 1, inferred.map.quantidade)) {
+          map.quantidade = inferred.map.quantidade;
+        }
         map.preco ??= inferred.map.preco;
       }
-      return { headerRowIdx: i, map };
+      return { headerRowIdx: inferred?.headerRowIdx ?? i, map };
     }
   }
   return inferColumnsFromData(rows, 0);
@@ -124,6 +130,15 @@ function isMeaningfulDescription(v: any): boolean {
   return !isUnitLike(s) && !isNumberLike(s);
 }
 
+function headerNear(rows: any[][], col: number, untilRow: number): string {
+  const parts: string[] = [];
+  for (let ri = Math.max(0, untilRow - 6); ri < Math.min(rows.length, untilRow + 2); ri++) {
+    const value = textOf(rows[ri]?.[col]);
+    if (value) parts.push(value);
+  }
+  return NORM(parts.join(" "));
+}
+
 function inferColumnsFromData(rows: any[][], startRow: number): { headerRowIdx: number; map: ColumnMap } | null {
   const endRow = Math.min(rows.length, Math.max(startRow + 40, 260));
   const maxCols = Math.min(40, Math.max(0, ...rows.slice(startRow, endRow).map((r) => r?.length ?? 0)));
@@ -159,11 +174,23 @@ function inferColumnsFromData(rows: any[][], startRow: number): { headerRowIdx: 
   const unidade = [...stats]
     .filter((s) => s.idx > desc.idx && s.unit >= 2)
     .sort((a, b) => (b.unit * 6 + b.nonEmpty) - (a.unit * 6 + a.nonEmpty))[0]?.idx ?? null;
-  const numericRight = [...stats]
-    .filter((s) => s.idx > (unidade ?? desc.idx) && s.num >= 2)
-    .sort((a, b) => a.idx - b.idx);
-  const quantidade = numericRight[0]?.idx ?? null;
-  const preco = numericRight.find((s) => s.idx !== quantidade)?.idx ?? null;
+  const numericCandidates = [...stats].filter((s) => s.idx !== desc.idx && s.idx !== codigo && s.idx !== unidade && s.num >= 2);
+  const quantityScore = (s: (typeof stats)[number]) => {
+    const h = headerNear(rows, s.idx, startRow);
+    const preferred = /\b(quantidade|qtd|qt|medicao|totais|total)\b/.test(h) ? 1000 : 0;
+    const penalized = /\b(custo|preco|unitario|parcial|parciais|comp|largura|alt|esp|element)\b/.test(h) ? -500 : 0;
+    return preferred + penalized + s.num;
+  };
+  const quantidade = numericCandidates.sort((a, b) => quantityScore(b) - quantityScore(a))[0]?.idx ?? null;
+  const preco = numericCandidates
+    .filter((s) => s.idx !== quantidade)
+    .sort((a, b) => {
+      const ah = headerNear(rows, a.idx, startRow);
+      const bh = headerNear(rows, b.idx, startRow);
+      const as = /\b(custo|preco|unitario|c unit|pu)\b/.test(ah) ? 1000 + a.num : a.num;
+      const bs = /\b(custo|preco|unitario|c unit|pu)\b/.test(bh) ? 1000 + b.num : b.num;
+      return bs - as;
+    })[0]?.idx ?? null;
 
   let firstDataRow = startRow;
   for (let ri = startRow; ri < endRow; ri++) {
@@ -189,6 +216,33 @@ function countMeaningful(rows: any[][], startRow: number, col: number): number {
   let count = 0;
   for (let ri = startRow; ri < Math.min(rows.length, startRow + 80); ri++) {
     if (isMeaningfulDescription(rows[ri]?.[col])) count += 1;
+  }
+  return count;
+}
+
+function countCodeLike(rows: any[][], startRow: number, col: number | null): number {
+  if (col == null) return 0;
+  let count = 0;
+  for (let ri = startRow; ri < Math.min(rows.length, startRow + 120); ri++) {
+    if (isCodeLike(rows[ri]?.[col])) count += 1;
+  }
+  return count;
+}
+
+function countUnitLike(rows: any[][], startRow: number, col: number | null): number {
+  if (col == null) return 0;
+  let count = 0;
+  for (let ri = startRow; ri < Math.min(rows.length, startRow + 120); ri++) {
+    if (isUnitLike(rows[ri]?.[col])) count += 1;
+  }
+  return count;
+}
+
+function countNumberLike(rows: any[][], startRow: number, col: number | null): number {
+  if (col == null) return 0;
+  let count = 0;
+  for (let ri = startRow; ri < Math.min(rows.length, startRow + 120); ri++) {
+    if (isNumberLike(rows[ri]?.[col])) count += 1;
   }
   return count;
 }
