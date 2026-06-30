@@ -40,6 +40,7 @@ type Generated = {
   unidades: GeneratedTermo[];
   capitulos: GeneratedTermo[];
   exemplos: GeneratedTermo[];
+  termos_negativos: GeneratedTermo[];
 };
 
 type RemocaoNegativo = {
