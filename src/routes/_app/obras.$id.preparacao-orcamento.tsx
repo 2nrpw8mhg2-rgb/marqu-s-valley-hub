@@ -145,10 +145,31 @@ function PreparacaoOrcamentoWizard() {
 
   const origemInvalida = !!rascunho?.mq_documento_id && !!doc && !mqAtivo;
 
+  const { data: leituraMQT } = useQuery({
+    queryKey: ["prep-leitura-mq", rascunho?.id, mqAtivo?.id],
+    queryFn: async () => {
+      if (!rascunho?.id || !mqAtivo) return { artigos: 0, ultimaLeitura: null as string | null };
+      const [{ count }, { data: ultimo }] = await Promise.all([
+        supabase.from("orcamento_artigos").select("id", { count: "exact", head: true }).eq("orcamento_id", rascunho.id),
+        supabase.from("orcamento_artigos").select("created_at").eq("orcamento_id", rascunho.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      return { artigos: count ?? 0, ultimaLeitura: (ultimo as any)?.created_at ?? null };
+    },
+    enabled: !!rascunho?.id && !!mqAtivo,
+  });
+
+  const leituraDesatualizada = !!mqAtivo && !!leituraMQT?.ultimaLeitura && new Date(leituraMQT.ultimaLeitura).getTime() < new Date(mqAtivo.created_at).getTime();
+  const leituraEmFalta = !!mqAtivo && !!leituraMQT && leituraMQT.artigos === 0;
+
   // Se a origem ficou inválida (doc movido/apagado), forçar regresso ao Passo 1.
   useEffect(() => {
     if (origemInvalida) setPasso(1);
   }, [origemInvalida]);
+
+  // Se o rascunho ainda tem artigos/classificações lidos antes do MQT selecionado, não deixar avançar com dados antigos.
+  useEffect(() => {
+    if ((leituraDesatualizada || leituraEmFalta) && passo > 2) setPasso(2);
+  }, [leituraDesatualizada, leituraEmFalta, passo]);
 
 
   async function persistPasso(p: number) {
@@ -194,6 +215,15 @@ function PreparacaoOrcamentoWizard() {
         </Card>
       ) : null}
 
+      {leituraDesatualizada && (
+        <Card className="p-3 border-amber-500/40 bg-amber-500/10 text-sm text-amber-700 dark:text-amber-400 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            A leitura/classificação guardada é anterior ao MQT selecionado. Re-lê este MQT antes de continuar.
+          </div>
+        </Card>
+      )}
+
       <Stepper passo={passo} setPasso={setPasso} maxPasso={rascunho?.wizard_passo ?? 0} />
 
       {passo === 0 && (
@@ -220,6 +250,7 @@ function PreparacaoOrcamentoWizard() {
             await qc.invalidateQueries({ queryKey: ["cc-run"] });
             await qc.invalidateQueries({ queryKey: ["cc-rows"] });
             await qc.invalidateQueries({ queryKey: ["cc-artigos-count"] });
+            await qc.invalidateQueries({ queryKey: ["prep-leitura-mq"] });
             await refetchRascunho();
             setForcarReleituraMQT(false);
             await persistPasso(1);
@@ -608,17 +639,28 @@ function Passo2({
   onVoltar: () => void;
   onConcluido: () => Promise<void>;
 }) {
+  const qc = useQueryClient();
   const [working, setWorking] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   const { data: status, refetch } = useQuery({
     queryKey: ["prep-passo2", rascunho.id, mqAtivo?.id],
     queryFn: async () => {
-      const [{ count: artigos }, { count: caps }] = await Promise.all([
+      const [{ count: artigos }, { count: caps }, { data: ultimo }] = await Promise.all([
         supabase.from("orcamento_artigos").select("id", { count: "exact", head: true }).eq("orcamento_id", rascunho.id),
         supabase.from("orcamento_capitulos").select("id", { count: "exact", head: true }).eq("orcamento_id", rascunho.id),
+        supabase.from("orcamento_artigos").select("created_at").eq("orcamento_id", rascunho.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
-      return { artigos: artigos ?? 0, caps: caps ?? 0, docNome: mqAtivo?.nome ?? "—", storagePath: mqAtivo?.storage_path ?? null };
+      const ultimaLeitura = (ultimo as any)?.created_at ?? null;
+      const desatualizado = !!mqAtivo?.created_at && !!ultimaLeitura && new Date(ultimaLeitura).getTime() < new Date(mqAtivo.created_at).getTime();
+      return {
+        artigos: desatualizado ? 0 : artigos ?? 0,
+        caps: desatualizado ? 0 : caps ?? 0,
+        artigosAntigos: artigos ?? 0,
+        desatualizado,
+        docNome: mqAtivo?.nome ?? "—",
+        storagePath: mqAtivo?.storage_path ?? null,
+      };
     },
     enabled: !!mqAtivo,
   });
@@ -653,6 +695,9 @@ function Passo2({
       if (!parsed || !parsed.length) throw new Error("Não foi possível detetar a estrutura do MQT neste ficheiro.");
 
       // Limpa qualquer leitura anterior deste rascunho (mantém imutabilidade entre leituras: ao re-ler substituímos)
+      await supabase.from("classificacao_artigos").delete().eq("orcamento_id", rascunho.id);
+      await supabase.from("orcamento_alertas_tecnicos").delete().eq("orcamento_id", rascunho.id);
+      await supabase.from("orcamento_classificacao_run").delete().eq("orcamento_id", rascunho.id);
       await supabase.from("orcamento_artigos").delete().eq("orcamento_id", rascunho.id);
       await supabase.from("orcamento_capitulos").delete().eq("orcamento_id", rascunho.id);
 
@@ -703,6 +748,11 @@ function Passo2({
       }
 
       toast.success(`Leitura concluída: ${caps.length} capítulos, ${payload.length} artigos.`);
+      await qc.invalidateQueries({ queryKey: ["prep-leitura-mq"] });
+      await qc.invalidateQueries({ queryKey: ["prep-passo3"] });
+      await qc.invalidateQueries({ queryKey: ["prep-passo4-rows"] });
+      await qc.invalidateQueries({ queryKey: ["prep-passo4-stats"] });
+      await qc.invalidateQueries({ queryKey: ["artigo-original"] });
       await refetch();
       await onConcluido();
     } catch (e: any) {
@@ -735,6 +785,12 @@ function Passo2({
       {erro && (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {erro}
+        </div>
+      )}
+
+      {status?.desatualizado && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+          Existem {status.artigosAntigos} artigos de uma leitura anterior. Ao carregar em «Ler MQT», serão substituídos pelo ficheiro selecionado.
         </div>
       )}
 
