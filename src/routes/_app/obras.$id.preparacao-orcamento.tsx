@@ -167,6 +167,32 @@ function PreparacaoOrcamentoWizard() {
         </p>
       </header>
 
+      {/* Origem do MQT — sempre visível */}
+      {mqAtivo ? (
+        <Card className="p-3 flex items-center justify-between gap-3 border-primary/30 bg-primary/5">
+          <div className="flex items-center gap-3 min-w-0">
+            <FileSpreadsheet className="h-4 w-4 text-primary shrink-0" />
+            <div className="min-w-0">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">A ler de Documentos → Mapa de Quantidades</div>
+              <div className="text-sm font-medium truncate">{mqAtivo.nome}</div>
+              <div className="text-xs text-muted-foreground">
+                {new Date(mqAtivo.created_at).toLocaleString("pt-PT")}
+                {mqAtivo.tamanho ? ` · ${(mqAtivo.tamanho / 1024).toFixed(0)} KB` : ""}
+              </div>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setPasso(1)}>Trocar MQT</Button>
+        </Card>
+      ) : origemInvalida ? (
+        <Card className="p-3 border-destructive/40 bg-destructive/10 text-sm text-destructive flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            O MQT deste rascunho já não está disponível na pasta «Mapa de Quantidades» desta obra.
+            Seleciona o MQT atual para continuar.
+          </div>
+        </Card>
+      ) : null}
+
       <Stepper passo={passo} setPasso={setPasso} maxPasso={rascunho?.wizard_passo ?? 0} />
 
       {passo === 0 && (
@@ -182,6 +208,7 @@ function PreparacaoOrcamentoWizard() {
           obraId={obraId}
           rascunho={rascunho}
           mqDocs={mqDocs}
+          pastaExiste={mqPastaInfo.existe}
           onSelecionado={async () => {
             await refetchRascunho();
             await persistPasso(1);
@@ -190,7 +217,7 @@ function PreparacaoOrcamentoWizard() {
         />
       )}
       {passo === 2 && rascunho && (
-        <Passo2 rascunho={rascunho} onConcluido={async () => { await persistPasso(2); setPasso(3); }} />
+        <Passo2 rascunho={rascunho} mqAtivo={mqAtivo} obraId={obraId} onVoltar={() => setPasso(1)} onConcluido={async () => { await persistPasso(2); setPasso(3); }} />
       )}
       {passo === 3 && rascunho && (
         <Passo3 rascunho={rascunho} onConcluido={async () => { await persistPasso(3); setPasso(4); }} />
