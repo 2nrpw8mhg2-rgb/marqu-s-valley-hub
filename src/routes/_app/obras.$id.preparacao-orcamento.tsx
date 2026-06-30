@@ -211,6 +211,9 @@ function PreparacaoOrcamentoWizard() {
           pastaExiste={mqPastaInfo.existe}
           onSelecionado={async () => {
             await refetchRascunho();
+            await qc.invalidateQueries({ queryKey: ["prep-passo2"] });
+            await qc.invalidateQueries({ queryKey: ["prep-passo3"] });
+            await qc.invalidateQueries({ queryKey: ["prep-passo4"] });
             await persistPasso(1);
             setPasso(2);
           }}
@@ -405,6 +408,7 @@ function Passo1({
   const [escolhido, setEscolhido] = useState<string | null>(rascunho?.mq_documento_id ?? null);
   const [revisao, setRevisao] = useState<string>(rascunho?.mq_revisao ?? "");
   const [working, setWorking] = useState(false);
+  const qc = useQueryClient();
 
   async function confirmar() {
     if (!escolhido) return;
@@ -412,11 +416,33 @@ function Passo1({
     try {
       const { data: u } = await supabase.auth.getUser();
       if (rascunho) {
+        const mudouMQT = rascunho.mq_documento_id !== escolhido;
+
+        if (mudouMQT) {
+          await supabase.from("classificacao_artigos").delete().eq("orcamento_id", rascunho.id);
+          await supabase.from("orcamento_artigos").delete().eq("orcamento_id", rascunho.id);
+          await supabase.from("orcamento_capitulos").delete().eq("orcamento_id", rascunho.id);
+        }
+
         // Atualiza rascunho existente
-        await supabase
+        const { error } = await supabase
           .from("orcamentos")
-          .update({ mq_documento_id: escolhido, mq_revisao: revisao || null })
+          .update({
+            mq_documento_id: escolhido,
+            mq_revisao: revisao || null,
+            wizard_passo: 1,
+            estado_mq: mudouMQT ? "importado" : rascunho.estado_mq,
+          })
           .eq("id", rascunho.id);
+        if (error) throw error;
+
+        qc.setQueryData(["prep-orc", obraId], {
+          ...rascunho,
+          mq_documento_id: escolhido,
+          mq_revisao: revisao || null,
+          wizard_passo: 1,
+          estado_mq: mudouMQT ? "importado" : rascunho.estado_mq,
+        });
       } else {
         // Cria rascunho técnico
         const { data: existentes } = await supabase
@@ -443,6 +469,10 @@ function Passo1({
         });
         if (error) throw error;
       }
+      await qc.invalidateQueries({ queryKey: ["prep-orc", obraId] });
+      await qc.invalidateQueries({ queryKey: ["prep-passo2"] });
+      await qc.invalidateQueries({ queryKey: ["prep-passo3"] });
+      await qc.invalidateQueries({ queryKey: ["prep-passo4"] });
       await onSelecionado();
     } catch (e: any) {
       toast.error(e.message ?? "Erro");
@@ -550,15 +580,15 @@ function Passo2({
   const [erro, setErro] = useState<string | null>(null);
 
   const { data: status, refetch } = useQuery({
-    queryKey: ["prep-passo2", rascunho.id],
+    queryKey: ["prep-passo2", rascunho.id, mqAtivo?.id],
     queryFn: async () => {
-      const [{ count: artigos }, { count: caps }, { data: docInfo }] = await Promise.all([
+      const [{ count: artigos }, { count: caps }] = await Promise.all([
         supabase.from("orcamento_artigos").select("id", { count: "exact", head: true }).eq("orcamento_id", rascunho.id),
         supabase.from("orcamento_capitulos").select("id", { count: "exact", head: true }).eq("orcamento_id", rascunho.id),
-        supabase.from("documentos").select("nome, storage_path").eq("id", rascunho.mq_documento_id).maybeSingle(),
       ]);
-      return { artigos: artigos ?? 0, caps: caps ?? 0, docNome: docInfo?.nome ?? "—", storagePath: docInfo?.storage_path ?? null };
+      return { artigos: artigos ?? 0, caps: caps ?? 0, docNome: mqAtivo?.nome ?? "—", storagePath: mqAtivo?.storage_path ?? null };
     },
+    enabled: !!mqAtivo,
   });
 
   async function executar() {
@@ -567,12 +597,13 @@ function Passo2({
       onVoltar();
       return;
     }
-    if (!status?.storagePath) return;
+    const storagePath = mqAtivo.storage_path;
+    if (!storagePath) return;
     setWorking(true);
     setErro(null);
     try {
       // Download do storage
-      const { data: blob, error: dlErr } = await supabase.storage.from("documentos").download(status.storagePath);
+      const { data: blob, error: dlErr } = await supabase.storage.from("documentos").download(storagePath);
       if (dlErr) throw dlErr;
       const buf = await blob.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
