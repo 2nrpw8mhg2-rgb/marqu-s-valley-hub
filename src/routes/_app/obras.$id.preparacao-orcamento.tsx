@@ -910,6 +910,7 @@ function Passo3({ rascunho, onConcluido }: { rascunho: any; onConcluido: () => P
 type EstadoCls = "classificado_auto" | "necessita_revisao" | "sem_classificacao" | "validado";
 type ClsRow = {
   id: string; orcamento_id: string; artigo_origem_id: string;
+  orcamento_artigos?: { ordem: number } | null;
   descricao_original: string; unidade_original: string | null; quantidade_original: number | null;
   especialidade_id: string | null; subespecialidade_id: string | null;
   categoria_id: string | null; artigo_mestre_id: string | null;
@@ -931,13 +932,16 @@ function Passo4({ rascunho, onAbrirValidacao, onConcluir }: { rascunho: any; onA
     queryFn: async () => {
       let q = supabase.from("classificacao_artigos").select("*, orcamento_artigos!inner(ordem)")
         .eq("orcamento_id", orcamentoId)
-        .order("ordem", { referencedTable: "orcamento_artigos", ascending: true })
         .order("created_at", { ascending: true });
       if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
       if (search.trim()) q = q.ilike("descricao_original", `%${search.trim()}%`);
       const { data, error } = await q.limit(5000);
       if (error) throw error;
-      return (data ?? []) as ClsRow[];
+      return ((data ?? []) as ClsRow[]).sort((a, b) => {
+        const ao = a.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
+        const bo = b.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
+        return ao - bo;
+      });
     },
   });
 
