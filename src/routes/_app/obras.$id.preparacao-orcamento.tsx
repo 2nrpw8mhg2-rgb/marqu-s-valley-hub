@@ -393,11 +393,13 @@ function Passo1({
   obraId,
   rascunho,
   mqDocs,
+  pastaExiste,
   onSelecionado,
 }: {
   obraId: string;
   rascunho: any;
   mqDocs: { id: string; nome: string; storage_path: string; created_at: string; tamanho: number | null }[];
+  pastaExiste: boolean;
   onSelecionado: () => Promise<void>;
 }) {
   const [escolhido, setEscolhido] = useState<string | null>(rascunho?.mq_documento_id ?? null);
