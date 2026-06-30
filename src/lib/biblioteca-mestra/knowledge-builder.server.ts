@@ -295,12 +295,14 @@ function derivarNegativos(
   vocPositivoCanonico: Set<string>,
   vocReaisDoArtigo: Set<string>,
   idx: IndiceGlobal,
+  ancorasArtigo: Set<string> = new Set(),
   maxAlta = 8,
   limiarAutoConfianca = 90
 ): { termos: GeneratedTermo[]; rejeicoes: RemocaoNegativo[] } {
   type Cand = {
     termo: string; espDom: string; domPct: number; exclusividade: number;
     suporte: number; totalAll: number; confianca: number;
+    proximidade: number; coOcorrentes: string[];
   };
   const out: Cand[] = [];
   const rejeicoes: RemocaoNegativo[] = [];
@@ -308,6 +310,18 @@ function derivarNegativos(
   const rejeitar = (termo: string, motivo: string) => {
     if (rejeicoes.length < 40) rejeicoes.push({ termo, motivo });
   };
+
+  // Âncoras = vocabulário canónico que caracteriza este artigo (descrição,
+  // positivos, contexto, histórico real). É o que permite diferenciar
+  // negativos por artigo: dois artigos da mesma especialidade têm âncoras
+  // diferentes, logo confundíveis diferentes.
+  const ancoras = new Set<string>(ancorasArtigo);
+  for (const t of vocPositivoCanonico) ancoras.add(t);
+  for (const t of vocReaisDoArtigo) ancoras.add(t);
+  for (const t of vocArtigoAtual) ancoras.add(t);
+  for (const a of [...ancoras]) {
+    if (tokenGenerico(a)) ancoras.delete(a);
+  }
 
   for (const [termoCanon, espMap] of idx.termoEspArtigos.entries()) {
     if (tokenGenerico(termoCanon)) { rejeitar(termoCanon, "vocabulário genérico"); continue; }
@@ -335,28 +349,70 @@ function derivarNegativos(
     const exclusividade = totalAll > 0 ? bestSize / totalAll : 0;
     if (exclusividade < 0.90) { rejeitar(termoCanon, `exclusividade baixa (${Math.round(exclusividade * 100)}%)`); continue; }
 
-    // Confiança combina exclusividade inter-especialidades e suporte absoluto.
-    // Só grava automaticamente termos quase inequívocos; os restantes são
-    // rejeitados em silêncio/log, porque negativo incorreto é pior que ausência.
     const suporteScore = Math.min(1, Math.log2(bestSize + 1) / 6);
     const confianca = Math.round(100 * ((0.70 * exclusividade) + (0.30 * suporteScore)));
     if (confianca < limiarAutoConfianca) { rejeitar(termoCanon, `confiança ${confianca}% abaixo do limiar ${limiarAutoConfianca}%`); continue; }
 
-    out.push({ termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade, suporte: bestSize, totalAll, confianca });
+    // Proximidade por artigo: para cada artigo da especialidade dominante onde
+    // o termo aparece, conta tokens em comum com as âncoras deste Artigo
+    // Mestre. Quanto maior, mais "confundível" — preferimos esses negativos
+    // porque tratam falsos positivos reais deste artigo, e não exclusividade
+    // estatística no abstrato.
+    let proximidade = 0;
+    const coOcorrentes = new Set<string>();
+    if (ancoras.size) {
+      const arts = espMap.get(bestEsp);
+      if (arts) {
+        for (const aId of arts) {
+          const voc = idx.artigoTermos.get(aId);
+          if (!voc) continue;
+          for (const t of voc) {
+            if (t === termoCanon) continue;
+            if (ancoras.has(t)) {
+              proximidade++;
+              if (coOcorrentes.size < 5) coOcorrentes.add(t);
+            }
+          }
+        }
+      }
+    }
+
+    out.push({
+      termo: termoCanon, espDom: bestEsp, domPct: bestDom, exclusividade,
+      suporte: bestSize, totalAll, confianca,
+      proximidade, coOcorrentes: [...coOcorrentes],
+    });
   }
 
-  out.sort((a, b) => b.confianca - a.confianca);
+  // Normaliza proximidade para [0,1] usando o máximo observado e ordena por
+  // score combinado: 50% proximidade ao artigo + 50% confiança estatística.
+  // Empate: maior exclusividade, depois maior suporte.
+  const maxProx = out.reduce((m, c) => Math.max(m, c.proximidade), 0);
+  const scored = out.map((c) => {
+    const proxNorm = maxProx > 0 ? c.proximidade / maxProx : 0;
+    const score = 0.5 * proxNorm + 0.5 * (c.confianca / 100);
+    return { ...c, proxNorm, score };
+  });
+  scored.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.exclusividade !== a.exclusividade) return b.exclusividade - a.exclusividade;
+    return b.suporte - a.suporte;
+  });
 
   const altas: GeneratedTermo[] = [];
   const vistos = new Set<string>();
-  for (const n of out) {
+  for (const n of scored) {
     const c = canonicalizar(n.termo);
     if (!c || vistos.has(c)) continue;
     vistos.add(c);
+    const proxBit = n.proximidade > 0 && n.coOcorrentes.length
+      ? ` Confundível com este artigo via co-ocorrência com: ${n.coOcorrentes.join(", ")}.`
+      : "";
     const just =
       `"${n.termo}" é específico de ${idx.nomeEsp.get(n.espDom) ?? ""} ` +
       `(${n.suporte} de ${n.totalAll} ocorrências; ${Math.round(n.exclusividade * 100)}% exclusividade, ` +
-      `${Math.round(n.domPct * 100)}% dominância) e não aparece no artigo/especialidade atual.`;
+      `${Math.round(n.domPct * 100)}% dominância) e não aparece no artigo/especialidade atual.` +
+      proxBit;
     if (altas.length < maxAlta) altas.push({
       termo: n.termo,
       peso: 30,
