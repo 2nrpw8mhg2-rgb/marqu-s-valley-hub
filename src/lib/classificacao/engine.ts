@@ -181,7 +181,7 @@ function ngrams(tokens: string[], n: number): string[] {
 // ---- Carregamento --------------------------------------------------------
 
 async function loadBib(): Promise<Bib> {
-  const [{ data: arts }, { data: artKw }, { data: subKw }, { data: espKw }, { data: subs }, { data: esps }, { data: cats }, { data: mem }] = await Promise.all([
+  const [{ data: arts }, { data: artKw }, { data: subKw }, { data: espKw }, { data: subs }, { data: esps }, { data: cats }, { data: mem }, { data: conhecRaw }] = await Promise.all([
     supabase.from("biblioteca_artigos").select("id, descricao, unidade, subespecialidade_id, categoria_id").eq("ativo", true),
     supabase.from("biblioteca_artigo_keywords").select("artigo_id, termo, tipo"),
     supabase.from("biblioteca_subespecialidade_keywords").select("subespecialidade_id, termo, tipo, peso").eq("ativo", true),
@@ -190,6 +190,7 @@ async function loadBib(): Promise<Bib> {
     supabase.from("biblioteca_especialidades").select("id, nome"),
     supabase.from("biblioteca_categorias").select("id, nome, subespecialidade_id"),
     supabase.from("classificacao_memoria").select("descricao_normalizada, artigo_mestre_id"),
+    supabase.from("biblioteca_artigo_conhecimento").select("artigo_mestre_id, tipo, termo, peso").eq("ativo", true).in("tipo", ["negativo_incompativel", "negativo_concorrente", "termo_negativo", "unidade_compativel", "exemplo_real"]),
   ]);
 
   const artigos: ArtigoBib[] = (arts ?? []).map((a: any) => {
@@ -216,6 +217,36 @@ async function loadBib(): Promise<Bib> {
     for (const t of a.token_set) docFreq.set(t, (docFreq.get(t) ?? 0) + 1);
   }
 
+  const conhec: Conhecimento = {
+    negIncompat: new Map(),
+    negConcorrente: new Map(),
+    unidades: new Map(),
+    exemplos: new Map(),
+  };
+  for (const r of (conhecRaw ?? []) as any[]) {
+    const aid = r.artigo_mestre_id as string;
+    const termo = (r.termo as string) ?? "";
+    if (!termo) continue;
+    if (r.tipo === "negativo_incompativel" || r.tipo === "termo_negativo") {
+      const arr = conhec.negIncompat.get(aid) ?? [];
+      arr.push({ termo, termo_norm: normalizar(termo), peso: Number(r.peso) || -60 });
+      conhec.negIncompat.set(aid, arr);
+    } else if (r.tipo === "negativo_concorrente") {
+      const arr = conhec.negConcorrente.get(aid) ?? [];
+      arr.push({ termo, termo_norm: normalizar(termo), peso: Number(r.peso) || -15 });
+      conhec.negConcorrente.set(aid, arr);
+    } else if (r.tipo === "unidade_compativel") {
+      const set = conhec.unidades.get(aid) ?? new Set<string>();
+      set.add(normalizarUnidade(termo));
+      conhec.unidades.set(aid, set);
+    } else if (r.tipo === "exemplo_real") {
+      const arr = conhec.exemplos.get(aid) ?? [];
+      const n = normalizar(termo);
+      arr.push({ termo_norm: n, tokens: new Set(tokenize(termo)) });
+      conhec.exemplos.set(aid, arr);
+    }
+  }
+
   return {
     artigos,
     artKw: (artKw ?? []).map((k: any) => ({ ...k, termo_norm: normalizar(k.termo) })),
@@ -226,6 +257,7 @@ async function loadBib(): Promise<Bib> {
     cats: new Map((cats ?? []).map((c: any) => [c.id, c])),
     memoria: new Map((mem ?? []).map((m: any) => [m.descricao_normalizada, m.artigo_mestre_id])),
     docFreq,
+    conhec,
   };
 }
 
