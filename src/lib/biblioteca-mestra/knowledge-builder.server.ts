@@ -655,7 +655,7 @@ function melhorarPalavrasChave(gen: Generated, fontes: Fontes): { removidos: Rem
 
   gen.palavras_chave = palavrasBoas
     .sort((a, b) => (b.confianca - a.confianca) || (Math.abs(b.peso) - Math.abs(a.peso)))
-    .slice(0, TIPO_LIMIT);
+    .slice(0, LIMITES.palavras_chave);
   return { removidos, movidosParaExpressoes };
 }
 
