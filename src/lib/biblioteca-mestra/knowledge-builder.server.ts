@@ -2020,6 +2020,18 @@ export async function processRun(runId: string) {
       .single();
     if (error || !run) throw error ?? new Error("Run não encontrada");
 
+    if (run.estado !== "pendente") return;
+
+    const { data: claimed, error: claimError } = await sb
+      .from("biblioteca_knowledge_run")
+      .update({ estado: "em_curso" })
+      .eq("id", runId)
+      .eq("estado", "pendente")
+      .select("id")
+      .maybeSingle();
+    if (claimError) throw claimError;
+    if (!claimed) return;
+
     const scope: Scope =
       run.scope_tipo === "especialidade"
         ? { tipo: "especialidade", especialidadeId: (run.scope_ids as any).especialidadeId }

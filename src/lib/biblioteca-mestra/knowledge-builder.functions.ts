@@ -14,6 +14,19 @@ function validateScope(s: any): ScopeInput {
   throw new Error("scope inválido");
 }
 
+function dispatchKnowledgeRun(runId: string) {
+  const work = import("./knowledge-builder.server")
+    .then(({ processRun }) => processRun(runId))
+    .catch((e) => console.error("knowledge run failed", e));
+
+  const edgeRuntime = (globalThis as any).EdgeRuntime;
+  if (edgeRuntime && typeof edgeRuntime.waitUntil === "function") {
+    edgeRuntime.waitUntil(work);
+  } else {
+    void work;
+  }
+}
+
 export const previewKnowledgeScope = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { scope: ScopeInput }) => ({ scope: validateScope(data?.scope) }))
@@ -49,9 +62,7 @@ export const startKnowledgeRun = createServerFn({ method: "POST" })
     if (error) throw error;
 
     const runId = row.id as string;
-    // dispara em background
-    const { processRun } = await import("./knowledge-builder.server");
-    void processRun(runId).catch((e) => console.error("knowledge run failed", e));
+    dispatchKnowledgeRun(runId);
 
     return { runId };
   });
@@ -69,6 +80,7 @@ export const getKnowledgeRunStatus = createServerFn({ method: "POST" })
       .eq("id", data.runId)
       .single();
     if (error) throw error;
+    if (row?.estado === "pendente") dispatchKnowledgeRun(data.runId);
     return row;
   });
 
