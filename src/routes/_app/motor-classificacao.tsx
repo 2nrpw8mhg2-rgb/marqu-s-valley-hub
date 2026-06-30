@@ -96,8 +96,10 @@ function CentroClassificacao() {
     queryKey: ["cc-rows", orcamento, estadoFilter, search],
     enabled: !!orcamento && !!run && run.estado === "concluido",
     queryFn: async () => {
-      let q = supabase.from("classificacao_artigos").select("*")
-        .eq("orcamento_id", orcamento).order("created_at", { ascending: true });
+      let q = supabase.from("classificacao_artigos").select("*, orcamento_artigos!inner(ordem)")
+        .eq("orcamento_id", orcamento)
+        .order("ordem", { referencedTable: "orcamento_artigos", ascending: true })
+        .order("created_at", { ascending: true });
       if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
       if (search.trim()) q = q.ilike("descricao_original", `%${search.trim()}%`);
       const { data, error } = await q.limit(2000);
