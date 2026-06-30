@@ -135,6 +135,37 @@ function isMeaningfulDescription(v: any): boolean {
   return !isUnitLike(s) && !isNumberLike(s);
 }
 
+function isTotalRow(descricao: string, unidade: string | null, qtd: number): boolean {
+  if (unidade || qtd !== 0) return false;
+  return /^(total|subtotal|sub total|soma)\b/.test(NORM(descricao));
+}
+
+function isSimpleChapterCode(codigo: string | null): boolean {
+  if (!codigo) return false;
+  const c = codigo.trim();
+  return /^\d{1,3}(\.\d{1,3}){0,2}$/.test(c) || /^[A-Z]$/i.test(c);
+}
+
+function looksLikeArticleWork(descricao: string): boolean {
+  const n = NORM(descricao);
+  return /\b(execucao|fornecimento|aplicacao|montagem|instalacao|colocacao|remocao|demolicao|pintura|revestimento|regularizacao|limpeza|transporte|carga|descarga|abertura|fecho|reparacao|substituicao|assentamento|betonagem|cofragem|armadura|escavacao|aterro)\b/.test(n);
+}
+
+function looksLikeChapterTitle(descricao: string): boolean {
+  const raw = descricao.trim();
+  const n = NORM(raw);
+  if (!n || isHeaderText(raw) || /^(total|subtotal|sub total|soma)\b/.test(n)) return false;
+  if (/^(capitulo|capítulo|parte|lote|especialidade|subcapitulo|subcapítulo)\b/i.test(raw)) return true;
+
+  const words = n.split(" ").filter(Boolean);
+  if (words.length > 7 || raw.length > 90) return false;
+
+  const letters = raw.replace(/[^a-zA-ZÀ-ÿ]/g, "");
+  if (letters.length < 4) return false;
+  const upper = letters.replace(/[^A-ZÀ-Ý]/g, "").length;
+  return upper / letters.length > 0.75;
+}
+
 function headerNear(rows: any[][], col: number, untilRow: number): string {
   const parts: string[] = [];
   for (let ri = Math.max(0, untilRow - 6); ri < Math.min(rows.length, untilRow + 2); ri++) {
@@ -268,15 +299,17 @@ export function parseRows(rows: any[][], headerRowIdx: number, map: ColumnMap): 
     const unidade = map.unidade != null ? String(r[map.unidade] ?? "").trim() || null : null;
     const qtd = map.quantidade != null ? toNum(r[map.quantidade]) : 0;
     const preco = map.preco != null ? toNum(r[map.preco]) : 0;
-    const normDesc = NORM(descricao);
-    if (!unidade && qtd === 0 && /^(total|subtotal|sub total|soma)\b/.test(normDesc)) continue;
-    const hasArticleSignal = !!codigo || !!unidade || (qtd !== 0 && isMeaningfulDescription(descricao));
-    if (!hasArticleSignal) continue;
+    if (isTotalRow(descricao, unidade, qtd)) continue;
+    if (!isMeaningfulDescription(descricao) && !codigo && !unidade && qtd === 0 && preco === 0) continue;
 
-    // Heurística capítulo: tem código tipo "1", "01", "1.1" sem unidade nem qtd
-    const isCapitulo =
-      (!unidade && qtd === 0 && preco === 0) ||
-      (!!codigo && /^[0-9]+(\.[0-9]+)*$/.test(codigo) && !unidade && qtd === 0);
+    const semMedicao = !unidade && qtd === 0 && preco === 0;
+    // Heurística capítulo: só é capítulo quando há sinal estrutural claro.
+    // Linhas apenas com descrição continuam como artigos, para não desaparecerem do MQT.
+    const shortNeutralTitle =
+      isSimpleChapterCode(codigo) &&
+      NORM(descricao).split(" ").filter(Boolean).length <= 5 &&
+      !looksLikeArticleWork(descricao);
+    const isCapitulo = semMedicao && (looksLikeChapterTitle(descricao) || shortNeutralTitle);
 
     out.push({ isCapitulo, sourceRow: i, codigo, descricao, unidade, quantidade: qtd, preco_unitario: preco });
   }

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -46,6 +46,40 @@ import * as XLSX from "xlsx";
 export const Route = createFileRoute("/_app/obras/$id/preparacao-orcamento")({
   component: PreparacaoOrcamentoWizard,
 });
+
+async function fetchClassificacaoRows(orcamentoId: string, estadoFilter = "all", search = "") {
+  const out: ClsRow[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    let q = supabase.from("classificacao_artigos").select("*, orcamento_artigos!inner(ordem, capitulo_id, capitulo:orcamento_capitulos(id, codigo, descricao, ordem))")
+      .eq("orcamento_id", orcamentoId)
+      .order("created_at", { ascending: true });
+    if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
+    if (search.trim()) q = q.ilike("descricao_original", `%${search.trim()}%`);
+    const { data, error } = await q.range(from, from + pageSize - 1);
+    if (error) throw error;
+    out.push(...((data ?? []) as ClsRow[]));
+    if (!data || data.length < pageSize) break;
+  }
+  return out.sort((a, b) => {
+    const ao = a.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
+    const bo = b.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
+    if (ao !== bo) return ao - bo;
+    return a.descricao_original.localeCompare(b.descricao_original, "pt-PT");
+  });
+}
+
+async function countClassificacoes(orcamentoId: string) {
+  const estados: EstadoCls[] = ["classificado_auto", "necessita_revisao", "sem_classificacao", "validado"];
+  const counts = await Promise.all([
+    supabase.from("classificacao_artigos").select("id", { count: "exact", head: true }).eq("orcamento_id", orcamentoId),
+    ...estados.map((estado) => supabase.from("classificacao_artigos").select("id", { count: "exact", head: true }).eq("orcamento_id", orcamentoId).eq("estado", estado)),
+  ]);
+  const failed = counts.find((r) => r.error);
+  if (failed?.error) throw failed.error;
+  const [total, auto, rever, sem, validados] = counts.map((r) => r.count ?? 0);
+  return { total, auto, rever, sem, validados };
+}
 
 // ----- Tipos de documentação esperados na obra (para o checklist) -----
 const CHECKLIST = [
@@ -703,19 +737,25 @@ function Passo2({
 
       // Capítulos
       const caps = parsed.filter((r) => r.isCapitulo);
-      const capIds = new Map<string, string>();
+      const capIds = new Map<number, string>();
       if (caps.length) {
-        const { data: insertedCaps, error: e1 } = await supabase
-          .from("orcamento_capitulos")
-          .insert(caps.map((c) => ({
+        const capPayload = caps.map((c) => {
+          const id = crypto.randomUUID();
+          capIds.set(c.sourceRow, id);
+          return {
+            id,
             orcamento_id: rascunho.id,
             codigo: c.codigo,
             descricao: c.descricao,
             ordem: (c.sourceRow + 1) * 10,
-          })))
-          .select("id, descricao");
+          };
+        });
+        const { data: insertedCaps, error: e1 } = await supabase
+          .from("orcamento_capitulos")
+          .insert(capPayload)
+          .select("id");
         if (e1) throw e1;
-        insertedCaps?.forEach((c) => capIds.set(c.descricao, c.id));
+        if (!insertedCaps?.length) throw new Error("Não foi possível guardar os capítulos do MQT.");
       }
 
       // Artigos (preço deliberadamente zero — esta fase é só estrutura/quantidades)
@@ -723,7 +763,7 @@ function Passo2({
       const payload = parsed
         .map((r, idx) => {
           if (r.isCapitulo) {
-            currentCap = capIds.get(r.descricao) ?? null;
+            currentCap = capIds.get(r.sourceRow) ?? null;
             return null;
           }
           return {
@@ -910,7 +950,11 @@ function Passo3({ rascunho, onConcluido }: { rascunho: any; onConcluido: () => P
 type EstadoCls = "classificado_auto" | "necessita_revisao" | "sem_classificacao" | "validado";
 type ClsRow = {
   id: string; orcamento_id: string; artigo_origem_id: string;
-  orcamento_artigos?: { ordem: number } | null;
+  orcamento_artigos?: {
+    ordem: number;
+    capitulo_id?: string | null;
+    capitulo?: { id: string; codigo: string | null; descricao: string | null; ordem: number | null } | null;
+  } | null;
   descricao_original: string; unidade_original: string | null; quantidade_original: number | null;
   especialidade_id: string | null; subespecialidade_id: string | null;
   categoria_id: string | null; artigo_mestre_id: string | null;
@@ -929,38 +973,14 @@ function Passo4({ rascunho, onAbrirValidacao, onConcluir }: { rascunho: any; onA
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["prep-passo4-rows", orcamentoId, estadoFilter, search],
-    queryFn: async () => {
-      let q = supabase.from("classificacao_artigos").select("*, orcamento_artigos!inner(ordem)")
-        .eq("orcamento_id", orcamentoId)
-        .order("created_at", { ascending: true });
-      if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
-      if (search.trim()) q = q.ilike("descricao_original", `%${search.trim()}%`);
-      const { data, error } = await q.limit(5000);
-      if (error) throw error;
-      return ((data ?? []) as ClsRow[]).sort((a, b) => {
-        const ao = a.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
-        const bo = b.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
-        return ao - bo;
-      });
-    },
+    queryFn: () => fetchClassificacaoRows(orcamentoId, estadoFilter, search),
   });
 
-  const { data: allRows = [] } = useQuery({
+  const { data: stats = { total: 0, validados: 0, auto: 0, rever: 0, sem: 0 } } = useQuery({
     queryKey: ["prep-passo4-stats", orcamentoId],
-    queryFn: async () => {
-      const { data } = await supabase.from("classificacao_artigos").select("estado").eq("orcamento_id", orcamentoId).limit(10000);
-      return (data ?? []) as { estado: EstadoCls }[];
-    },
+    queryFn: () => countClassificacoes(orcamentoId),
     refetchInterval: 8000,
   });
-
-  const stats = useMemo(() => ({
-    total: allRows.length,
-    validados: allRows.filter((x) => x.estado === "validado").length,
-    auto: allRows.filter((x) => x.estado === "classificado_auto").length,
-    rever: allRows.filter((x) => x.estado === "necessita_revisao").length,
-    sem: allRows.filter((x) => x.estado === "sem_classificacao").length,
-  }), [allRows]);
 
   const { data: esps = [] } = useQuery({
     queryKey: ["prep-esps"],
@@ -1112,63 +1132,75 @@ function Passo4({ rascunho, onAbrirValidacao, onConcluir }: { rascunho: any; onA
               {!isLoading && rows.length === 0 && (
                 <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sem resultados para os filtros.</TableCell></TableRow>
               )}
-              {rows.map((r) => {
+              {rows.map((r, index) => {
                 const art: any = r.artigo_mestre_id ? artMap.get(r.artigo_mestre_id) : null;
                 const espNome = r.especialidade_id ? espMap.get(r.especialidade_id) : null;
                 const subNome = r.subespecialidade_id ? (subMap.get(r.subespecialidade_id) as any)?.nome : null;
                 const catNome = r.categoria_id ? (catMap.get(r.categoria_id) as any)?.nome : null;
                 const trail = [espNome, subNome, catNome, art?.descricao].filter(Boolean) as string[];
                 const acao = calcularProximaAcao({ estado: r.estado, metodo: r.metodo_match, confianca: r.confianca, candidatos: r.candidatos });
+                const capitulo = r.orcamento_artigos?.capitulo ?? null;
+                const prevCapituloId = rows[index - 1]?.orcamento_artigos?.capitulo?.id ?? null;
+                const showCapitulo = !!capitulo && capitulo.id !== prevCapituloId;
                 const onAcao = () => {
                   if (acao.tipo === "aceitar") validar(r);
                   else if (acao.tipo === "corrigir" || acao.tipo === "escolher") setDialogRow(r);
                   else setPanelRow(r);
                 };
                 return (
-                  <TableRow key={r.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setPanelRow(r)}>
-                    <TableCell className="max-w-[300px]">
-                      <div className="text-sm line-clamp-2">{r.descricao_original}</div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {r.unidade_original ?? "—"} · qtd {r.quantidade_original ?? "—"}
-                      </div>
-                    </TableCell>
-                    <TableCell className="max-w-[280px]">
-                      {trail.length === 0 ? (
-                        <Badge variant="outline" className="text-muted-foreground">Sem destino</Badge>
-                      ) : (
-                        <div className="space-y-0.5">
-                          {trail.map((t, i) => (
-                            <div key={i} className="flex items-center gap-1 text-xs">
-                              {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
-                              <span className={i === trail.length - 1 ? "font-medium" : "text-muted-foreground"}>{t}</span>
-                            </div>
-                          ))}
+                  <Fragment key={r.id}>
+                    {showCapitulo && (
+                      <TableRow className="bg-muted/60 hover:bg-muted/60">
+                        <TableCell colSpan={6} className="py-2 text-xs font-semibold text-foreground">
+                          {capitulo.codigo ? `${capitulo.codigo} — ` : ""}{capitulo.descricao ?? "Capítulo"}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => setPanelRow(r)}>
+                      <TableCell className="max-w-[300px]">
+                        <div className="text-sm line-clamp-2">{r.descricao_original}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {r.unidade_original ?? "—"} · qtd {r.quantidade_original ?? "—"}
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell><ResultadoIABadge metodo={r.metodo_match} estado={r.estado} /></TableCell>
-                    <TableCell><ConfiancaBar value={r.confianca} /></TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <ProximaAcaoChip acao={acao} onClick={onAcao} />
-                    </TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-1 justify-end">
-                        <Button size="sm" variant="ghost" title="Pesquisar Artigo Mestre" onClick={() => setDialogRow(r)}>
-                          {r.artigo_mestre_id ? <Edit3 className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
-                        </Button>
-                        {r.estado !== "validado" && (
-                          <Button size="sm" variant="ghost" title="Validar" onClick={() => validar(r)} disabled={!r.artigo_mestre_id}>
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                          </Button>
+                      </TableCell>
+                      <TableCell className="max-w-[280px]">
+                        {trail.length === 0 ? (
+                          <Badge variant="outline" className="text-muted-foreground">Sem destino</Badge>
+                        ) : (
+                          <div className="space-y-0.5">
+                            {trail.map((t, i) => (
+                              <div key={i} className="flex items-center gap-1 text-xs">
+                                {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+                                <span className={i === trail.length - 1 ? "font-medium" : "text-muted-foreground"}>{t}</span>
+                              </div>
+                            ))}
+                          </div>
                         )}
-                        {r.artigo_mestre_id && (
-                          <Button size="sm" variant="ghost" title="Remover" onClick={() => remover(r)}>
-                            <X className="h-3.5 w-3.5" />
+                      </TableCell>
+                      <TableCell><ResultadoIABadge metodo={r.metodo_match} estado={r.estado} /></TableCell>
+                      <TableCell><ConfiancaBar value={r.confianca} /></TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <ProximaAcaoChip acao={acao} onClick={onAcao} />
+                      </TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex gap-1 justify-end">
+                          <Button size="sm" variant="ghost" title="Pesquisar Artigo Mestre" onClick={() => setDialogRow(r)}>
+                            {r.artigo_mestre_id ? <Edit3 className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
                           </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                          {r.estado !== "validado" && (
+                            <Button size="sm" variant="ghost" title="Validar" onClick={() => validar(r)} disabled={!r.artigo_mestre_id}>
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {r.artigo_mestre_id && (
+                            <Button size="sm" variant="ghost" title="Remover" onClick={() => remover(r)}>
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </Fragment>
                 );
               })}
             </TableBody>

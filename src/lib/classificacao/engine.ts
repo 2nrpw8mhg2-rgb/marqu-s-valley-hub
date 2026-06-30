@@ -694,6 +694,23 @@ export type ClassificacaoProgress = {
   porAnalisar: number;
 };
 
+async function fetchAllOrcamentoArtigos(orcamentoId: string) {
+  const out: any[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("orcamento_artigos").select("id, orcamento_id, descricao, unidade, quantidade, ordem, created_at")
+      .eq("orcamento_id", orcamentoId)
+      .order("ordem", { ascending: true })
+      .order("created_at", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    out.push(...(data ?? []));
+    if (!data || data.length < pageSize) break;
+  }
+  return out;
+}
+
 export async function runClassificacao(orcamentoId: string, onProgress?: (snapshot: ClassificacaoProgress) => void) {
   const { data: u } = await supabase.auth.getUser();
   const { data: run, error: runErr } = await supabase.from("orcamento_classificacao_run").insert({
@@ -701,11 +718,7 @@ export async function runClassificacao(orcamentoId: string, onProgress?: (snapsh
   }).select("id").single();
   if (runErr) throw runErr;
 
-  const { data: artigos } = await supabase
-    .from("orcamento_artigos").select("id, orcamento_id, descricao, unidade, quantidade, ordem")
-    .eq("orcamento_id", orcamentoId)
-    .order("ordem", { ascending: true })
-    .order("created_at", { ascending: true });
+  const artigos = await fetchAllOrcamentoArtigos(orcamentoId);
 
   const { data: existentes } = await supabase
     .from("classificacao_artigos").select("artigo_origem_id, estado")
