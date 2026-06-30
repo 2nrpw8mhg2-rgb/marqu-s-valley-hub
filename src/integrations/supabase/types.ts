@@ -1875,6 +1875,11 @@ export type Database = {
         | "expressao"
         | "material"
         | "termo_negativo"
+        | "negativo_concorrente"
+        | "negativo_incompativel"
+        | "unidade_compativel"
+        | "capitulo_tipico"
+        | "exemplo_real"
       biblioteca_keyword_origem: "manual" | "ia"
       biblioteca_keyword_tipo: "positiva" | "negativa"
       categoria_sistema:
@@ -2123,6 +2128,11 @@ export const Constants = {
         "expressao",
         "material",
         "termo_negativo",
+        "negativo_concorrente",
+        "negativo_incompativel",
+        "unidade_compativel",
+        "capitulo_tipico",
+        "exemplo_real",
       ],
       biblioteca_keyword_origem: ["manual", "ia"],
       biblioteca_keyword_tipo: ["positiva", "negativa"],
