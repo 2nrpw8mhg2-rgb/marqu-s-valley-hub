@@ -589,11 +589,24 @@ function palavraChaveTemEvidencia(termoCanon: string, fontes: Fontes): boolean {
   if (textoContemTermo(fontes.artigo.observacoes, termoCanon)) return true;
   if (textoContemTermo(fontes.contexto.subespecialidade, termoCanon)) return true;
   if (textoContemTermo(fontes.contexto.categoria, termoCanon)) return true;
+  if (textoContemTermo(fontes.contexto.especialidade, termoCanon)) return true;
   for (const h of fontes.historico) {
     if (textoContemTermo(h.descricao, termoCanon)) return true;
   }
   for (const c of fontes.candidatos.slice(0, 20)) {
     if (c.score >= 0.35 && textoContemTermo(c.descricao, termoCanon)) return true;
+  }
+  // Evidência por irmãos da categoria e vocabulário já curado na sub/esp.
+  // Sem isto, qualquer termo legitimamente inferido a partir do contexto
+  // da família era descartado, deixando listas anémicas (3-4 palavras).
+  for (const i of fontes.irmaosCategoria ?? []) {
+    if (textoContemTermo(i.descricao, termoCanon)) return true;
+  }
+  for (const v of fontes.vocReutilizadoSub ?? []) {
+    if (textoContemTermo(v, termoCanon)) return true;
+  }
+  for (const v of fontes.vocReutilizadoEsp ?? []) {
+    if (textoContemTermo(v, termoCanon)) return true;
   }
   return false;
 }
@@ -607,14 +620,17 @@ function motivoPalavraChaveFraca(t: GeneratedTermo, fontes: Fontes): string | nu
   if (partes.every((p) => tokenGenerico(p) || PALAVRAS_CHAVE_FRACAS.has(p))) {
     return "todos os componentes são genéricos";
   }
-  if (Number(t.confianca) < 50) return `confiança ${t.confianca}% demasiado baixa`;
+  // Limiares deliberadamente baixos: esta passagem só elimina genéricos e
+  // duplicados, não estrangula o enriquecimento. A confiança é depois usada
+  // pelo motor de classificação para ponderar matches.
+  if (Number(t.confianca) < 40) return `confiança ${t.confianca}% demasiado baixa`;
 
   const temEvidencia = palavraChaveTemEvidencia(c, fontes);
-  if (!temEvidencia && t.fonte === "inferido" && t.confianca < 75) {
-    return "termo inferido sem evidência suficiente nas fontes";
+  if (!temEvidencia && t.fonte === "inferido" && t.confianca < 55) {
+    return "termo inferido sem evidência mínima nas fontes";
   }
-  if (fontes.semHistorico && !temEvidencia && t.confianca < 80) {
-    return "artigo sem histórico: termo sem evidência forte nas fontes";
+  if (fontes.semHistorico && !temEvidencia && t.confianca < 55) {
+    return "artigo sem histórico: termo sem evidência mínima nas fontes";
   }
   return null;
 }
