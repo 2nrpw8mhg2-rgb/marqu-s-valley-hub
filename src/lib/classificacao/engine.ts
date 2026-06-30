@@ -415,13 +415,20 @@ function scoreCandidato(
     });
   }
   hits.push(...artHitsForArt);
+  if (bonusExemplos > 0) {
+    hits.push({
+      termo: `exemplo real similar (${bonusExemplos} pts)`,
+      nivel: "artigo", entidade_id: art.id, entidade_nome: art.descricao,
+      peso: 1, pontos: bonusExemplos,
+    });
+  }
 
   return {
     art,
     score_texto,
     score_final,
     hits,
-    negs: [...artNegsForArt],
+    negs: [...artNegsForArt, ...incompatHits, ...concorHits],
     unidadeCompat,
     tokensPartilhados: partilhados,
   };
