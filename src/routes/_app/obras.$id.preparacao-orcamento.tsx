@@ -890,9 +890,9 @@ function Passo3({ rascunho, onConcluido }: { rascunho: any; onConcluido: () => P
       </div>
 
       <div className="flex justify-end gap-2">
-        <Button onClick={executar} disabled={running} variant={classificados > 0 ? "outline" : "default"}>
+        <Button onClick={executar} disabled={running} variant={temClassificacao ? "outline" : "default"}>
           {running && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          {classificados > 0 ? "Re-classificar" : "Classificar agora"}
+          {temClassificacao ? "Re-classificar" : "Classificar agora"}
         </Button>
         {podeAvancar && (
           <Button onClick={onConcluido} className="bg-primary text-primary-foreground hover:bg-primary/90">
