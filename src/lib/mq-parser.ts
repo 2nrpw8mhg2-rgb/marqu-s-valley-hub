@@ -146,6 +146,11 @@ function isSimpleChapterCode(codigo: string | null): boolean {
   return /^\d{1,3}(\.\d{1,3}){0,2}$/.test(c) || /^[A-Z]$/i.test(c);
 }
 
+function looksLikeArticleWork(descricao: string): boolean {
+  const n = NORM(descricao);
+  return /\b(execucao|fornecimento|aplicacao|montagem|instalacao|colocacao|remocao|demolicao|pintura|revestimento|regularizacao|limpeza|transporte|carga|descarga|abertura|fecho|reparacao|substituicao|assentamento|betonagem|cofragem|armadura|escavacao|aterro)\b/.test(n);
+}
+
 function looksLikeChapterTitle(descricao: string): boolean {
   const raw = descricao.trim();
   const n = NORM(raw);
@@ -300,8 +305,11 @@ export function parseRows(rows: any[][], headerRowIdx: number, map: ColumnMap): 
     const semMedicao = !unidade && qtd === 0 && preco === 0;
     // Heurística capítulo: só é capítulo quando há sinal estrutural claro.
     // Linhas apenas com descrição continuam como artigos, para não desaparecerem do MQT.
-    const isCapitulo =
-      semMedicao && (isSimpleChapterCode(codigo) || looksLikeChapterTitle(descricao));
+    const shortNeutralTitle =
+      isSimpleChapterCode(codigo) &&
+      NORM(descricao).split(" ").filter(Boolean).length <= 5 &&
+      !looksLikeArticleWork(descricao);
+    const isCapitulo = semMedicao && (looksLikeChapterTitle(descricao) || shortNeutralTitle);
 
     out.push({ isCapitulo, sourceRow: i, codigo, descricao, unidade, quantidade: qtd, preco_unitario: preco });
   }
