@@ -122,6 +122,13 @@ type ArtigoBib = {
   trigrams: string[];
 };
 
+type Conhecimento = {
+  negIncompat: Map<string, { termo: string; termo_norm: string; peso: number }[]>;
+  negConcorrente: Map<string, { termo: string; termo_norm: string; peso: number }[]>;
+  unidades: Map<string, Set<string>>;
+  exemplos: Map<string, { termo_norm: string; tokens: Set<string> }[]>;
+};
+
 type Bib = {
   artigos: ArtigoBib[];
   artKw: { artigo_id: string; termo: string; termo_norm: string; tipo: "positiva" | "negativa" }[];
@@ -132,6 +139,7 @@ type Bib = {
   cats: Map<string, { id: string; nome: string; subespecialidade_id: string }>;
   memoria: Map<string, string>;
   docFreq: Map<string, number>; // token -> nº de artigos mestres que o contêm
+  conhec: Conhecimento;
 };
 
 // ---- Unidades ------------------------------------------------------------
