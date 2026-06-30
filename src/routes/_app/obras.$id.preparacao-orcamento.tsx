@@ -121,14 +121,33 @@ function PreparacaoOrcamentoWizard() {
 
 
 
-  const mqDocs = useMemo(() => {
+  // Pasta "Mapa de Quantidades" desta obra — única fonte autorizada de MQT
+  const mqPastaInfo = useMemo(() => {
     const pastas = (doc?.pastas ?? []) as { id: string; nome: string }[];
-    const docs = (doc?.docs ?? []) as { id: string; nome: string; tipo: string; pasta_id: string | null; storage_path: string; created_at: string; tamanho: number | null }[];
-    const mqPastas = new Set(pastas.filter((p) => p.nome?.toLowerCase() === "mapa de quantidades").map((p) => p.id));
-    return docs
-      .filter((d) => d.tipo === "mq" || (d.pasta_id && mqPastas.has(d.pasta_id)))
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const found = pastas.find((p) => p.nome?.trim().toLowerCase() === "mapa de quantidades");
+    return { existe: !!found, id: found?.id ?? null };
   }, [doc]);
+
+  const mqDocs = useMemo(() => {
+    if (!mqPastaInfo.id) return [];
+    const docs = (doc?.docs ?? []) as { id: string; nome: string; tipo: string; pasta_id: string | null; storage_path: string; created_at: string; tamanho: number | null }[];
+    return docs
+      .filter((d) => d.pasta_id === mqPastaInfo.id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [doc, mqPastaInfo.id]);
+
+  // Documento MQT em uso pelo rascunho — só conta se ainda existir na pasta correta desta obra.
+  const mqAtivo = useMemo(() => {
+    if (!rascunho?.mq_documento_id) return null;
+    return mqDocs.find((d) => d.id === rascunho.mq_documento_id) ?? null;
+  }, [rascunho?.mq_documento_id, mqDocs]);
+
+  const origemInvalida = !!rascunho?.mq_documento_id && !mqAtivo && (doc?.docs?.length ?? 0) >= 0 && mqDocs.length >= 0 && doc !== undefined;
+
+  // Se a origem ficou inválida (doc movido/apagado), forçar regresso ao Passo 1.
+  useEffect(() => {
+    if (origemInvalida) setPasso(1);
+  }, [origemInvalida]);
 
 
   async function persistPasso(p: number) {
