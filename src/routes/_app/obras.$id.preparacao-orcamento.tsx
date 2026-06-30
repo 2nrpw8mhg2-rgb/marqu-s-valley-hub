@@ -204,15 +204,28 @@ function Stepper({ passo, setPasso, maxPasso }: { passo: number; setPasso: (n: n
 // =========================================================================
 //  Passo 0 — Documentação disponível
 // =========================================================================
+type ChecklistRow = {
+  key: string;
+  label: string;
+  count: number;
+  present: boolean;
+  required?: boolean;
+  docs: { id: string; nome: string; tipo: string; created_at: string; tamanho: number | null }[];
+};
+
 function Passo0({
   rows,
+  obraId,
   onAvancar,
 }: {
-  rows: { key: string; label: string; count: number; present: boolean; required?: boolean }[];
+  rows: ChecklistRow[];
+  obraId: string;
   onAvancar: () => void;
 }) {
   const mqRow = rows.find((r) => r.key === "mq");
   const podeAvancar = !!mqRow?.present;
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+
   return (
     <Card className="p-6 space-y-5">
       <div className="flex items-start gap-3">
@@ -220,37 +233,83 @@ function Passo0({
         <div>
           <h3 className="font-semibold">Documentação disponível na obra</h3>
           <p className="text-sm text-muted-foreground">
-            Verificação automática contra a Gestão Documental. Para iniciar a preparação, basta existir um Mapa de Quantidades.
+            Verificação automática contra a Gestão Documental. Clica em cada categoria para ver os ficheiros encontrados.
+            Para iniciar a preparação, basta existir um Mapa de Quantidades.
           </p>
         </div>
       </div>
       <ul className="divide-y divide-border border border-border rounded-md overflow-hidden">
-        {rows.map((r) => (
-          <li key={r.key} className="flex items-center justify-between px-4 py-3 bg-background">
-            <div className="flex items-center gap-3">
-              {r.present ? (
-                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-              ) : r.required ? (
-                <AlertTriangle className="h-5 w-5 text-amber-500" />
-              ) : (
-                <Circle className="h-5 w-5 text-muted-foreground/50" />
+        {rows.map((r) => {
+          const isOpen = !!open[r.key];
+          return (
+            <li key={r.key} className="bg-background">
+              <button
+                type="button"
+                onClick={() => r.present && setOpen((s) => ({ ...s, [r.key]: !s[r.key] }))}
+                disabled={!r.present}
+                className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
+                  r.present ? "hover:bg-muted/40 cursor-pointer" : "cursor-default"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  {r.present ? (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  ) : r.required ? (
+                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                  ) : (
+                    <Circle className="h-5 w-5 text-muted-foreground/50" />
+                  )}
+                  <div>
+                    <div className="font-medium text-sm flex items-center gap-2">
+                      {r.label}
+                      {r.required && <span className="text-[10px] uppercase tracking-wider text-amber-600">obrigatório</span>}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {r.present ? `${r.count} ficheiro(s) encontrados${r.present ? " — clica para ver" : ""}` : "Sem ficheiros nesta categoria"}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className={r.present ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" : "border-border text-muted-foreground"}>
+                    {r.present ? "OK" : "Em falta"}
+                  </Badge>
+                  {r.present && (
+                    <span className={`text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`}>›</span>
+                  )}
+                </div>
+              </button>
+              {isOpen && r.present && (
+                <div className="px-4 pb-3 pt-1 bg-muted/20 border-t border-border/60">
+                  <ul className="divide-y divide-border/60">
+                    {r.docs.map((d) => (
+                      <li key={d.id} className="flex items-center justify-between gap-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">{d.nome}</div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {new Date(d.created_at).toLocaleString("pt-PT")}
+                              {d.tamanho ? ` · ${(d.tamanho / 1024).toFixed(0)} KB` : ""}
+                              {d.tipo ? ` · ${d.tipo.replace("_", " ")}` : ""}
+                            </div>
+                          </div>
+                        </div>
+                        <a
+                          href={`/obras/${obraId}/documentos`}
+                          className="text-xs text-primary hover:underline shrink-0"
+                        >
+                          Abrir em Documentos
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
-              <div>
-                <div className="font-medium text-sm">
-                  {r.label}
-                  {r.required && <span className="ml-2 text-[10px] uppercase tracking-wider text-amber-600">obrigatório</span>}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {r.present ? `${r.count} ficheiro(s) encontrados` : "Sem ficheiros nesta categoria"}
-                </div>
-              </div>
-            </div>
-            <Badge variant="outline" className={r.present ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" : "border-border text-muted-foreground"}>
-              {r.present ? "OK" : "Em falta"}
-            </Badge>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
+
       <div className="flex justify-end">
         <Button onClick={onAvancar} disabled={!podeAvancar} className="bg-primary text-primary-foreground hover:bg-primary/90">
           Iniciar Preparação do Orçamento <ArrowRight className="h-4 w-4 ml-2" />
