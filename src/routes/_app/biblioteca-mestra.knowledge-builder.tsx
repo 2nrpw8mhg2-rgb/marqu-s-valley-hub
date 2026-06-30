@@ -95,6 +95,26 @@ function KnowledgeBuilderPage() {
     enabled: !!subId && scopeTipo === "artigo",
   });
 
+  const { data: activeRun } = useQuery({
+    queryKey: ["kb-active-run"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("biblioteca_knowledge_run")
+        .select("id, estado")
+        .in("estado", ["pendente", "em_curso"])
+        .order("iniciado_em", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data ?? null;
+    },
+    refetchInterval: runId ? false : 4000,
+  });
+
+  useEffect(() => {
+    if (!runId && activeRun?.id) setRunId(activeRun.id as string);
+  }, [activeRun, runId]);
+
   const scope = useMemo(() => {
     if (scopeTipo === "especialidade" && espId) return { tipo: "especialidade" as const, especialidadeId: espId };
     if (scopeTipo === "subespecialidade" && subId) return { tipo: "subespecialidade" as const, subespecialidadeId: subId };
