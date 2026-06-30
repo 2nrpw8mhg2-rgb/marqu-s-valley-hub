@@ -5,6 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   CheckCircle2,
   Circle,
@@ -18,10 +22,25 @@ import {
   ArrowLeft,
   FileText,
   AlertTriangle,
+  Search,
+  ChevronRight,
+  Edit3,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { detectColumns, parseRows, type ParsedRow } from "@/lib/mq-parser";
-import { runClassificacao, type ClassificacaoProgress } from "@/lib/classificacao/engine";
+import {
+  runClassificacao,
+  aprenderClassificacao,
+  registarAprendizagem,
+  type ClassificacaoProgress,
+  type Candidato,
+  type Metodo,
+} from "@/lib/classificacao/engine";
+import { ResultadoIABadge } from "@/components/classificacao/ResultadoIABadge";
+import { ConfiancaBar } from "@/components/classificacao/ConfiancaBar";
+import { ProximaAcaoChip, calcularProximaAcao } from "@/components/classificacao/ProximaAcaoChip";
+import { ClassificacaoSidePanel, type PanelRow } from "@/components/classificacao/ClassificacaoSidePanel";
 import * as XLSX from "xlsx";
 
 export const Route = createFileRoute("/_app/obras/$id/preparacao-orcamento")({
