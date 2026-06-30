@@ -3,12 +3,25 @@ import type { Database } from "@/integrations/supabase/types";
 
 type Sb = SupabaseClient<Database>;
 
-const TIPO_LIMIT = 8;
-const MQ_TOP = 40;
-const CANDIDATOS_TOP = 60;
-const ORC_FETCH_PER_TOKEN = 80;
-const VIZINHOS_LIMIT = 15;
-const VIZINHO_EXEMPLOS = 5;
+// Limites por tipo: guarda final, não cota da IA. Estão deliberadamente
+// generosos para permitir enriquecimento profundo.
+const LIMITES: Record<string, number> = {
+  palavras_chave: 40,
+  sinonimos: 30,
+  expressoes: 30,
+  materiais: 25,
+  unidades: 10,
+  capitulos: 10,
+  exemplos: 50,
+};
+const MQ_TOP = 120;
+const CANDIDATOS_TOP = 150;
+const ORC_FETCH_PER_TOKEN = 200;
+const VIZINHOS_LIMIT = 40;
+const VIZINHO_EXEMPLOS = 12;
+const IRMAOS_CATEGORIA_LIMIT = 25;
+const VOC_REUTILIZADO_TOP = 50;
+const CORRECOES_TOP = 30;
 
 type FonteOrigem = "historico" | "candidatos" | "vizinhos" | "inferido";
 
@@ -24,7 +37,9 @@ type Generated = {
   sinonimos: GeneratedTermo[];
   expressoes: GeneratedTermo[];
   materiais: GeneratedTermo[];
-  termos_negativos: GeneratedTermo[];
+  unidades: GeneratedTermo[];
+  capitulos: GeneratedTermo[];
+  exemplos: GeneratedTermo[];
 };
 
 type RemocaoNegativo = {
@@ -42,7 +57,6 @@ const TIPO_MAP = {
   sinonimos: { tipo: "sinonimo", pesoDefault: 10, sign: 1 },
   expressoes: { tipo: "expressao", pesoDefault: 40, sign: 1 },
   materiais: { tipo: "material", pesoDefault: 8, sign: 1 },
-  termos_negativos: { tipo: "negativo_incompativel", pesoDefault: -60, sign: -1 },
 } as const;
 
 const FONTE_TO_ORIGEM: Record<FonteOrigem, "mapas_quantidades" | "orcamentos_brutos" | "artigos_vizinhos" | "ia"> = {
