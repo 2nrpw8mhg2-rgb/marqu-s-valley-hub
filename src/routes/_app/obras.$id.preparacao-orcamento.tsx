@@ -102,13 +102,14 @@ function PreparacaoOrcamentoWizard() {
 
 
   const mqDocs = useMemo(() => {
-    const pastas = doc?.pastas ?? [];
-    const docs = doc?.docs ?? [];
+    const pastas = (doc?.pastas ?? []) as { id: string; nome: string }[];
+    const docs = (doc?.docs ?? []) as { id: string; nome: string; tipo: string; pasta_id: string | null; storage_path: string; created_at: string; tamanho: number | null }[];
     const mqPastas = new Set(pastas.filter((p) => p.nome?.toLowerCase() === "mapa de quantidades").map((p) => p.id));
     return docs
-      .filter((d) => d.tipo === "mq" || mqPastas.has(d.pasta_id as any))
+      .filter((d) => d.tipo === "mq" || (d.pasta_id && mqPastas.has(d.pasta_id)))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [doc]);
+
 
   async function persistPasso(p: number) {
     if (!rascunho) return;
