@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
@@ -27,7 +27,11 @@ export const Route = createFileRoute("/_app/motor-classificacao")({
 type EstadoCls = "classificado_auto" | "necessita_revisao" | "sem_classificacao" | "validado";
 type ClsRow = {
   id: string; orcamento_id: string; artigo_origem_id: string;
-  orcamento_artigos?: { ordem: number } | null;
+  orcamento_artigos?: {
+    ordem: number;
+    capitulo_id?: string | null;
+    capitulo?: { id: string; codigo: string | null; descricao: string | null; ordem: number | null } | null;
+  } | null;
   descricao_original: string; unidade_original: string | null; quantidade_original: number | null;
   especialidade_id: string | null; subespecialidade_id: string | null;
   categoria_id: string | null; artigo_mestre_id: string | null;
@@ -39,7 +43,7 @@ async function fetchClassificacaoRows(orcamentoId: string, estadoFilter = "all",
   const out: ClsRow[] = [];
   const pageSize = 1000;
   for (let from = 0; ; from += pageSize) {
-    let q = supabase.from("classificacao_artigos").select("*, orcamento_artigos!inner(ordem)")
+    let q = supabase.from("classificacao_artigos").select("*, orcamento_artigos!inner(ordem, capitulo_id, capitulo:orcamento_capitulos(id, codigo, descricao, ordem))")
       .eq("orcamento_id", orcamentoId)
       .order("created_at", { ascending: true });
     if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
@@ -63,6 +67,8 @@ async function countClassificacoes(orcamentoId: string) {
     supabase.from("classificacao_artigos").select("id", { count: "exact", head: true }).eq("orcamento_id", orcamentoId),
     ...estados.map((estado) => supabase.from("classificacao_artigos").select("id", { count: "exact", head: true }).eq("orcamento_id", orcamentoId).eq("estado", estado)),
   ]);
+  const failed = counts.find((r) => r.error);
+  if (failed?.error) throw failed.error;
   const [total, auto, parcial, sem, validados] = counts.map((r) => r.count ?? 0);
   return { total, auto, parcial, sem, validados };
 }
@@ -435,61 +441,73 @@ function CentroClassificacao() {
                     {!isLoading && rows.length === 0 && (
                       <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sem resultados para os filtros.</TableCell></TableRow>
                     )}
-                    {rows.map((r) => {
+                    {rows.map((r, index) => {
                       const art: any = r.artigo_mestre_id ? artMap.get(r.artigo_mestre_id) : null;
                       const espNome = r.especialidade_id ? espMap.get(r.especialidade_id) : null;
                       const subNome = r.subespecialidade_id ? (subMap.get(r.subespecialidade_id) as any)?.nome : null;
                       const catNome = r.categoria_id ? (catMap.get(r.categoria_id) as any)?.nome : null;
                       const trail = [espNome, subNome, catNome, art?.descricao].filter(Boolean) as string[];
                       const acao = calcularProximaAcao({ estado: r.estado, metodo: r.metodo_match, confianca: r.confianca, candidatos: r.candidatos });
+                      const capitulo = r.orcamento_artigos?.capitulo ?? null;
+                      const prevCapituloId = rows[index - 1]?.orcamento_artigos?.capitulo?.id ?? null;
+                      const showCapitulo = !!capitulo && capitulo.id !== prevCapituloId;
                       const onAcao = () => {
                         if (acao.tipo === "aceitar") validar(r);
                         else if (acao.tipo === "corrigir" || acao.tipo === "escolher") setDialogRow(r);
                         else setPanelRow(r);
                       };
                       return (
-                        <TableRow key={r.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setPanelRow(r)}>
-                          <TableCell className="max-w-[280px]">
-                            <div className="text-sm line-clamp-2">{r.descricao_original}</div>
-                            <div className="text-[10px] text-muted-foreground">{r.unidade_original ?? ""} · qtd {r.quantidade_original ?? "—"}</div>
-                          </TableCell>
-                          <TableCell className="max-w-[260px]">
-                            {trail.length === 0 ? (
-                              <Badge variant="outline" className="text-muted-foreground">Sem destino</Badge>
-                            ) : (
-                              <div className="space-y-0.5">
-                                {trail.map((t, i) => (
-                                  <div key={i} className="flex items-center gap-1 text-xs">
-                                    {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
-                                    <span className={i === trail.length - 1 ? "font-medium" : "text-muted-foreground"}>{t}</span>
-                                  </div>
-                                ))}
+                        <Fragment key={r.id}>
+                          {showCapitulo && (
+                            <TableRow className="bg-muted/60 hover:bg-muted/60">
+                              <TableCell colSpan={6} className="py-2 text-xs font-semibold text-foreground">
+                                {capitulo.codigo ? `${capitulo.codigo} — ` : ""}{capitulo.descricao ?? "Capítulo"}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => setPanelRow(r)}>
+                            <TableCell className="max-w-[280px]">
+                              <div className="text-sm line-clamp-2">{r.descricao_original}</div>
+                              <div className="text-[10px] text-muted-foreground">{r.unidade_original ?? ""} · qtd {r.quantidade_original ?? "—"}</div>
+                            </TableCell>
+                            <TableCell className="max-w-[260px]">
+                              {trail.length === 0 ? (
+                                <Badge variant="outline" className="text-muted-foreground">Sem destino</Badge>
+                              ) : (
+                                <div className="space-y-0.5">
+                                  {trail.map((t, i) => (
+                                    <div key={i} className="flex items-center gap-1 text-xs">
+                                      {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+                                      <span className={i === trail.length - 1 ? "font-medium" : "text-muted-foreground"}>{t}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell><ResultadoIABadge metodo={r.metodo_match} estado={r.estado} /></TableCell>
+                            <TableCell><ConfiancaBar value={r.confianca} /></TableCell>
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <ProximaAcaoChip acao={acao} onClick={onAcao} />
+                            </TableCell>
+                            <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex gap-1 justify-end">
+                                <Button size="sm" variant="ghost" title="Pesquisar Artigo Mestre" onClick={() => setDialogRow(r)}>
+                                  {r.artigo_mestre_id ? <Edit3 className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
+                                </Button>
+                                {r.estado !== "validado" && (
+                                  <Button size="sm" variant="ghost" title="Validar" onClick={() => validar(r)} disabled={!r.artigo_mestre_id}>
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                {r.artigo_mestre_id && (
+                                  <Button size="sm" variant="ghost" title="Remover" onClick={() => remover(r)}>
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
                               </div>
-                            )}
-                          </TableCell>
-                          <TableCell><ResultadoIABadge metodo={r.metodo_match} estado={r.estado} /></TableCell>
-                          <TableCell><ConfiancaBar value={r.confianca} /></TableCell>
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <ProximaAcaoChip acao={acao} onClick={onAcao} />
-                          </TableCell>
-                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex gap-1 justify-end">
-                              <Button size="sm" variant="ghost" title="Pesquisar Artigo Mestre" onClick={() => setDialogRow(r)}>
-                                {r.artigo_mestre_id ? <Edit3 className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
-                              </Button>
-                              {r.estado !== "validado" && (
-                                <Button size="sm" variant="ghost" title="Validar" onClick={() => validar(r)} disabled={!r.artigo_mestre_id}>
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              {r.artigo_mestre_id && (
-                                <Button size="sm" variant="ghost" title="Remover" onClick={() => remover(r)}>
-                                  <X className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                            </TableCell>
+                          </TableRow>
+                        </Fragment>
                       );
                     })}
                   </TableBody>
