@@ -2051,7 +2051,7 @@ export async function processRun(runId: string) {
 
         const res = await persistir(sb, artigoId, gen, run.modo as Modo, fontes);
 
-        // ===== Extras: concorrentes / unidades / capítulos / exemplos =====
+        // ===== Extras: concorrentes / incompatíveis / unidades / capítulos / exemplos =====
         try {
           const ancorasExtras = new Set<string>();
           const addAncoraExtra = (s: string) => {
@@ -2071,15 +2071,39 @@ export async function processRun(runId: string) {
             fontes.subespecialidadeId,
             ancorasExtras
           );
+          const incompativeis = await derivarIncompatibilidades(
+            sb,
+            fontes.especialidadeId,
+            ancorasExtras
+          );
           const uce = await derivarUnidadesCapitulosExemplos(sb, artigoId);
+
+          // Merge IA-generated unidades/capítulos/exemplos com os derivados
+          // do histórico real. Histórico tem precedência; IA preenche os vazios.
+          const mergeUnico = (a: GeneratedTermo[], b: GeneratedTermo[]) => {
+            const seen = new Set(a.map((x) => x.termo.toLowerCase().trim()));
+            const out = [...a];
+            for (const t of b) {
+              const k = t.termo.toLowerCase().trim();
+              if (!k || seen.has(k)) continue;
+              seen.add(k);
+              out.push(t);
+            }
+            return out;
+          };
+          const unidadesFinal = mergeUnico(uce.unidades, gen.unidades);
+          const capitulosFinal = mergeUnico(uce.capitulos, gen.capitulos);
+          const exemplosFinal = mergeUnico(uce.exemplos, gen.exemplos);
+
           const extrasTipos = await gravarExtras(
             sb,
             artigoId,
             {
               concorrentes,
-              unidades: uce.unidades,
-              capitulos: uce.capitulos,
-              exemplos: uce.exemplos,
+              incompativeis,
+              unidades: unidadesFinal,
+              capitulos: capitulosFinal,
+              exemplos: exemplosFinal,
             },
             run.modo as Modo
           );
@@ -2090,7 +2114,7 @@ export async function processRun(runId: string) {
           await appendLog(
             sb,
             runId,
-            `extras: ${extrasTipos.negativo_concorrente} concorrentes · ${extrasTipos.unidade_compativel} unidades · ${extrasTipos.capitulo_tipico} capítulos · ${extrasTipos.exemplo_real} exemplos`
+            `extras: ${extrasTipos.negativo_concorrente} concorrentes · ${extrasTipos.negativo_incompativel} incompatíveis · ${extrasTipos.unidade_compativel} unidades · ${extrasTipos.capitulo_tipico} capítulos · ${extrasTipos.exemplo_real} exemplos`
           );
         } catch (e: any) {
           await appendLog(sb, runId, `extras falhou (ignorado): ${String(e?.message ?? e).slice(0, 200)}`);
