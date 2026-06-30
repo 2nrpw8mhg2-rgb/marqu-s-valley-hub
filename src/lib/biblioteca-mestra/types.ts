@@ -99,7 +99,12 @@ export type ConhecimentoTipo =
   | "sinonimo"
   | "expressao"
   | "material"
-  | "termo_negativo";
+  | "termo_negativo"
+  | "negativo_concorrente"
+  | "negativo_incompativel"
+  | "unidade_compativel"
+  | "capitulo_tipico"
+  | "exemplo_real";
 
 export type ConhecimentoOrigem =
   | "ia"
