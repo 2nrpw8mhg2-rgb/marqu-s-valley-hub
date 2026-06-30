@@ -121,14 +121,33 @@ function PreparacaoOrcamentoWizard() {
 
 
 
-  const mqDocs = useMemo(() => {
+  // Pasta "Mapa de Quantidades" desta obra — única fonte autorizada de MQT
+  const mqPastaInfo = useMemo(() => {
     const pastas = (doc?.pastas ?? []) as { id: string; nome: string }[];
-    const docs = (doc?.docs ?? []) as { id: string; nome: string; tipo: string; pasta_id: string | null; storage_path: string; created_at: string; tamanho: number | null }[];
-    const mqPastas = new Set(pastas.filter((p) => p.nome?.toLowerCase() === "mapa de quantidades").map((p) => p.id));
-    return docs
-      .filter((d) => d.tipo === "mq" || (d.pasta_id && mqPastas.has(d.pasta_id)))
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const found = pastas.find((p) => p.nome?.trim().toLowerCase() === "mapa de quantidades");
+    return { existe: !!found, id: found?.id ?? null };
   }, [doc]);
+
+  const mqDocs = useMemo(() => {
+    if (!mqPastaInfo.id) return [];
+    const docs = (doc?.docs ?? []) as { id: string; nome: string; tipo: string; pasta_id: string | null; storage_path: string; created_at: string; tamanho: number | null }[];
+    return docs
+      .filter((d) => d.pasta_id === mqPastaInfo.id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [doc, mqPastaInfo.id]);
+
+  // Documento MQT em uso pelo rascunho — só conta se ainda existir na pasta correta desta obra.
+  const mqAtivo = useMemo(() => {
+    if (!rascunho?.mq_documento_id) return null;
+    return mqDocs.find((d) => d.id === rascunho.mq_documento_id) ?? null;
+  }, [rascunho?.mq_documento_id, mqDocs]);
+
+  const origemInvalida = !!rascunho?.mq_documento_id && !!doc && !mqAtivo;
+
+  // Se a origem ficou inválida (doc movido/apagado), forçar regresso ao Passo 1.
+  useEffect(() => {
+    if (origemInvalida) setPasso(1);
+  }, [origemInvalida]);
 
 
   async function persistPasso(p: number) {
@@ -148,6 +167,32 @@ function PreparacaoOrcamentoWizard() {
         </p>
       </header>
 
+      {/* Origem do MQT — sempre visível */}
+      {mqAtivo ? (
+        <Card className="p-3 flex items-center justify-between gap-3 border-primary/30 bg-primary/5">
+          <div className="flex items-center gap-3 min-w-0">
+            <FileSpreadsheet className="h-4 w-4 text-primary shrink-0" />
+            <div className="min-w-0">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">A ler de Documentos → Mapa de Quantidades</div>
+              <div className="text-sm font-medium truncate">{mqAtivo.nome}</div>
+              <div className="text-xs text-muted-foreground">
+                {new Date(mqAtivo.created_at).toLocaleString("pt-PT")}
+                {mqAtivo.tamanho ? ` · ${(mqAtivo.tamanho / 1024).toFixed(0)} KB` : ""}
+              </div>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setPasso(1)}>Trocar MQT</Button>
+        </Card>
+      ) : origemInvalida ? (
+        <Card className="p-3 border-destructive/40 bg-destructive/10 text-sm text-destructive flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            O MQT deste rascunho já não está disponível na pasta «Mapa de Quantidades» desta obra.
+            Seleciona o MQT atual para continuar.
+          </div>
+        </Card>
+      ) : null}
+
       <Stepper passo={passo} setPasso={setPasso} maxPasso={rascunho?.wizard_passo ?? 0} />
 
       {passo === 0 && (
@@ -163,6 +208,7 @@ function PreparacaoOrcamentoWizard() {
           obraId={obraId}
           rascunho={rascunho}
           mqDocs={mqDocs}
+          pastaExiste={mqPastaInfo.existe}
           onSelecionado={async () => {
             await refetchRascunho();
             await persistPasso(1);
@@ -171,7 +217,7 @@ function PreparacaoOrcamentoWizard() {
         />
       )}
       {passo === 2 && rascunho && (
-        <Passo2 rascunho={rascunho} onConcluido={async () => { await persistPasso(2); setPasso(3); }} />
+        <Passo2 rascunho={rascunho} mqAtivo={mqAtivo} obraId={obraId} onVoltar={() => setPasso(1)} onConcluido={async () => { await persistPasso(2); setPasso(3); }} />
       )}
       {passo === 3 && rascunho && (
         <Passo3 rascunho={rascunho} onConcluido={async () => { await persistPasso(3); setPasso(4); }} />
@@ -347,11 +393,13 @@ function Passo1({
   obraId,
   rascunho,
   mqDocs,
+  pastaExiste,
   onSelecionado,
 }: {
   obraId: string;
   rascunho: any;
   mqDocs: { id: string; nome: string; storage_path: string; created_at: string; tamanho: number | null }[];
+  pastaExiste: boolean;
   onSelecionado: () => Promise<void>;
 }) {
   const [escolhido, setEscolhido] = useState<string | null>(rascunho?.mq_documento_id ?? null);
@@ -407,14 +455,21 @@ function Passo1({
     return (
       <Card className="p-8 text-center space-y-3">
         <FileSpreadsheet className="h-10 w-10 mx-auto text-muted-foreground/60" />
-        <h3 className="font-semibold">Sem MQT na Gestão Documental</h3>
+        <h3 className="font-semibold">
+          {pastaExiste ? "Pasta «Mapa de Quantidades» vazia" : "Pasta «Mapa de Quantidades» não existe"}
+        </h3>
         <p className="text-sm text-muted-foreground">
-          Adiciona o Mapa de Quantidades à pasta «Mapa de Quantidades» (ou marca-o como tipo «MQ») no separador Documentos
-          desta obra. Esta fase não permite uploads diretos.
+          {pastaExiste
+            ? "A pasta «Mapa de Quantidades» desta obra está vazia. Adiciona o ficheiro MQT na Gestão Documental."
+            : "Cria a pasta «Mapa de Quantidades» na Gestão Documental desta obra e coloca lá o ficheiro MQT."}
         </p>
+        <Button asChild variant="outline" size="sm">
+          <a href={`/obras/${obraId}/documentos`}>Abrir Documentos da obra</a>
+        </Button>
       </Card>
     );
   }
+
 
   return (
     <Card className="p-6 space-y-5">
@@ -478,7 +533,19 @@ function Passo1({
 // =========================================================================
 //  Passo 2 — Leitura IA do MQT (download + parse + insert imutável)
 // =========================================================================
-function Passo2({ rascunho, onConcluido }: { rascunho: any; onConcluido: () => Promise<void> }) {
+function Passo2({
+  rascunho,
+  mqAtivo,
+  obraId,
+  onVoltar,
+  onConcluido,
+}: {
+  rascunho: any;
+  mqAtivo: { id: string; nome: string; storage_path: string; created_at: string; tamanho: number | null } | null;
+  obraId: string;
+  onVoltar: () => void;
+  onConcluido: () => Promise<void>;
+}) {
   const [working, setWorking] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -495,6 +562,11 @@ function Passo2({ rascunho, onConcluido }: { rascunho: any; onConcluido: () => P
   });
 
   async function executar() {
+    if (!mqAtivo) {
+      toast.error("O MQT já não está disponível na pasta «Mapa de Quantidades» desta obra.");
+      onVoltar();
+      return;
+    }
     if (!status?.storagePath) return;
     setWorking(true);
     setErro(null);
