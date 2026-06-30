@@ -218,12 +218,11 @@ export const CONHECIMENTO_TIPOS: {
   { value: "sinonimo", label: "Sinónimo", labelShort: "Sinónimos", pesoDefault: 10, className: "border-violet-500/40 text-violet-700 dark:text-violet-400" },
   { value: "expressao", label: "Expressão", labelShort: "Expressões", pesoDefault: 40, className: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" },
   { value: "material", label: "Material", labelShort: "Materiais", pesoDefault: 8, className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
-  { value: "negativo_concorrente", label: "Negativo concorrente", labelShort: "⚠️ Concorrentes", pesoDefault: -15, className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
-  { value: "negativo_incompativel", label: "Negativo incompatível", labelShort: "🚫 Incompatíveis", pesoDefault: -60, className: "border-destructive/40 text-destructive" },
   { value: "unidade_compativel", label: "Unidade compatível", labelShort: "📏 Unidades", pesoDefault: 0, className: "border-cyan-500/40 text-cyan-700 dark:text-cyan-400" },
   { value: "capitulo_tipico", label: "Capítulo típico", labelShort: "📂 Capítulos", pesoDefault: 5, className: "border-fuchsia-500/40 text-fuchsia-700 dark:text-fuchsia-400" },
-  { value: "exemplo_real", label: "Exemplo real", labelShort: "📝 Exemplos", pesoDefault: 0, className: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" },
-  { value: "termo_negativo", label: "Termo negativo (legacy)", labelShort: "Negativos (legacy)", pesoDefault: -30, className: "border-destructive/40 text-destructive" },
+  { value: "exemplo_real", label: "Exemplo real", labelShort: "📝 Exemplos", pesoDefault: 0, className: "border-teal-500/40 text-teal-700 dark:text-teal-400" },
+  { value: "negativo_concorrente", label: "Negativo concorrente", labelShort: "⚠️ Concorrentes", pesoDefault: -15, className: "border-amber-500/40 text-amber-700 dark:text-amber-400" },
+  { value: "negativo_incompativel", label: "Especialidades excluídas", labelShort: "🚫 Especialidades excluídas", pesoDefault: -60, className: "border-destructive/40 text-destructive" },
 ];
 
 export const CONHECIMENTO_ORIGENS: {
