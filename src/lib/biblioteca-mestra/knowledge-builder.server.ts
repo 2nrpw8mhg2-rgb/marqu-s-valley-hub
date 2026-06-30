@@ -2026,14 +2026,9 @@ export async function processRun(runId: string) {
       await appendLog(sb, runId, `Limpeza falhou (ignorado): ${e?.message ?? e}`);
     }
 
-    // Índice estatístico inter-especialidades (calculado UMA vez por run).
-    await appendLog(sb, runId, "A construir índice estatístico inter-especialidades…");
-    const indice = await construirIndiceGlobal(sb);
-    await appendLog(
-      sb,
-      runId,
-      `Índice: ${indice.termoEspArtigos.size} termos × ${indice.totalPorEsp.size} especialidades`
-    );
+    // (Índice estatístico inter-especialidades descontinuado: as Especialidades
+    // Excluídas e Negativos Concorrentes são agora derivados directamente da
+    // Biblioteca Mestra curada, sem necessidade de pré-índice.)
 
 
     const counts: Record<string, number> = {
