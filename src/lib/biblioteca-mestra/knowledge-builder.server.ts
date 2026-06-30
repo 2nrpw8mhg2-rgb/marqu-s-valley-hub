@@ -1913,7 +1913,7 @@ export async function processRun(runId: string) {
             sb,
             artigoId,
             fontes.especialidadeId,
-            (fontes as any).subespecialidadeId ?? null,
+            fontes.subespecialidadeId,
             ancorasExtras
           );
           const uce = await derivarUnidadesCapitulosExemplos(sb, artigoId);
