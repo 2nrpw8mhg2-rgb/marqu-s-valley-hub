@@ -1402,7 +1402,7 @@ async function callAI(prompt: string): Promise<Generated> {
         { role: "user", content: prompt },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 4000,
+      max_tokens: 16000,
     }),
   });
   if (!resp.ok) {
