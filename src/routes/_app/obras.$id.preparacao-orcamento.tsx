@@ -5,6 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   CheckCircle2,
   Circle,
@@ -18,10 +22,25 @@ import {
   ArrowLeft,
   FileText,
   AlertTriangle,
+  Search,
+  ChevronRight,
+  Edit3,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { detectColumns, parseRows, type ParsedRow } from "@/lib/mq-parser";
-import { runClassificacao, type ClassificacaoProgress } from "@/lib/classificacao/engine";
+import {
+  runClassificacao,
+  aprenderClassificacao,
+  registarAprendizagem,
+  type ClassificacaoProgress,
+  type Candidato,
+  type Metodo,
+} from "@/lib/classificacao/engine";
+import { ResultadoIABadge } from "@/components/classificacao/ResultadoIABadge";
+import { ConfiancaBar } from "@/components/classificacao/ConfiancaBar";
+import { ProximaAcaoChip, calcularProximaAcao } from "@/components/classificacao/ProximaAcaoChip";
+import { ClassificacaoSidePanel, type PanelRow } from "@/components/classificacao/ClassificacaoSidePanel";
 import * as XLSX from "xlsx";
 
 export const Route = createFileRoute("/_app/obras/$id/preparacao-orcamento")({
@@ -693,48 +712,269 @@ function Passo3({ rascunho, onConcluido }: { rascunho: any; onConcluido: () => P
 }
 
 // =========================================================================
-//  Passo 4 — Validação manual + aprendizagem
+//  Passo 4 — Validação manual + aprendizagem (tabela completa do MQT)
 // =========================================================================
+type EstadoCls = "classificado_auto" | "necessita_revisao" | "sem_classificacao" | "validado";
+type ClsRow = {
+  id: string; orcamento_id: string; artigo_origem_id: string;
+  descricao_original: string; unidade_original: string | null; quantidade_original: number | null;
+  especialidade_id: string | null; subespecialidade_id: string | null;
+  categoria_id: string | null; artigo_mestre_id: string | null;
+  confianca: number; estado: EstadoCls;
+  metodo_match: Metodo; motivo: string | null; candidatos: Candidato[] | null;
+};
+
 function Passo4({ rascunho, onAbrirValidacao, onConcluir }: { rascunho: any; onAbrirValidacao: () => void; onConcluir: () => Promise<void> }) {
-  const { data: stats } = useQuery({
-    queryKey: ["prep-passo4", rascunho.id],
+  const qc = useQueryClient();
+  const orcamentoId = rascunho.id as string;
+  const obraIdAtual = rascunho.obra_id as string | null;
+  const [estadoFilter, setEstadoFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [dialogRow, setDialogRow] = useState<ClsRow | null>(null);
+  const [panelRow, setPanelRow] = useState<ClsRow | null>(null);
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["prep-passo4-rows", orcamentoId, estadoFilter, search],
     queryFn: async () => {
-      const [{ count: total }, { data: cls }] = await Promise.all([
-        supabase.from("orcamento_artigos").select("id", { count: "exact", head: true }).eq("orcamento_id", rascunho.id),
-        supabase.from("classificacao_artigos").select("estado").eq("orcamento_id", rascunho.id),
-      ]);
-      const lista = (cls ?? []) as { estado: string }[];
-      return {
-        total: total ?? 0,
-        validados: lista.filter((x) => x.estado === "validado").length,
-        auto: lista.filter((x) => x.estado === "classificado_auto").length,
-        rever: lista.filter((x) => x.estado === "necessita_revisao").length,
-        sem: lista.filter((x) => x.estado === "sem_classificacao").length,
-      };
+      let q = supabase.from("classificacao_artigos").select("*")
+        .eq("orcamento_id", orcamentoId).order("created_at", { ascending: true });
+      if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
+      if (search.trim()) q = q.ilike("descricao_original", `%${search.trim()}%`);
+      const { data, error } = await q.limit(5000);
+      if (error) throw error;
+      return (data ?? []) as ClsRow[];
     },
-    refetchInterval: 4000,
   });
-  const pendentes = (stats?.rever ?? 0) + (stats?.sem ?? 0);
+
+  const { data: allRows = [] } = useQuery({
+    queryKey: ["prep-passo4-stats", orcamentoId],
+    queryFn: async () => {
+      const { data } = await supabase.from("classificacao_artigos").select("estado").eq("orcamento_id", orcamentoId).limit(10000);
+      return (data ?? []) as { estado: EstadoCls }[];
+    },
+    refetchInterval: 8000,
+  });
+
+  const stats = useMemo(() => ({
+    total: allRows.length,
+    validados: allRows.filter((x) => x.estado === "validado").length,
+    auto: allRows.filter((x) => x.estado === "classificado_auto").length,
+    rever: allRows.filter((x) => x.estado === "necessita_revisao").length,
+    sem: allRows.filter((x) => x.estado === "sem_classificacao").length,
+  }), [allRows]);
+
+  const { data: esps = [] } = useQuery({
+    queryKey: ["prep-esps"],
+    queryFn: async () => (await supabase.from("biblioteca_especialidades").select("id, nome").order("ordem")).data ?? [],
+  });
+  const { data: subs = [] } = useQuery({
+    queryKey: ["prep-subs"],
+    queryFn: async () => (await supabase.from("biblioteca_subespecialidades").select("id, nome, especialidade_id").order("ordem")).data ?? [],
+  });
+  const { data: cats = [] } = useQuery({
+    queryKey: ["prep-cats"],
+    queryFn: async () => (await supabase.from("biblioteca_categorias").select("id, nome, subespecialidade_id").order("ordem")).data ?? [],
+  });
+  const { data: arts = [] } = useQuery({
+    queryKey: ["prep-arts"],
+    queryFn: async () => (await supabase.from("biblioteca_artigos").select("id, descricao, unidade, tipo, categoria_id, subespecialidade_id").eq("ativo", true)).data ?? [],
+  });
+
+  const espMap = useMemo(() => new Map(esps.map((e: any) => [e.id, e.nome])), [esps]);
+  const subMap = useMemo(() => new Map(subs.map((s: any) => [s.id, s])), [subs]);
+  const catMap = useMemo(() => new Map(cats.map((c: any) => [c.id, c])), [cats]);
+  const artMap = useMemo(() => new Map(arts.map((a: any) => [a.id, a])), [arts]);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["prep-passo4-rows", orcamentoId] });
+    qc.invalidateQueries({ queryKey: ["prep-passo4-stats", orcamentoId] });
+  };
+
+  const validar = async (row: ClsRow) => {
+    if (!row.artigo_mestre_id) return toast.error("Atribui um Artigo Mestre antes de validar");
+    const { data: u } = await supabase.auth.getUser();
+    const { error } = await supabase.from("classificacao_artigos").update({
+      estado: "validado", validado_por: u.user?.id ?? null, validado_em: new Date().toISOString(),
+    }).eq("id", row.id);
+    if (error) return toast.error(error.message);
+    await aprenderClassificacao(row.descricao_original, row.artigo_mestre_id);
+    const espFinal = row.especialidade_id ? (espMap.get(row.especialidade_id) as string) ?? "—" : "—";
+    await registarAprendizagem({
+      descricaoOriginal: row.descricao_original,
+      especialidadeSugerida: null,
+      especialidadeFinal: espFinal,
+      confiancaSugerida: row.confianca,
+      obraId: obraIdAtual,
+      acao: "validar",
+    });
+    toast.success("Validado e guardado na memória");
+    invalidate();
+  };
+
+  const remover = async (row: ClsRow) => {
+    const { error } = await supabase.from("classificacao_artigos").update({
+      artigo_mestre_id: null, categoria_id: null, subespecialidade_id: null, especialidade_id: null,
+      confianca: 0, estado: "sem_classificacao", metodo_match: "nenhum", motivo: "Removido manualmente",
+      validado_por: null, validado_em: null,
+    }).eq("id", row.id);
+    if (error) return toast.error(error.message);
+    toast.success("Classificação removida");
+    invalidate();
+  };
+
+  const atribuir = async (row: ClsRow, artigoMestreId: string) => {
+    const art: any = artMap.get(artigoMestreId);
+    if (!art) return;
+    const sub: any = subMap.get(art.subespecialidade_id);
+    const espFinalId = sub?.especialidade_id ?? null;
+    const { error } = await supabase.from("classificacao_artigos").update({
+      artigo_mestre_id: artigoMestreId,
+      categoria_id: art.categoria_id,
+      subespecialidade_id: art.subespecialidade_id,
+      especialidade_id: espFinalId,
+      confianca: 100, estado: "classificado_auto", metodo_match: "manual",
+      motivo: "Atribuído manualmente pelo utilizador",
+    }).eq("id", row.id);
+    if (error) return toast.error(error.message);
+    const espSug = row.especialidade_id ? (espMap.get(row.especialidade_id) as string) ?? null : null;
+    const espFinal = espFinalId ? (espMap.get(espFinalId) as string) ?? "—" : "—";
+    await registarAprendizagem({
+      descricaoOriginal: row.descricao_original,
+      especialidadeSugerida: espSug,
+      especialidadeFinal: espFinal,
+      confiancaSugerida: row.confianca,
+      obraId: obraIdAtual,
+      acao: row.artigo_mestre_id === artigoMestreId ? "validar" : "corrigir",
+    });
+    toast.success("Artigo Mestre atribuído");
+    invalidate();
+    setDialogRow(null);
+  };
 
   return (
     <Card className="p-6 space-y-5">
       <div className="flex items-start gap-3">
         <ShieldCheck className="h-5 w-5 text-primary mt-0.5" />
         <div>
-          <h3 className="font-semibold">Validação e aprendizagem</h3>
+          <h3 className="font-semibold">Mapa de Quantidades classificado</h3>
           <p className="text-sm text-muted-foreground">
-            Confirma ou corrige a classificação dos artigos que ficaram incertos. <strong>Cada correção alimenta a aprendizagem do
-            sistema</strong> — a Biblioteca Mestra fica mais inteligente para a próxima obra.
+            Cada linha do MQT original com a classificação proposta contra a Biblioteca Mestra. Aceita, corrige ou atribui um Artigo Mestre.
+            <strong> Cada correção alimenta a aprendizagem do sistema.</strong>
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <KPI label="Total" value={stats?.total ?? 0} />
-        <KPI label="Auto" value={stats?.auto ?? 0} tone="blue" />
-        <KPI label="Validados" value={stats?.validados ?? 0} tone="emerald" />
-        <KPI label="A validar" value={stats?.rever ?? 0} tone="amber" />
-        <KPI label="Sem classif." value={stats?.sem ?? 0} tone="muted" />
+        <KPI label="Total" value={stats.total} />
+        <KPI label="Auto" value={stats.auto} tone="blue" />
+        <KPI label="Validados" value={stats.validados} tone="emerald" />
+        <KPI label="A validar" value={stats.rever} tone="amber" />
+        <KPI label="Sem classif." value={stats.sem} tone="muted" />
+      </div>
+
+      <div className="flex flex-wrap gap-3 items-end">
+        <div className="space-y-1.5 min-w-[180px]">
+          <label className="text-xs text-muted-foreground">Filtrar estado</label>
+          <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="sem_classificacao">Sem classificação</SelectItem>
+              <SelectItem value="necessita_revisao">A validar</SelectItem>
+              <SelectItem value="classificado_auto">Auto-classificados</SelectItem>
+              <SelectItem value="validado">Validados</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5 flex-1 min-w-[240px]">
+          <label className="text-xs text-muted-foreground">Pesquisar artigo</label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Descrição..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      <div className="border border-border rounded-md overflow-hidden">
+        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+          <Table>
+            <TableHeader className="sticky top-0 bg-card z-10">
+              <TableRow>
+                <TableHead>Artigo Original (MQT)</TableHead>
+                <TableHead>Classificação proposta</TableHead>
+                <TableHead className="w-40">Resultado IA</TableHead>
+                <TableHead className="w-36">Confiança</TableHead>
+                <TableHead className="w-40">Próxima ação</TableHead>
+                <TableHead className="w-28 text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading && <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">A carregar…</TableCell></TableRow>}
+              {!isLoading && rows.length === 0 && (
+                <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sem resultados para os filtros.</TableCell></TableRow>
+              )}
+              {rows.map((r) => {
+                const art: any = r.artigo_mestre_id ? artMap.get(r.artigo_mestre_id) : null;
+                const espNome = r.especialidade_id ? espMap.get(r.especialidade_id) : null;
+                const subNome = r.subespecialidade_id ? (subMap.get(r.subespecialidade_id) as any)?.nome : null;
+                const catNome = r.categoria_id ? (catMap.get(r.categoria_id) as any)?.nome : null;
+                const trail = [espNome, subNome, catNome, art?.descricao].filter(Boolean) as string[];
+                const acao = calcularProximaAcao({ estado: r.estado, metodo: r.metodo_match, confianca: r.confianca, candidatos: r.candidatos });
+                const onAcao = () => {
+                  if (acao.tipo === "aceitar") validar(r);
+                  else if (acao.tipo === "corrigir" || acao.tipo === "escolher") setDialogRow(r);
+                  else setPanelRow(r);
+                };
+                return (
+                  <TableRow key={r.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setPanelRow(r)}>
+                    <TableCell className="max-w-[300px]">
+                      <div className="text-sm line-clamp-2">{r.descricao_original}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {r.unidade_original ?? "—"} · qtd {r.quantidade_original ?? "—"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-[280px]">
+                      {trail.length === 0 ? (
+                        <Badge variant="outline" className="text-muted-foreground">Sem destino</Badge>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {trail.map((t, i) => (
+                            <div key={i} className="flex items-center gap-1 text-xs">
+                              {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+                              <span className={i === trail.length - 1 ? "font-medium" : "text-muted-foreground"}>{t}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell><ResultadoIABadge metodo={r.metodo_match} estado={r.estado} /></TableCell>
+                    <TableCell><ConfiancaBar value={r.confianca} /></TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <ProximaAcaoChip acao={acao} onClick={onAcao} />
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-1 justify-end">
+                        <Button size="sm" variant="ghost" title="Pesquisar Artigo Mestre" onClick={() => setDialogRow(r)}>
+                          {r.artigo_mestre_id ? <Edit3 className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
+                        </Button>
+                        {r.estado !== "validado" && (
+                          <Button size="sm" variant="ghost" title="Validar" onClick={() => validar(r)} disabled={!r.artigo_mestre_id}>
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {r.artigo_mestre_id && (
+                          <Button size="sm" variant="ghost" title="Remover" onClick={() => remover(r)}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
@@ -745,15 +985,115 @@ function Passo4({ rascunho, onAbrirValidacao, onConcluir }: { rascunho: any; onA
         </p>
       </div>
 
-      <div className="flex justify-end gap-2">
-        <Button onClick={onAbrirValidacao} variant="outline">
-          Abrir Motor de Classificação <ArrowRight className="h-4 w-4 ml-2" />
+      <div className="flex justify-between gap-2">
+        <Button onClick={onAbrirValidacao} variant="ghost" size="sm" className="text-muted-foreground">
+          Abrir em página inteira <ArrowRight className="h-3.5 w-3.5 ml-1" />
         </Button>
-        <Button onClick={onConcluir} className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={pendentes > 0 && (stats?.total ?? 0) > 0 && pendentes === stats?.total}>
+        <Button onClick={onConcluir} className="bg-primary text-primary-foreground hover:bg-primary/90">
           Marcar rascunho técnico como pronto
         </Button>
       </div>
+
+      <SearchBibliotecaDialog
+        open={!!dialogRow} onClose={() => setDialogRow(null)}
+        onPick={(artId) => dialogRow && atribuir(dialogRow, artId)}
+        esps={esps} subs={subs} cats={cats} arts={arts}
+        suggestion={dialogRow?.descricao_original ?? ""}
+      />
+      <ClassificacaoSidePanel
+        row={panelRow as PanelRow | null}
+        orcamentoId={orcamentoId}
+        onClose={() => setPanelRow(null)}
+        espMap={espMap as Map<string, string>}
+        subMap={subMap as Map<string, any>}
+        catMap={catMap as Map<string, any>}
+        artMap={artMap as Map<string, any>}
+        onAceitar={(r) => { validar(r as any); setPanelRow(null); }}
+        onCorrigir={(r) => { setDialogRow(r as any); }}
+        onRefresh={invalidate}
+      />
     </Card>
+  );
+}
+
+function SearchBibliotecaDialog({
+  open, onClose, onPick, esps, subs, cats, arts, suggestion,
+}: {
+  open: boolean; onClose: () => void; onPick: (id: string) => void;
+  esps: any[]; subs: any[]; cats: any[]; arts: any[]; suggestion: string;
+}) {
+  const [espId, setEspId] = useState<string>("all");
+  const [subId, setSubId] = useState<string>("all");
+  const [catId, setCatId] = useState<string>("all");
+  const [q, setQ] = useState(suggestion);
+  useEffect(() => { setQ(suggestion); }, [suggestion]);
+
+  const filteredSubs = subs.filter((s) => espId === "all" || s.especialidade_id === espId);
+  const filteredCats = cats.filter((c) => {
+    if (subId !== "all") return c.subespecialidade_id === subId;
+    if (espId !== "all") return filteredSubs.some((s) => s.id === c.subespecialidade_id);
+    return true;
+  });
+  const filteredArts = arts.filter((a) => {
+    if (catId !== "all" && a.categoria_id !== catId) return false;
+    if (subId !== "all" && a.subespecialidade_id !== subId) return false;
+    if (espId !== "all") {
+      const sub = subs.find((s) => s.id === a.subespecialidade_id);
+      if (!sub || sub.especialidade_id !== espId) return false;
+    }
+    if (q.trim() && !a.descricao.toLowerCase().includes(q.trim().toLowerCase())) return false;
+    return true;
+  }).slice(0, 200);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="bg-card border-border max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader><DialogTitle>Pesquisar na Biblioteca Mestra</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          <Select value={espId} onValueChange={(v) => { setEspId(v); setSubId("all"); setCatId("all"); }}>
+            <SelectTrigger><SelectValue placeholder="Especialidade" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas especialidades</SelectItem>
+              {esps.map((e) => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={subId} onValueChange={(v) => { setSubId(v); setCatId("all"); }}>
+            <SelectTrigger><SelectValue placeholder="Subespecialidade" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas subespecialidades</SelectItem>
+              {filteredSubs.map((s) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={catId} onValueChange={setCatId}>
+            <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas categorias</SelectItem>
+              {filteredCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Input placeholder="Pesquisar artigo..." value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <div className="border border-border rounded-md overflow-auto flex-1 mt-2">
+          <Table>
+            <TableHeader><TableRow>
+              <TableHead>Descrição</TableHead><TableHead className="w-20">Un.</TableHead>
+              <TableHead className="w-24">Tipo</TableHead><TableHead className="w-20"></TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+              {filteredArts.length === 0 && <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Sem resultados</TableCell></TableRow>}
+              {filteredArts.map((a) => (
+                <TableRow key={a.id} className="cursor-pointer hover:bg-muted/40" onClick={() => onPick(a.id)}>
+                  <TableCell className="text-sm">{a.descricao}</TableCell>
+                  <TableCell className="text-sm">{a.unidade ?? "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{a.tipo}</TableCell>
+                  <TableCell><Button size="sm" variant="outline">Selecionar</Button></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
