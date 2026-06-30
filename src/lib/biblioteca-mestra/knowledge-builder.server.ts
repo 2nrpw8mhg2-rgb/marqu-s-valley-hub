@@ -1603,6 +1603,7 @@ async function snapshotArtigo(sb: Sb, artigoId: string): Promise<AntesSnap> {
 
 type Extras = {
   concorrentes: GeneratedTermo[];
+  incompativeis: GeneratedTermo[];
   unidades: GeneratedTermo[];
   capitulos: GeneratedTermo[];
   exemplos: GeneratedTermo[];
