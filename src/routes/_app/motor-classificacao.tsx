@@ -27,6 +27,7 @@ export const Route = createFileRoute("/_app/motor-classificacao")({
 type EstadoCls = "classificado_auto" | "necessita_revisao" | "sem_classificacao" | "validado";
 type ClsRow = {
   id: string; orcamento_id: string; artigo_origem_id: string;
+  orcamento_artigos?: { ordem: number } | null;
   descricao_original: string; unidade_original: string | null; quantidade_original: number | null;
   especialidade_id: string | null; subespecialidade_id: string | null;
   categoria_id: string | null; artigo_mestre_id: string | null;
@@ -96,13 +97,18 @@ function CentroClassificacao() {
     queryKey: ["cc-rows", orcamento, estadoFilter, search],
     enabled: !!orcamento && !!run && run.estado === "concluido",
     queryFn: async () => {
-      let q = supabase.from("classificacao_artigos").select("*")
-        .eq("orcamento_id", orcamento).order("created_at", { ascending: true });
+      let q = supabase.from("classificacao_artigos").select("*, orcamento_artigos!inner(ordem)")
+        .eq("orcamento_id", orcamento)
+        .order("created_at", { ascending: true });
       if (estadoFilter !== "all") q = q.eq("estado", estadoFilter as EstadoCls);
       if (search.trim()) q = q.ilike("descricao_original", `%${search.trim()}%`);
       const { data, error } = await q.limit(2000);
       if (error) throw error;
-      return (data ?? []) as ClsRow[];
+      return ((data ?? []) as ClsRow[]).sort((a, b) => {
+        const ao = a.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
+        const bo = b.orcamento_artigos?.ordem ?? Number.MAX_SAFE_INTEGER;
+        return ao - bo;
+      });
     },
   });
 

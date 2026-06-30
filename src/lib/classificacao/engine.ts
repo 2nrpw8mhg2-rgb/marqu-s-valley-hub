@@ -702,8 +702,10 @@ export async function runClassificacao(orcamentoId: string, onProgress?: (snapsh
   if (runErr) throw runErr;
 
   const { data: artigos } = await supabase
-    .from("orcamento_artigos").select("id, orcamento_id, descricao, unidade, quantidade")
-    .eq("orcamento_id", orcamentoId);
+    .from("orcamento_artigos").select("id, orcamento_id, descricao, unidade, quantidade, ordem")
+    .eq("orcamento_id", orcamentoId)
+    .order("ordem", { ascending: true })
+    .order("created_at", { ascending: true });
 
   const { data: existentes } = await supabase
     .from("classificacao_artigos").select("artigo_origem_id, estado")

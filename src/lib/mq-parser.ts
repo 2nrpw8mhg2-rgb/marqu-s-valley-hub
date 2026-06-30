@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 
 export type ParsedRow = {
   isCapitulo: boolean;
+  sourceRow: number;
   codigo: string | null;
   descricao: string;
   unidade: string | null;
@@ -269,14 +270,15 @@ export function parseRows(rows: any[][], headerRowIdx: number, map: ColumnMap): 
     const preco = map.preco != null ? toNum(r[map.preco]) : 0;
     const normDesc = NORM(descricao);
     if (!unidade && qtd === 0 && /^(total|subtotal|sub total|soma)\b/.test(normDesc)) continue;
-    if (!codigo && !unidade) continue;
+    const hasArticleSignal = !!codigo || !!unidade || (qtd !== 0 && isMeaningfulDescription(descricao));
+    if (!hasArticleSignal) continue;
 
     // Heurística capítulo: tem código tipo "1", "01", "1.1" sem unidade nem qtd
     const isCapitulo =
       (!unidade && qtd === 0 && preco === 0) ||
       (!!codigo && /^[0-9]+(\.[0-9]+)*$/.test(codigo) && !unidade && qtd === 0);
 
-    out.push({ isCapitulo, codigo, descricao, unidade, quantidade: qtd, preco_unitario: preco });
+    out.push({ isCapitulo, sourceRow: i, codigo, descricao, unidade, quantidade: qtd, preco_unitario: preco });
   }
   return out;
 }
