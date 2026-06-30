@@ -1781,6 +1781,99 @@ async function derivarUnidadesCapitulosExemplos(
   return { unidades, capitulos, exemplos };
 }
 
+// Especialidades excluídas: termos centrais (palavras-chave/materiais curados)
+// que aparecem APENAS noutras especialidades. Geram penalização forte e podem
+// eliminar candidatos confundíveis entre especialidades distintas.
+async function derivarIncompatibilidades(
+  sb: Sb,
+  artigoEspId: string | null,
+  ancoras: Set<string>
+): Promise<GeneratedTermo[]> {
+  if (!artigoEspId) return [];
+
+  // 1) IDs das subespecialidades da MESMA especialidade (proibido marcar como excluído)
+  const { data: subsMesma } = await sb
+    .from("biblioteca_subespecialidades")
+    .select("id")
+    .eq("especialidade_id", artigoEspId);
+  const subIdsMesma = new Set((subsMesma ?? []).map((s) => s.id as string));
+
+  // 2) IDs de artigos da MESMA especialidade
+  const { data: artsMesma } = await sb
+    .from("biblioteca_artigos")
+    .select("id")
+    .in("subespecialidade_id", [...subIdsMesma])
+    .eq("ativo", true);
+  const artigosMesmaEsp = new Set((artsMesma ?? []).map((r) => r.id as string));
+
+  // 3) Termos curados da MESMA especialidade (devem ficar de fora dos excluídos)
+  const termosMesma = new Set<string>();
+  if (artigosMesmaEsp.size) {
+    const { data } = await sb
+      .from("biblioteca_artigo_conhecimento")
+      .select("termo")
+      .in("artigo_mestre_id", [...artigosMesmaEsp].slice(0, 500))
+      .in("tipo", ["palavra_chave", "expressao", "material", "sinonimo"])
+      .eq("ativo", true)
+      .limit(5000);
+    for (const r of data ?? []) {
+      const c = lemaSingular((r.termo as string).trim().toLowerCase());
+      if (c) termosMesma.add(c);
+    }
+  }
+
+  // 4) Termos curados das OUTRAS especialidades
+  const { data: outrosArts } = await sb
+    .from("biblioteca_artigos")
+    .select("id, subespecialidade_id, biblioteca_subespecialidades(especialidade_id)")
+    .eq("ativo", true)
+    .limit(8000);
+  const outrosIds: string[] = [];
+  const espPorArtigo = new Map<string, string>();
+  for (const r of (outrosArts ?? []) as any[]) {
+    const espId = r.biblioteca_subespecialidades?.especialidade_id as string | undefined;
+    if (!espId || espId === artigoEspId) continue;
+    outrosIds.push(r.id as string);
+    espPorArtigo.set(r.id as string, espId);
+  }
+  if (!outrosIds.length) return [];
+
+  const { data: termosOutros } = await sb
+    .from("biblioteca_artigo_conhecimento")
+    .select("artigo_mestre_id, termo, tipo")
+    .in("artigo_mestre_id", outrosIds.slice(0, 800))
+    .in("tipo", ["palavra_chave", "expressao", "material"])
+    .eq("ativo", true)
+    .limit(8000);
+
+  const freq = new Map<string, { count: number; esps: Set<string> }>();
+  for (const r of termosOutros ?? []) {
+    const raw = (r.termo as string).trim().toLowerCase();
+    if (!raw) continue;
+    const c = r.tipo === "expressao" ? raw : lemaSingular(raw);
+    if (!c || tokenGenerico(c)) continue;
+    if (termosMesma.has(c)) continue;
+    if (ancoras.has(c)) continue;
+    const espId = espPorArtigo.get(r.artigo_mestre_id as string) ?? "";
+    const cur = freq.get(c) ?? { count: 0, esps: new Set() };
+    cur.count++;
+    if (espId) cur.esps.add(espId);
+    freq.set(c, cur);
+  }
+
+  return [...freq.entries()]
+    .filter(([, v]) => v.count >= 2)
+    .map(([termo, v]) => ({
+      termo,
+      peso: -60,
+      confianca: Math.min(95, 60 + v.count * 2),
+      justificacao: `Termo central de ${v.esps.size} outra(s) especialidade(s), ausente desta. Penaliza fortemente candidatos cruzados.`,
+      fonte: "vizinhos" as const,
+    }))
+    .sort((a, b) => b.confianca - a.confianca)
+    .slice(0, 60);
+}
+
 async function gravarExtras(
   sb: Sb,
   artigoId: string,
@@ -1788,9 +1881,10 @@ async function gravarExtras(
   modo: Modo
 ): Promise<Record<string, number>> {
   const perTipo: Record<string, number> = {
-    negativo_concorrente: 0, unidade_compativel: 0, capitulo_tipico: 0, exemplo_real: 0,
+    negativo_concorrente: 0, negativo_incompativel: 0,
+    unidade_compativel: 0, capitulo_tipico: 0, exemplo_real: 0,
   };
-  const tiposNovos = ["negativo_concorrente", "unidade_compativel", "capitulo_tipico", "exemplo_real"];
+  const tiposNovos = ["negativo_concorrente", "negativo_incompativel", "unidade_compativel", "capitulo_tipico", "exemplo_real"];
 
   if (modo === "regenerar") {
     await sb
@@ -1809,7 +1903,7 @@ async function gravarExtras(
   const setExist = new Set((existentes ?? []).map((e) => `${e.tipo}::${(e.termo as string).toLowerCase()}`));
 
   const rows: any[] = [];
-  const push = (tipo: string, t: GeneratedTermo, origem: "mapas_quantidades" | "artigos_vizinhos") => {
+  const push = (tipo: string, t: GeneratedTermo, origem: "mapas_quantidades" | "artigos_vizinhos" | "ia") => {
     if (!t.termo) return;
     const key = `${tipo}::${t.termo.toLowerCase()}`;
     if (setExist.has(key)) return;
@@ -1830,9 +1924,10 @@ async function gravarExtras(
   };
 
   for (const t of extras.concorrentes) push("negativo_concorrente", t, "artigos_vizinhos");
-  for (const t of extras.unidades) push("unidade_compativel", t, "mapas_quantidades");
-  for (const t of extras.capitulos) push("capitulo_tipico", t, "mapas_quantidades");
-  for (const t of extras.exemplos) push("exemplo_real", t, "mapas_quantidades");
+  for (const t of extras.incompativeis) push("negativo_incompativel", t, "artigos_vizinhos");
+  for (const t of extras.unidades) push("unidade_compativel", t, t.fonte === "historico" ? "mapas_quantidades" : "ia");
+  for (const t of extras.capitulos) push("capitulo_tipico", t, t.fonte === "historico" ? "mapas_quantidades" : "ia");
+  for (const t of extras.exemplos) push("exemplo_real", t, t.fonte === "historico" ? "mapas_quantidades" : "ia");
 
   if (rows.length) {
     const { error } = await sb.from("biblioteca_artigo_conhecimento").insert(rows);
