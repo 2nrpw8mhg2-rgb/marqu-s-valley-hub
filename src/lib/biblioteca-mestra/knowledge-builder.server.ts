@@ -1912,7 +1912,7 @@ async function derivarIncompatibilidades(
   if (outrosIds.length) {
     const { data: termosOutros } = await sb
       .from("biblioteca_artigo_conhecimento")
-      .select("artigo_mestre_id, termo, tipo, subespecialidade_id:artigo_mestre_id")
+      .select("artigo_mestre_id, termo, tipo")
       .in("artigo_mestre_id", outrosIds.slice(0, 800))
       .in("tipo", ["palavra_chave", "expressao", "material"])
       .eq("ativo", true)
