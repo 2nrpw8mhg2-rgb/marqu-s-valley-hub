@@ -329,8 +329,16 @@ function scoreCandidato(
   }
   bonusR = Math.min(bonusR, PESOS_CLASSIFICACAO.TOKEN_RARO_CAP);
 
-  // 4) Unidade
-  const unidadeCompat = compararUnidades(unidadeOrigem, art.unidade_norm);
+  // 4) Unidade — combina compatibilidade da unidade do artigo mestre
+  //    com a lista alargada "unidade_compativel" do conhecimento estruturado.
+  const unidadesCompat = bib.conhec.unidades.get(art.id);
+  let unidadeCompat = compararUnidades(unidadeOrigem, art.unidade_norm);
+  if (unidadeCompat !== 1 && unidadesCompat && unidadeOrigem && unidadesCompat.has(unidadeOrigem)) {
+    unidadeCompat = 1;
+  }
+  if (unidadeCompat !== 1 && unidadesCompat && unidadeOrigem && unidadesCompat.size > 0 && !unidadesCompat.has(unidadeOrigem)) {
+    unidadeCompat = -1;
+  }
   const bonusU = unidadeCompat === 1 ? PESOS_CLASSIFICACAO.UNIDADE_OK
                : unidadeCompat === -1 ? PESOS_CLASSIFICACAO.UNIDADE_BAD
                : 0;
@@ -339,16 +347,58 @@ function scoreCandidato(
   const bonusArtKw = artHitsForArt.reduce((s, h) => s + h.pontos, 0);
   const penalArtKw = artNegsForArt.reduce((s, h) => s + h.pontos, 0);
 
+  // 5b) Conhecimento estruturado: negativos incompatíveis e concorrentes
+  let penalIncompat = 0;
+  const incompatHits: KeywordHit[] = [];
+  for (const n of bib.conhec.negIncompat.get(art.id) ?? []) {
+    if (termMatches(origemNorm, origemTokenSet, n.termo_norm)) {
+      penalIncompat += n.peso < 0 ? n.peso : -Math.abs(n.peso);
+      incompatHits.push({
+        termo: n.termo, nivel: "artigo", entidade_id: art.id, entidade_nome: art.descricao,
+        peso: 1, pontos: n.peso < 0 ? n.peso : -Math.abs(n.peso),
+      });
+    }
+  }
+  let penalConcor = 0;
+  const concorHits: KeywordHit[] = [];
+  for (const n of bib.conhec.negConcorrente.get(art.id) ?? []) {
+    if (termMatches(origemNorm, origemTokenSet, n.termo_norm)) {
+      penalConcor += n.peso < 0 ? n.peso : -Math.abs(n.peso);
+      concorHits.push({
+        termo: n.termo, nivel: "artigo", entidade_id: art.id, entidade_nome: art.descricao,
+        peso: 1, pontos: n.peso < 0 ? n.peso : -Math.abs(n.peso),
+      });
+    }
+  }
+
+  // 5c) Exemplos reais — similaridade textual (Jaccard nos tokens)
+  let bonusExemplos = 0;
+  const exemplos = bib.conhec.exemplos.get(art.id) ?? [];
+  if (exemplos.length && origemTokenSet.size) {
+    let melhor = 0;
+    for (const ex of exemplos) {
+      if (!ex.tokens.size) continue;
+      let inter = 0;
+      for (const t of ex.tokens) if (origemTokenSet.has(t)) inter++;
+      const uni = ex.tokens.size + origemTokenSet.size - inter;
+      const sim = uni > 0 ? inter / uni : 0;
+      if (sim > melhor) melhor = sim;
+    }
+    bonusExemplos = Math.round(melhor * 40);
+  }
+
   // 6) Filtro de elegibilidade conservador
   const temArtKeywordPositiva = artHitsForArt.length > 0;
   const elegivel =
     temArtKeywordPositiva ||
     score_texto >= PESOS_CLASSIFICACAO.MIN_TEXTO ||
-    (score_texto >= PESOS_CLASSIFICACAO.MIN_TEXTO_UNIDADE && unidadeCompat === 1);
+    (score_texto >= PESOS_CLASSIFICACAO.MIN_TEXTO_UNIDADE && unidadeCompat === 1) ||
+    bonusExemplos >= 25;
   if (!elegivel) return null;
 
   const score_final =
     score_texto + bonusN + bonusR + espHitsCap + subespHitsCap + bonusU + bonusArtKw + penalArtKw +
+    penalIncompat + penalConcor + bonusExemplos +
     espNegs.reduce((s, h) => s + h.pontos, 0) +
     subespNegs.reduce((s, h) => s + h.pontos, 0);
 
