@@ -1,43 +1,38 @@
-## Objetivo
-Expor a funcionalidade de Subempreitadas no servidor MCP para que o ChatGPT possa auditar, analisar e validar orçamentos. Toda a autenticação continua via OAuth Supabase e RLS aplica-se como o utilizador ligado — sem service role.
+## Diagnóstico já confirmado
 
-## 1. Atualizar `obter_orcamento`
-Ficheiro: `src/lib/mcp/tools/obter-orcamento.ts`
+- O ficheiro principal `src/lib/mcp/index.ts` já regista as 5 tools novas.
+- O manifesto local `.lovable/mcp/manifest.json` já está em `version: 0.3.0`, path `/mcp`, com 11 tools no total.
+- As tools novas aparecem no manifesto local:
+  - `listar_subempreitadas`
+  - `obter_resumo_subempreitadas_orcamento`
+  - `obter_artigos_por_subempreitada`
+  - `separar_orcamento_por_subempreitada`
+  - `validar_subempreitada_artigo`
+- O plugin MCP está ativo em `vite.config.ts` com `mcpPlugin()`, portanto o endpoint gerado continua a ser `/mcp`.
 
-Expandir o `select` de `orcamento_artigos` para incluir:
-`subempreitada_id, subempreitada_confianca, subempreitada_origem, subempreitada_validada_manual` + join `subempreitada:subempreitadas(codigo, nome)`.
+## Hipótese principal
 
-Cada artigo devolve sempre os campos (com `null` quando não classificado):
-```
-subempreitada_id, subempreitada_codigo, subempreitada_nome,
-subempreitada_confianca, subempreitada_origem, subempreitada_validada_manual
-```
+O ChatGPT continua ligado a uma versão publicada anterior, ou tem a lista de tools em cache. Localmente o MCP já expõe as tools, mas a produção precisa de receber a versão atual e o conector no ChatGPT precisa de reconectar/atualizar tools.
 
-## 2. Novas ferramentas MCP
-Criar sob `src/lib/mcp/tools/`:
+## Plano de ação
 
-- **`listar-subempreitadas.ts`** → `listar_subempreitadas` — sem input, devolve todas as subempreitadas ativas (`id, codigo, nome, descricao, ordem`).
-- **`resumo-subempreitadas-orcamento.ts`** → `obter_resumo_subempreitadas_orcamento` — input `{ orcamento_id }`. Agrega por subempreitada: `numero_artigos`, `valor_total` (Σ `quantidade * preco_unitario`), `percentagem` do total, mais linha "Sem classificação".
-- **`artigos-por-subempreitada.ts`** → `obter_artigos_por_subempreitada` — input `{ orcamento_id, subempreitada_id (nullable p/ não classificados) }`. Devolve lista completa de artigos com campos de subempreitada, capítulo e confiança.
-- **`validar-subempreitada-artigo.ts`** → `validar_subempreitada_artigo` — input `{ artigo_id, subempreitada_id, validado_manual? }`. Replica a lógica de `alterarSubempreitadaArtigo`: update do artigo + insert em `subempreitada_aprendizagem` com `user_id = ctx.getUserId()`. Anotação `readOnlyHint: false`.
-- **`separar-orcamento-por-subempreitada.ts`** → `separar_orcamento_por_subempreitada` — input `{ orcamento_id }`. Reutiliza a lógica de `classificarOrcamento` (import direto do engine + queries). Devolve `{ artigos_processados, artigos_classificados, sem_classificacao, tempo_ms, conflitos }` (conflitos = artigos com `confianca < 0.7`). Anotação `readOnlyHint: false`.
+1. **Validar novamente o manifesto MCP**
+   - Executar o extrator oficial do manifesto MCP.
+   - Confirmar que o manifesto gerado continua com as 11 tools e sem erros.
 
-Todas usam `supabaseForUser(ctx)` — RLS aplica-se.
+2. **Publicar a versão atual**
+   - Antes de publicar, verificar se existe algum bloqueio crítico de segurança.
+   - Publicar a app para que o endpoint de produção `/mcp` passe a servir a versão `0.3.0`.
 
-## 3. Registo
-`src/lib/mcp/index.ts`: importar e adicionar as 5 ferramentas ao array `tools`. Bump `version` para `0.3.0`.
+3. **Confirmar o endpoint correto para o ChatGPT**
+   - Endpoint esperado: `https://marquis-opus-pro.lovable.app/mcp`.
+   - URL estável alternativa de produção: `https://project--039d4604-74b9-4371-9e62-78d763dd48e6.lovable.app/mcp`.
+   - Se o ChatGPT estiver ligado a outro domínio, preview URL, URL antiga ou endpoint diferente, tem de ser removido e adicionado novamente com o endpoint correto.
 
-## 4. Metadados de auditoria
-`obter_artigos_por_subempreitada` e `obter_orcamento` devolvem por artigo:
-- `subempreitada_confianca` (score 0–1)
-- `subempreitada_origem` (`manual | artigo_mestre | regras | ia`)
-- `subempreitada_validada_manual` (bool)
-- `updated_at` do artigo (timestamp da última alteração)
+4. **Pós-publicação**
+   - No ChatGPT, remover/reconectar o conector MCP ou usar “Refresh tools / Reconnect”.
+   - Confirmar que o `list_tools` passa a mostrar as 5 tools novas.
 
-## 5. Validação
-Após as edições, correr `app_mcp_server--extract_mcp_manifest` para regenerar `.lovable/mcp/manifest.json` e confirmar que as 5 novas tools aparecem sem erros.
+## Resultado esperado
 
-## Notas técnicas
-- Sem alterações de schema — todas as colunas já existem.
-- Sem service role — tudo via cliente publishable + bearer do utilizador; RLS existente sobre `orcamento_artigos`, `subempreitadas` e `subempreitada_aprendizagem` cobre o acesso.
-- Nomes de tools e mensagens em pt-PT.
+Após publicação e reconexão no ChatGPT, o MCP deve expor 11 tools, incluindo todas as tools de Subempreitadas, mantendo autenticação e permissões existentes.
