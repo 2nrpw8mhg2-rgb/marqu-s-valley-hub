@@ -12,9 +12,18 @@ import { toast } from "sonner";
 import { HardHat, ShieldCheck, FileText, Boxes } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: typeof s.next === "string" ? s.next : "",
+  }),
   head: () => ({ meta: [{ title: "Entrar — MV OS" }] }),
   component: AuthPage,
 });
+
+function safeNext(next: string): string {
+  if (!next) return "";
+  if (!next.startsWith("/") || next.startsWith("//")) return "";
+  return next;
+}
 
 function AuthPage() {
   const navigate = useNavigate();
