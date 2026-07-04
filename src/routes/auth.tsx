@@ -27,6 +27,8 @@ function safeNext(next: string): string {
 
 function AuthPage() {
   const navigate = useNavigate();
+  const search = Route.useSearch();
+  const nextTarget = safeNext(search.next);
   const { session, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
 
@@ -40,8 +42,14 @@ function AuthPage() {
   const [sPassword, setSPassword] = useState("");
 
   useEffect(() => {
-    if (!authLoading && session) navigate({ to: "/dashboard", replace: true });
-  }, [session, authLoading, navigate]);
+    if (!authLoading && session) {
+      if (nextTarget) {
+        window.location.href = nextTarget;
+      } else {
+        navigate({ to: "/dashboard", replace: true });
+      }
+    }
+  }, [session, authLoading, navigate, nextTarget]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,18 +60,25 @@ function AuthPage() {
       toast.error(error.message);
     } else {
       toast.success("Sessão iniciada");
-      navigate({ to: "/dashboard", replace: true });
+      if (nextTarget) {
+        window.location.href = nextTarget;
+      } else {
+        navigate({ to: "/dashboard", replace: true });
+      }
     }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    const returnTo = nextTarget
+      ? `${window.location.origin}${nextTarget}`
+      : `${window.location.origin}/`;
     const { error } = await supabase.auth.signUp({
       email: sEmail,
       password: sPassword,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        emailRedirectTo: returnTo,
         data: { nome: sNome },
       },
     });
