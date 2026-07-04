@@ -12,7 +12,7 @@
   "mcp": {
     "server": {
       "name": "mv-os-mcp",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "title": "MV OS MCP"
     },
     "tools": [
@@ -97,7 +97,7 @@
       {
         "name": "obter_orcamento",
         "title": "Obter orçamento",
-        "description": "Devolve um orçamento com os seus capítulos e artigos.",
+        "description": "Devolve um orçamento com capítulos e artigos, incluindo a subempreitada atribuída a cada artigo.",
         "annotations": {
           "readOnlyHint": true,
           "openWorldHint": false
@@ -170,6 +170,151 @@
               "maximum": 200
             }
           }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "listar_subempreitadas",
+        "title": "Listar subempreitadas",
+        "description": "Lista todas as subempreitadas ativas (categorias de execução em obra).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "obter_resumo_subempreitadas_orcamento",
+        "title": "Resumo por subempreitada",
+        "description": "Agrega os artigos de um orçamento por subempreitada, devolvendo número de artigos, valor total e percentagem.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "orcamento_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "orcamento_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "obter_artigos_por_subempreitada",
+        "title": "Artigos por subempreitada",
+        "description": "Devolve todos os artigos de um orçamento pertencentes a uma subempreitada (ou sem classificação quando subempreitada_id for null).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "orcamento_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "subempreitada_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "UUID da subempreitada. Passar null para obter os artigos ainda sem classificação."
+            }
+          },
+          "required": [
+            "orcamento_id",
+            "subempreitada_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "validar_subempreitada_artigo",
+        "title": "Validar subempreitada de artigo",
+        "description": "Atribui manualmente uma subempreitada a um artigo de orçamento e grava a aprendizagem para casos futuros.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "artigo_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "subempreitada_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "validado_manual": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "artigo_id",
+            "subempreitada_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "separar_orcamento_por_subempreitada",
+        "title": "Separar orçamento por subempreitada",
+        "description": "Executa o motor de classificação por subempreitada num orçamento (preservando os artigos validados manualmente) e devolve o resumo da operação.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "orcamento_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "orcamento_id"
+          ]
         },
         "outputSchema": null
       }
