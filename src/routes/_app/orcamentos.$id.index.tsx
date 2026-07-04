@@ -271,6 +271,9 @@ function OrcamentoEditor() {
             <Link to="/orcamentos/$id/decomposicao" params={{ id }}>
               <Button variant="outline" size="sm"><Layers className="h-4 w-4 mr-1" /> Decomposição de Preços</Button>
             </Link>
+            <Link to="/orcamentos/$id/subempreitadas" params={{ id }}>
+              <Button variant="outline" size="sm"><Users className="h-4 w-4 mr-1" /> Subempreitadas</Button>
+            </Link>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-1" /> Importar MQ</Button>
             <Button variant="outline" size="sm" onClick={novaVersao}><GitBranch className="h-4 w-4 mr-1" /> Nova versão</Button>
             <Button variant="outline" size="sm" onClick={doExportExcel}><FileSpreadsheet className="h-4 w-4 mr-1" /> Excel</Button>
