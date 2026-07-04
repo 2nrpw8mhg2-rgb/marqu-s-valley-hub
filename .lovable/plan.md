@@ -1,55 +1,84 @@
-# Servidor MCP com OAuth Supabase
 
-Já existe o esqueleto MCP montado (`src/lib/mcp/`, `mcpPlugin()` no `vite.config.ts`, rota `/mcp`). Falta ligar a autenticação OAuth do Supabase e trocar as ferramentas demo por ferramentas úteis para o ChatGPT.
+# Separação automática de artigos por subempreitada
 
-## O que vai ser feito
+Cria o conceito de **subempreitada** (categoria de trabalho executado por um subempreiteiro em obra — ex.: Pinturas, Coberturas, AVAC) distinto do que já existe:
 
-1. **Ativar o servidor OAuth do Supabase**
-   Chamar `supabase--configure_oauth_server` (sem parâmetros). Isto ativa o OAuth 2.1 e o registo dinâmico de clientes para o ChatGPT/Claude se registarem sozinhos.
+- `subempreiteiros` = fornecedores (empresas).
+- `procurement_pacotes` = pacotes de consulta a subempreiteiros (a jusante).
+- `biblioteca_subespecialidades` = organização técnica da biblioteca (não é o mesmo mapa).
 
-2. **Criar a página de consentimento**
-   Novo ficheiro `src/routes/[.]lovable.oauth.consent.tsx`. É para onde o Supabase manda o utilizador aprovar a ligação do ChatGPT. Mostra "Ligar ChatGPT a MV OS" com botões Aprovar / Recusar. Se o utilizador não estiver autenticado, redireciona para `/auth` e volta ao consentimento depois de entrar.
+A subempreitada é a "peça" contratual que se atribui a cada artigo do orçamento, com atribuição automática, dashboard e vista dedicada.
 
-3. **Atualizar `src/routes/auth.tsx`** para preservar o parâmetro `next` (URL da página de consentimento) em:
-   - login com email/password
-   - registo (via `emailRedirectTo`)
-   - (se existir botão Google, também no `redirect_uri`)
+## 1. Base de dados (migração única)
 
-4. **Ativar OAuth no `defineMcp`**
-   Em `src/lib/mcp/index.ts`, acrescentar `auth: auth.oauth.issuer({ issuer: https://<project-ref>.supabase.co/auth/v1, acceptedAudiences: "authenticated" })` usando `import.meta.env.VITE_SUPABASE_PROJECT_ID`.
+**Tabela `subempreitadas`**
+`id, codigo (unique), nome, descricao, palavras_chave text[], termos_exclusao text[], ordem, ativo, created_at, updated_at`.
+RLS: leitura para `authenticated`; escrita só admin (`private.has_role`). Seed com as 22 subempreitadas indicadas.
 
-5. **Substituir as ferramentas demo por ferramentas reais**
-   Remover `echo` e `server_info` e criar em `src/lib/mcp/tools/`:
+**`biblioteca_artigos` — novas colunas**
+`subempreitada_principal_id (fk)`, `subempreitada_secundaria_id (fk)`, `confianca_subempreitada numeric`, `origem_classificacao_subempreitada text` (`manual | regras | ia | herdada`).
 
-   - `listar_obras` — lista as obras do utilizador (nome, estado, cliente)
-   - `obter_obra` — detalhes de uma obra por id
-   - `listar_orcamentos` — orçamentos (opcionalmente filtrados por obra)
-   - `obter_orcamento` — capítulos e artigos de um orçamento
-   - `pesquisar_biblioteca` — pesquisa por texto na biblioteca mestra (especialidade, categoria, artigo)
-   - `listar_subempreiteiros` — nome, especialidade, rating
+**`orcamento_artigos` — novas colunas**
+`subempreitada_id (fk)`, `subempreitada_confianca numeric`, `subempreitada_origem text` (`artigo_mestre | regras | manual | ia`), `subempreitada_validada_manual boolean default false`.
 
-   Todas as ferramentas:
-   - Recebem o token OAuth do `ToolContext` e criam um cliente Supabase por utilizador (`Authorization: Bearer <token>`), para o RLS ser aplicado como esse utilizador.
-   - Marcadas como `readOnlyHint: true` (só leitura nesta primeira fase).
-   - Nunca retornam o token nem escrevem nos dados.
+**`subempreitada_aprendizagem`** (para o ponto 8)
+`id, artigo_descricao_normalizada, artigo_mestre_id nullable, subempreitada_id, user_id, created_at`. Alimentada quando o utilizador corrige manualmente.
 
-6. **Regenerar o manifesto** com `app_mcp_server--extract_mcp_manifest` para o painel de "Agent integrations" mostrar as novas ferramentas.
+Índices: em `orcamento_artigos.subempreitada_id`, em `biblioteca_artigos.subempreitada_principal_id`, e trigrama em `subempreitadas.palavras_chave` para pesquisa.
 
-## Impacto no RLS
+## 2. Motor de atribuição (`src/lib/subempreitadas/`)
 
-Nesta app **só administradores** podem ler as tabelas de negócio (correção de segurança recente). Portanto: só o utilizador com role `admin` consegue realmente listar obras/orçamentos pelo ChatGPT. Isto é o comportamento correto face às políticas atuais.
+Função pura `classificarArtigo(artigo, ctx) → { subempreitada_id, confianca, origem, alternativas[] }` com esta cascata:
 
-Se quiseres que utilizadores normais também possam consultar via ChatGPT, tenho de acrescentar depois um role intermédio (ex.: `member`) e ajustar as políticas — mas isso é um passo separado.
+1. **Aprendizagem manual** (match exato por descrição normalizada) → confiança 1.0, origem `manual`.
+2. **Artigo Mestre associado** → herda `subempreitada_principal_id` → confiança 0.95, origem `artigo_mestre`.
+3. **Regras por palavras-chave** sobre `descricao + codigo`, normalizando pt-PT (remover acentos, minúsculas). Score por subempreitada = (nº matches positivos × peso) − (matches em `termos_exclusao` × peso alto). Empate → escolhe maior score; se diferença < 15% marca `alternativas`.
+4. **Sinal auxiliar** do capítulo original: soma pequena (máx 10%), nunca decisor sozinho.
+5. Se `confianca < 0.70` → `subempreitada_validada_manual = false` + estado "necessita validação". Nunca deixa `subempreitada_id` NULL a não ser que o score global seja 0.
 
-## Como usar depois (do teu lado)
+Executor server-fn `classificarOrcamento(orcamento_id)` que corre em lote e faz upsert.
+Hook de importação MQ (`ImportMQDialog` / `mq-parser`) chama o classificador logo após inserir artigos.
+Hook de associação a Artigo Mestre → reclassifica esse artigo.
 
-1. Aprovas este plano → eu implemento tudo.
-2. Publicas de novo a app (para aplicar as novas rotas MCP + consentimento).
-3. No ChatGPT (Pro): Settings → Connectors → **Add custom connector** → cola `https://<teu-dominio>.lovable.app/mcp`.
-4. O ChatGPT abre o Supabase para autenticar → aterras na página de consentimento da app → aprovas.
-5. A partir daí: "lista as minhas obras", "mostra o orçamento X", etc.
+## 3. UI
 
-## Confirmações antes de implementar
+**Nova vista** `src/routes/_app/orcamentos.$id.subempreitadas.tsx` com dois separadores:
 
-- Confirmas o conjunto inicial de 6 ferramentas listadas em cima? Se quiseres começar mais estreito (só obras + orçamentos), diz.
-- Só leitura nesta primeira versão — depois acrescentamos escrita se fizer sentido. Ok?
+- **Dashboard**: cards com nº artigos, valor total e nº por validar por subempreitada; contadores globais (sem subempreitada, baixa confiança); botão "Classificar novamente"; botão "Exportar pedido de proposta".
+- **Separação por Subempreitada** (tabela): Código original · Capítulo original · Descrição · Un. · Qtd · Preço · Total · Artigo Mestre · Subempreitada sugerida (select editável) · Confiança (barra) · Estado (validado/necessita validação/sem subempreitada) · Ações (validar, alterar, ver alternativas). Filtros por subempreitada, estado e confiança.
+
+Alterar manualmente → grava em `orcamento_artigos` (`origem = manual`, `validada_manual = true`) e insere linha em `subempreitada_aprendizagem`.
+
+**Página de gestão** `src/routes/_app/biblioteca-mestra.subempreitadas.tsx` para admin editar lista, palavras-chave, termos de exclusão.
+
+**Integração `orcamentos.$id.index`**: barra de resumo por subempreitada + link para a nova vista.
+
+## 4. Exportação (`src/lib/subempreitadas/export.ts`)
+
+Selecionar 1 ou N subempreitadas → gerar:
+
+- **Excel** (xlsx): folha por subempreitada com colunas do orçamento + totais.
+- **PDF**: mapa de quantidades filtrado, cabeçalho com obra/orçamento/subempreitada.
+- **Pedido de proposta**: PDF/Excel formatado para envio a subempreiteiro (sem preços unitários internos, só quantidades e descrição). Reutiliza `orcamento-export.ts`.
+
+Opcional (fora deste plano): botão "Criar pacote de procurement" que cria diretamente um `procurement_pacote` já preenchido a partir de uma subempreitada.
+
+## 5. Terminologia
+
+Toda a UI, mensagens e nomes em português de Portugal — segue o memory `mem://constraints/idioma-ptpt` (betão, cofragem, caixilharia, guardar/eliminar, etc.). Nada de "concreto", "salvar", "excluir".
+
+## Ordem de implementação
+
+1. Migração (tabelas + colunas + seed + RLS + GRANTs).
+2. Motor de classificação + server-fns.
+3. Página de gestão de subempreitadas (admin).
+4. Hook na importação MQ + reclassificação em massa.
+5. Vista "Separação por Subempreitada" + Dashboard.
+6. Aprendizagem manual.
+7. Exportações (Excel, PDF, pedido de proposta).
+
+## Confirmações antes de avançar
+
+1. **Escopo do seed**: uso exatamente a lista das 22 subempreitadas que indicaste, com palavras-chave iniciais escolhidas por mim (podes afinar depois na página de gestão)?
+2. **Reclassificação retroativa**: aplico o motor a todos os orçamentos existentes na migração, ou só aos novos daqui para a frente?
+3. **Pedido de proposta**: gero um documento standalone, ou queres que crie diretamente um `procurement_pacote` (já existente na app) com os artigos da subempreitada?
