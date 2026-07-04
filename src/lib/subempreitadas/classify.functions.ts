@@ -92,8 +92,13 @@ export const classificarOrcamento = createServerFn({ method: "POST" })
 export const classificarTudo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const isAdmin = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
-    if (!isAdmin.data) throw new Error("Só administradores podem correr esta operação.");
+    const { data: roleRow } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!roleRow) throw new Error("Só administradores podem correr esta operação.");
     // Delega ao classificador com orcamento_id = null
     const sb = context.supabase;
     const { data: subsRaw } = await sb.from("subempreitadas").select("id, codigo, nome, palavras_chave, termos_exclusao, ativo").eq("ativo", true);
