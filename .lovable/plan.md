@@ -1,43 +1,55 @@
-Este plano é um **guia de instalação**, não uma alteração de código. Vais fazer os passos no ChatGPT; eu apoio-te em direto.
+# Servidor MCP com OAuth Supabase
 
-## Pré-requisito (fazes tu)
-Carregar em **Publish** no canto superior direito do editor e esperar até ficar "Published" a verde. Depois avisa-me — eu confirmo o URL exato do teu `/mcp`.
+Já existe o esqueleto MCP montado (`src/lib/mcp/`, `mcpPlugin()` no `vite.config.ts`, rota `/mcp`). Falta ligar a autenticação OAuth do Supabase e trocar as ferramentas demo por ferramentas úteis para o ChatGPT.
 
-## Passo 1 — Verificar plano do ChatGPT
-1. Abre https://chatgpt.com e faz login.
-2. Canto inferior esquerdo → clica no teu nome → **My plan**.
-3. Deves ver **Plus**, **Pro**, **Business** ou **Enterprise**. Se disser "Free", tens de fazer upgrade para continuar.
+## O que vai ser feito
 
-## Passo 2 — Ativar Developer Mode
-1. **Settings** (⚙️ canto superior direito) → **Connectors**.
-2. Separador **Advanced** (em cima) → ativa **Developer mode**.
-3. Aceita a caixa de aviso que aparece.
+1. **Ativar o servidor OAuth do Supabase**
+   Chamar `supabase--configure_oauth_server` (sem parâmetros). Isto ativa o OAuth 2.1 e o registo dinâmico de clientes para o ChatGPT/Claude se registarem sozinhos.
 
-## Passo 3 — Criar o connector MV OS
-1. Volta a **Settings → Connectors → Connectors**.
-2. Canto superior direito → botão **Create** (ou "New connector").
-3. Preenche:
-   - **Name:** `MV OS`
-   - **Description:** `Plataforma interna Marquês Valley` (opcional)
-   - **MCP Server URL:** `https://<URL-que-te-vou-dar>/mcp`
-   - **Authentication:** escolhe **No authentication**
-4. Marca a caixa **"I trust this application"**.
-5. Clica **Create**.
-6. Deves ver **2 tools disponíveis**: `echo` e `server_info`.
+2. **Criar a página de consentimento**
+   Novo ficheiro `src/routes/[.]lovable.oauth.consent.tsx`. É para onde o Supabase manda o utilizador aprovar a ligação do ChatGPT. Mostra "Ligar ChatGPT a MV OS" com botões Aprovar / Recusar. Se o utilizador não estiver autenticado, redireciona para `/auth` e volta ao consentimento depois de entrar.
 
-## Passo 4 — Usar numa conversa
-1. Abre uma **conversa nova** no ChatGPT.
-2. Em baixo, ao lado do campo de escrita, clica no ícone **+** (mais) → **Developer mode / Connectors**.
-3. Ativa o toggle do **MV OS**.
-4. Escreve: `Chama a ferramenta echo do MV OS com o texto "olá do ChatGPT".`
-5. O ChatGPT vai pedir autorização (uma vez) → aprova → deves receber "olá do ChatGPT" de volta.
-6. Testa também: `Usa server_info do MV OS.` → deve devolver nome, versão e hora.
+3. **Atualizar `src/routes/auth.tsx`** para preservar o parâmetro `next` (URL da página de consentimento) em:
+   - login com email/password
+   - registo (via `emailRedirectTo`)
+   - (se existir botão Google, também no `redirect_uri`)
 
-## Se algo correr mal
-Diz-me exatamente o que vês (mensagem de erro, ecrã em branco, opção que não aparece) e eu ajusto. Pontos habituais:
-- **"Create" não aparece** → Developer mode não está ativo, ou plano não permite.
-- **Erro 404 no URL** → publicação ainda não terminou, esperar 1 minuto.
-- **Connector cria mas não mostra tools** → dizer-me para eu verificar o `/mcp`.
+4. **Ativar OAuth no `defineMcp`**
+   Em `src/lib/mcp/index.ts`, acrescentar `auth: auth.oauth.issuer({ issuer: https://<project-ref>.supabase.co/auth/v1, acceptedAudiences: "authenticated" })` usando `import.meta.env.VITE_SUPABASE_PROJECT_ID`.
 
-## Próximo passo (depois disto correr)
-Ativar OAuth para o ChatGPT agir como tu e expor ferramentas úteis (listar obras, orçamentos, etc.). Nessa altura crio um plano separado.
+5. **Substituir as ferramentas demo por ferramentas reais**
+   Remover `echo` e `server_info` e criar em `src/lib/mcp/tools/`:
+
+   - `listar_obras` — lista as obras do utilizador (nome, estado, cliente)
+   - `obter_obra` — detalhes de uma obra por id
+   - `listar_orcamentos` — orçamentos (opcionalmente filtrados por obra)
+   - `obter_orcamento` — capítulos e artigos de um orçamento
+   - `pesquisar_biblioteca` — pesquisa por texto na biblioteca mestra (especialidade, categoria, artigo)
+   - `listar_subempreiteiros` — nome, especialidade, rating
+
+   Todas as ferramentas:
+   - Recebem o token OAuth do `ToolContext` e criam um cliente Supabase por utilizador (`Authorization: Bearer <token>`), para o RLS ser aplicado como esse utilizador.
+   - Marcadas como `readOnlyHint: true` (só leitura nesta primeira fase).
+   - Nunca retornam o token nem escrevem nos dados.
+
+6. **Regenerar o manifesto** com `app_mcp_server--extract_mcp_manifest` para o painel de "Agent integrations" mostrar as novas ferramentas.
+
+## Impacto no RLS
+
+Nesta app **só administradores** podem ler as tabelas de negócio (correção de segurança recente). Portanto: só o utilizador com role `admin` consegue realmente listar obras/orçamentos pelo ChatGPT. Isto é o comportamento correto face às políticas atuais.
+
+Se quiseres que utilizadores normais também possam consultar via ChatGPT, tenho de acrescentar depois um role intermédio (ex.: `member`) e ajustar as políticas — mas isso é um passo separado.
+
+## Como usar depois (do teu lado)
+
+1. Aprovas este plano → eu implemento tudo.
+2. Publicas de novo a app (para aplicar as novas rotas MCP + consentimento).
+3. No ChatGPT (Pro): Settings → Connectors → **Add custom connector** → cola `https://<teu-dominio>.lovable.app/mcp`.
+4. O ChatGPT abre o Supabase para autenticar → aterras na página de consentimento da app → aprovas.
+5. A partir daí: "lista as minhas obras", "mostra o orçamento X", etc.
+
+## Confirmações antes de implementar
+
+- Confirmas o conjunto inicial de 6 ferramentas listadas em cima? Se quiseres começar mais estreito (só obras + orçamentos), diz.
+- Só leitura nesta primeira versão — depois acrescentamos escrita se fizer sentido. Ok?
