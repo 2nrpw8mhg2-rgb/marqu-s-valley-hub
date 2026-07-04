@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as McpRouteImport } from './routes/mcp'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
@@ -19,6 +20,8 @@ import { Route as AppDecomposicaoPrecosRouteImport } from './routes/_app/decompo
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppBibliotecaMestraRouteImport } from './routes/_app/biblioteca-mestra'
 import { Route as AppBibliotecaRouteImport } from './routes/_app/biblioteca'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos.index'
 import { Route as AppObrasIndexRouteImport } from './routes/_app/obras.index'
 import { Route as AppBibliotecaMestraIndexRouteImport } from './routes/_app/biblioteca-mestra.index'
@@ -34,6 +37,7 @@ import { Route as AppBibliotecaMestraKeywordsRouteImport } from './routes/_app/b
 import { Route as AppBibliotecaMestraEspecialidadesRouteImport } from './routes/_app/biblioteca-mestra.especialidades'
 import { Route as AppBibliotecaMestraCategoriasRouteImport } from './routes/_app/biblioteca-mestra.categorias'
 import { Route as AppBibliotecaMestraArtigosRouteImport } from './routes/_app/biblioteca-mestra.artigos'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as AppOrcamentosIdIndexRouteImport } from './routes/_app/orcamentos.$id.index'
 import { Route as AppObrasIdIndexRouteImport } from './routes/_app/obras.$id.index'
 import { Route as AppProcurementPacotesIdRouteImport } from './routes/_app/procurement.pacotes.$id'
@@ -48,6 +52,11 @@ import { Route as AppObrasIdMedicoesRouteImport } from './routes/_app/obras.$id.
 import { Route as AppObrasIdFinanceiraRouteImport } from './routes/_app/obras.$id.financeira'
 import { Route as AppObrasIdDocumentosRouteImport } from './routes/_app/obras.$id.documentos'
 
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -97,6 +106,18 @@ const AppBibliotecaRoute = AppBibliotecaRouteImport.update({
   path: '/biblioteca',
   getParentRoute: () => AppRoute,
 } as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppOrcamentosIndexRoute = AppOrcamentosIndexRouteImport.update({
   id: '/orcamentos/',
   path: '/orcamentos/',
@@ -183,6 +204,12 @@ const AppBibliotecaMestraArtigosRoute =
     path: '/artigos',
     getParentRoute: () => AppBibliotecaMestraRoute,
   } as any)
+const Char91DotmcpChar93InvokeToolToolRoute =
+  Char91DotmcpChar93InvokeToolToolRouteImport.update({
+    id: '/.mcp/invoke-tool/$tool',
+    path: '/.mcp/invoke-tool/$tool',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppOrcamentosIdIndexRoute = AppOrcamentosIdIndexRouteImport.update({
   id: '/orcamentos/$id/',
   path: '/orcamentos/$id/',
@@ -254,6 +281,9 @@ const AppObrasIdDocumentosRoute = AppObrasIdDocumentosRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/mcp': typeof McpRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/biblioteca': typeof AppBibliotecaRoute
   '/biblioteca-mestra': typeof AppBibliotecaMestraRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
@@ -261,6 +291,7 @@ export interface FileRoutesByFullPath {
   '/documentos': typeof AppDocumentosRoute
   '/motor-classificacao': typeof AppMotorClassificacaoRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
   '/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
   '/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
@@ -293,12 +324,16 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/mcp': typeof McpRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/biblioteca': typeof AppBibliotecaRoute
   '/dashboard': typeof AppDashboardRoute
   '/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/documentos': typeof AppDocumentosRoute
   '/motor-classificacao': typeof AppMotorClassificacaoRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
   '/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
   '/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
@@ -332,6 +367,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
+  '/mcp': typeof McpRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_app/biblioteca': typeof AppBibliotecaRoute
   '/_app/biblioteca-mestra': typeof AppBibliotecaMestraRouteWithChildren
   '/_app/dashboard': typeof AppDashboardRoute
@@ -339,6 +377,7 @@ export interface FileRoutesById {
   '/_app/documentos': typeof AppDocumentosRoute
   '/_app/motor-classificacao': typeof AppMotorClassificacaoRoute
   '/_app/subempreiteiros': typeof AppSubempreiteirosRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_app/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
   '/_app/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
   '/_app/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
@@ -373,6 +412,9 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/mcp'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/biblioteca'
     | '/biblioteca-mestra'
     | '/dashboard'
@@ -380,6 +422,7 @@ export interface FileRouteTypes {
     | '/documentos'
     | '/motor-classificacao'
     | '/subempreiteiros'
+    | '/.mcp/invoke-tool/$tool'
     | '/biblioteca-mestra/artigos'
     | '/biblioteca-mestra/categorias'
     | '/biblioteca-mestra/especialidades'
@@ -412,12 +455,16 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/mcp'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/biblioteca'
     | '/dashboard'
     | '/decomposicao-precos'
     | '/documentos'
     | '/motor-classificacao'
     | '/subempreiteiros'
+    | '/.mcp/invoke-tool/$tool'
     | '/biblioteca-mestra/artigos'
     | '/biblioteca-mestra/categorias'
     | '/biblioteca-mestra/especialidades'
@@ -450,6 +497,9 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/auth'
+    | '/mcp'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/_app/biblioteca'
     | '/_app/biblioteca-mestra'
     | '/_app/dashboard'
@@ -457,6 +507,7 @@ export interface FileRouteTypes {
     | '/_app/documentos'
     | '/_app/motor-classificacao'
     | '/_app/subempreiteiros'
+    | '/.mcp/invoke-tool/$tool'
     | '/_app/biblioteca-mestra/artigos'
     | '/_app/biblioteca-mestra/categorias'
     | '/_app/biblioteca-mestra/especialidades'
@@ -491,10 +542,21 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
+  McpRoute: typeof McpRoute
+  Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
+  Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -564,6 +626,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/biblioteca'
       preLoaderRoute: typeof AppBibliotecaRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.mcp/list-tools': {
+      id: '/.mcp/list-tools'
+      path: '/.mcp/list-tools'
+      fullPath: '/.mcp/list-tools'
+      preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/orcamentos/': {
       id: '/_app/orcamentos/'
@@ -669,6 +745,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/biblioteca-mestra/artigos'
       preLoaderRoute: typeof AppBibliotecaMestraArtigosRouteImport
       parentRoute: typeof AppBibliotecaMestraRoute
+    }
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/orcamentos/$id/': {
       id: '/_app/orcamentos/$id/'
@@ -879,6 +962,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
+  McpRoute: McpRoute,
+  Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
+  Char91DotwellKnownChar93OauthProtectedResourceRoute:
+    Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

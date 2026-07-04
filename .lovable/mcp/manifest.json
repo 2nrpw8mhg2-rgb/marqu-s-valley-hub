@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "sdk_version": "0.20.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "mv-os-mcp",
+      "version": "0.1.0",
+      "title": "MV OS MCP"
+    },
+    "tools": [
+      {
+        "name": "echo",
+        "title": "Echo",
+        "description": "Devolve o texto recebido. Útil para verificar a ligação ao MCP do MV OS.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Texto a devolver tal como recebido."
+            }
+          },
+          "required": [
+            "text"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "server_info",
+        "title": "Informação do servidor",
+        "description": "Devolve informação básica sobre este servidor MCP do MV OS (nome, versão, hora UTC atual).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
