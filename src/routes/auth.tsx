@@ -27,7 +27,7 @@ function safeNext(next: string): string {
 function AuthPage() {
   const navigate = useNavigate();
   const search = Route.useSearch();
-  const nextTarget = safeNext(search.next);
+  const nextTarget = safeNext(search.next ?? "");
   const { session, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
 
