@@ -3,53 +3,173 @@
   "sdk_version": "0.20.0",
   "path": "/mcp",
   "auth": {
-    "type": "none"
+    "type": "oauth",
+    "issuer": "https://xxxogkovsqunndzqspst.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
   },
   "mcp": {
     "server": {
       "name": "mv-os-mcp",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "title": "MV OS MCP"
     },
     "tools": [
       {
-        "name": "echo",
-        "title": "Echo",
-        "description": "Devolve o texto recebido. Útil para verificar a ligação ao MCP do MV OS.",
+        "name": "listar_obras",
+        "title": "Listar obras",
+        "description": "Lista as obras acessíveis ao utilizador autenticado (código, nome, cliente, estado, localização).",
         "annotations": {
           "readOnlyHint": true,
-          "idempotentHint": true,
           "openWorldHint": false
         },
         "inputSchema": {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
           "properties": {
-            "text": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Texto a devolver tal como recebido."
+            "estado": {
+              "description": "Filtro opcional por estado da obra.",
+              "type": "string"
+            },
+            "limite": {
+              "description": "Número máximo de resultados (por omissão 50).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
             }
-          },
-          "required": [
-            "text"
-          ]
+          }
         },
         "outputSchema": null
       },
       {
-        "name": "server_info",
-        "title": "Informação do servidor",
-        "description": "Devolve informação básica sobre este servidor MCP do MV OS (nome, versão, hora UTC atual).",
+        "name": "obter_obra",
+        "title": "Obter obra",
+        "description": "Devolve os detalhes completos de uma obra pelo seu id.",
         "annotations": {
           "readOnlyHint": true,
-          "idempotentHint": true,
           "openWorldHint": false
         },
         "inputSchema": {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "UUID da obra."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "listar_orcamentos",
+        "title": "Listar orçamentos",
+        "description": "Lista orçamentos, opcionalmente filtrados por obra.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "obra_id": {
+              "description": "UUID opcional da obra para filtrar.",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "limite": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "obter_orcamento",
+        "title": "Obter orçamento",
+        "description": "Devolve um orçamento com os seus capítulos e artigos.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "UUID do orçamento."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "pesquisar_biblioteca",
+        "title": "Pesquisar biblioteca",
+        "description": "Pesquisa artigos na biblioteca mestra por texto (código ou descrição).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "texto": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Texto a pesquisar em código ou descrição."
+            },
+            "limite": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "texto"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "listar_subempreiteiros",
+        "title": "Listar subempreiteiros",
+        "description": "Lista subempreiteiros registados.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "texto": {
+              "description": "Pesquisa por nome.",
+              "type": "string"
+            },
+            "limite": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
         },
         "outputSchema": null
       }
