@@ -1320,6 +1320,7 @@ export type Database = {
           subempreitada_validada_manual: boolean
           unidade: string | null
           unidade_normalizada: string | null
+          updated_at: string
         }
         Insert: {
           capitulo_id?: string | null
@@ -1348,6 +1349,7 @@ export type Database = {
           subempreitada_validada_manual?: boolean
           unidade?: string | null
           unidade_normalizada?: string | null
+          updated_at?: string
         }
         Update: {
           capitulo_id?: string | null
@@ -1376,6 +1378,7 @@ export type Database = {
           subempreitada_validada_manual?: boolean
           unidade?: string | null
           unidade_normalizada?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
