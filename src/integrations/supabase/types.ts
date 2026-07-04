@@ -221,11 +221,15 @@ export type Database = {
           ativo: boolean
           categoria_id: string
           codigo: string | null
+          confianca_subempreitada: number | null
           created_at: string
           descricao: string
           estado_ia: Database["public"]["Enums"]["biblioteca_artigo_estado_ia"]
           id: string
           observacoes: string | null
+          origem_classificacao_subempreitada: string | null
+          subempreitada_principal_id: string | null
+          subempreitada_secundaria_id: string | null
           subespecialidade_id: string
           tipo: Database["public"]["Enums"]["biblioteca_artigo_tipo"]
           unidade: string | null
@@ -236,11 +240,15 @@ export type Database = {
           ativo?: boolean
           categoria_id: string
           codigo?: string | null
+          confianca_subempreitada?: number | null
           created_at?: string
           descricao: string
           estado_ia?: Database["public"]["Enums"]["biblioteca_artigo_estado_ia"]
           id?: string
           observacoes?: string | null
+          origem_classificacao_subempreitada?: string | null
+          subempreitada_principal_id?: string | null
+          subempreitada_secundaria_id?: string | null
           subespecialidade_id: string
           tipo?: Database["public"]["Enums"]["biblioteca_artigo_tipo"]
           unidade?: string | null
@@ -251,11 +259,15 @@ export type Database = {
           ativo?: boolean
           categoria_id?: string
           codigo?: string | null
+          confianca_subempreitada?: number | null
           created_at?: string
           descricao?: string
           estado_ia?: Database["public"]["Enums"]["biblioteca_artigo_estado_ia"]
           id?: string
           observacoes?: string | null
+          origem_classificacao_subempreitada?: string | null
+          subempreitada_principal_id?: string | null
+          subempreitada_secundaria_id?: string | null
           subespecialidade_id?: string
           tipo?: Database["public"]["Enums"]["biblioteca_artigo_tipo"]
           unidade?: string | null
@@ -268,6 +280,20 @@ export type Database = {
             columns: ["categoria_id"]
             isOneToOne: false
             referencedRelation: "biblioteca_categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "biblioteca_artigos_subempreitada_principal_id_fkey"
+            columns: ["subempreitada_principal_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "biblioteca_artigos_subempreitada_secundaria_id_fkey"
+            columns: ["subempreitada_secundaria_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
             referencedColumns: ["id"]
           },
           {
@@ -1288,6 +1314,10 @@ export type Database = {
           preco_seco: number
           preco_unitario: number
           quantidade: number
+          subempreitada_confianca: number | null
+          subempreitada_id: string | null
+          subempreitada_origem: string | null
+          subempreitada_validada_manual: boolean
           unidade: string | null
           unidade_normalizada: string | null
         }
@@ -1312,6 +1342,10 @@ export type Database = {
           preco_seco?: number
           preco_unitario?: number
           quantidade?: number
+          subempreitada_confianca?: number | null
+          subempreitada_id?: string | null
+          subempreitada_origem?: string | null
+          subempreitada_validada_manual?: boolean
           unidade?: string | null
           unidade_normalizada?: string | null
         }
@@ -1336,6 +1370,10 @@ export type Database = {
           preco_seco?: number
           preco_unitario?: number
           quantidade?: number
+          subempreitada_confianca?: number | null
+          subempreitada_id?: string | null
+          subempreitada_origem?: string | null
+          subempreitada_validada_manual?: boolean
           unidade?: string | null
           unidade_normalizada?: string | null
         }
@@ -1352,6 +1390,13 @@ export type Database = {
             columns: ["orcamento_id"]
             isOneToOne: false
             referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamento_artigos_subempreitada_id_fkey"
+            columns: ["subempreitada_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
             referencedColumns: ["id"]
           },
         ]
@@ -1684,6 +1729,93 @@ export type Database = {
           email?: string | null
           id?: string
           nome?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      subempreitada_aprendizagem: {
+        Row: {
+          artigo_mestre_id: string | null
+          created_at: string
+          descricao_normalizada: string
+          id: string
+          peso: number
+          subempreitada_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          artigo_mestre_id?: string | null
+          created_at?: string
+          descricao_normalizada: string
+          id?: string
+          peso?: number
+          subempreitada_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          artigo_mestre_id?: string | null
+          created_at?: string
+          descricao_normalizada?: string
+          id?: string
+          peso?: number
+          subempreitada_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subempreitada_aprendizagem_artigo_mestre_id_fkey"
+            columns: ["artigo_mestre_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subempreitada_aprendizagem_subempreitada_id_fkey"
+            columns: ["subempreitada_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subempreitadas: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          ordem: number
+          palavras_chave: string[]
+          termos_exclusao: string[]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          ordem?: number
+          palavras_chave?: string[]
+          termos_exclusao?: string[]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          ordem?: number
+          palavras_chave?: string[]
+          termos_exclusao?: string[]
           updated_at?: string
         }
         Relationships: []

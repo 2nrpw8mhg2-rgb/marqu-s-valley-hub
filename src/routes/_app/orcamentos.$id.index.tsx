@@ -12,8 +12,10 @@ import { ImportMQDialog } from "@/components/orcamentos/ImportMQDialog";
 import { exportToExcel, exportToPDF, type ExportData } from "@/lib/orcamento-export";
 import { fmtEUR, fmtNum, lineTotal } from "@/lib/orcamento-utils";
 import type { ParsedRow } from "@/lib/mq-parser";
-import { Upload, FileDown, FileSpreadsheet, Trash2, Plus, ArrowLeft, GitBranch, Save, Layers } from "lucide-react";
+import { Upload, FileDown, FileSpreadsheet, Trash2, Plus, ArrowLeft, GitBranch, Save, Layers, Users } from "lucide-react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { classificarOrcamento } from "@/lib/subempreitadas/classify.functions";
 
 export const Route = createFileRoute("/_app/orcamentos/$id/")({
   head: () => ({ meta: [{ title: "Editor de orçamento — MV OS" }] }),
@@ -48,6 +50,7 @@ function OrcamentoEditor() {
   const navigate = useNavigate();
   const [importOpen, setImportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const classificarFn = useServerFn(classificarOrcamento);
 
   const { data, isLoading } = useQuery({
     queryKey: ["orcamento", id],
@@ -193,6 +196,13 @@ function OrcamentoEditor() {
       if (error) throw error;
     }
     qc.invalidateQueries({ queryKey: ["orcamento", id] });
+    // classificação automática por subempreitada
+    try {
+      const r = await classificarFn({ data: { orcamento_id: id } });
+      toast.success(`${r.atribuidos} de ${r.total} artigos atribuídos a subempreitada`);
+    } catch (e: any) {
+      toast.error("Classificação por subempreitada falhou: " + e.message);
+    }
   };
 
   const novaVersao = async () => {
@@ -260,6 +270,9 @@ function OrcamentoEditor() {
             <Link to="/orcamentos"><Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> Lista</Button></Link>
             <Link to="/orcamentos/$id/decomposicao" params={{ id }}>
               <Button variant="outline" size="sm"><Layers className="h-4 w-4 mr-1" /> Decomposição de Preços</Button>
+            </Link>
+            <Link to="/orcamentos/$id/subempreitadas" params={{ id }}>
+              <Button variant="outline" size="sm"><Users className="h-4 w-4 mr-1" /> Subempreitadas</Button>
             </Link>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-1" /> Importar MQ</Button>
             <Button variant="outline" size="sm" onClick={novaVersao}><GitBranch className="h-4 w-4 mr-1" /> Nova versão</Button>

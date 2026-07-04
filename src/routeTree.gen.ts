@@ -31,6 +31,7 @@ import { Route as AppObrasIdRouteImport } from './routes/_app/obras.$id'
 import { Route as AppBibliotecaMestraUnidadesRouteImport } from './routes/_app/biblioteca-mestra.unidades'
 import { Route as AppBibliotecaMestraTemplatesRouteImport } from './routes/_app/biblioteca-mestra.templates'
 import { Route as AppBibliotecaMestraSubespecialidadesRouteImport } from './routes/_app/biblioteca-mestra.subespecialidades'
+import { Route as AppBibliotecaMestraSubempreitadasRouteImport } from './routes/_app/biblioteca-mestra.subempreitadas'
 import { Route as AppBibliotecaMestraSistemasRouteImport } from './routes/_app/biblioteca-mestra.sistemas'
 import { Route as AppBibliotecaMestraKnowledgeBuilderRouteImport } from './routes/_app/biblioteca-mestra.knowledge-builder'
 import { Route as AppBibliotecaMestraKeywordsRouteImport } from './routes/_app/biblioteca-mestra.keywords'
@@ -42,6 +43,7 @@ import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.
 import { Route as AppOrcamentosIdIndexRouteImport } from './routes/_app/orcamentos.$id.index'
 import { Route as AppObrasIdIndexRouteImport } from './routes/_app/obras.$id.index'
 import { Route as AppProcurementPacotesIdRouteImport } from './routes/_app/procurement.pacotes.$id'
+import { Route as AppOrcamentosIdSubempreitadasRouteImport } from './routes/_app/orcamentos.$id.subempreitadas'
 import { Route as AppOrcamentosIdDecomposicaoRouteImport } from './routes/_app/orcamentos.$id.decomposicao'
 import { Route as AppObrasIdRelatoriosRouteImport } from './routes/_app/obras.$id.relatorios'
 import { Route as AppObrasIdProcurementRouteImport } from './routes/_app/obras.$id.procurement'
@@ -169,6 +171,12 @@ const AppBibliotecaMestraSubespecialidadesRoute =
     path: '/subespecialidades',
     getParentRoute: () => AppBibliotecaMestraRoute,
   } as any)
+const AppBibliotecaMestraSubempreitadasRoute =
+  AppBibliotecaMestraSubempreitadasRouteImport.update({
+    id: '/subempreitadas',
+    path: '/subempreitadas',
+    getParentRoute: () => AppBibliotecaMestraRoute,
+  } as any)
 const AppBibliotecaMestraSistemasRoute =
   AppBibliotecaMestraSistemasRouteImport.update({
     id: '/sistemas',
@@ -231,6 +239,12 @@ const AppProcurementPacotesIdRoute = AppProcurementPacotesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AppProcurementPacotesRoute,
 } as any)
+const AppOrcamentosIdSubempreitadasRoute =
+  AppOrcamentosIdSubempreitadasRouteImport.update({
+    id: '/orcamentos/$id/subempreitadas',
+    path: '/orcamentos/$id/subempreitadas',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppOrcamentosIdDecomposicaoRoute =
   AppOrcamentosIdDecomposicaoRouteImport.update({
     id: '/orcamentos/$id/decomposicao',
@@ -305,6 +319,7 @@ export interface FileRoutesByFullPath {
   '/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
   '/biblioteca-mestra/knowledge-builder': typeof AppBibliotecaMestraKnowledgeBuilderRoute
   '/biblioteca-mestra/sistemas': typeof AppBibliotecaMestraSistemasRoute
+  '/biblioteca-mestra/subempreitadas': typeof AppBibliotecaMestraSubempreitadasRoute
   '/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
   '/biblioteca-mestra/templates': typeof AppBibliotecaMestraTemplatesRoute
   '/biblioteca-mestra/unidades': typeof AppBibliotecaMestraUnidadesRoute
@@ -324,6 +339,7 @@ export interface FileRoutesByFullPath {
   '/obras/$id/procurement': typeof AppObrasIdProcurementRoute
   '/obras/$id/relatorios': typeof AppObrasIdRelatoriosRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
+  '/orcamentos/$id/subempreitadas': typeof AppOrcamentosIdSubempreitadasRoute
   '/procurement/pacotes/$id': typeof AppProcurementPacotesIdRoute
   '/obras/$id/': typeof AppObrasIdIndexRoute
   '/orcamentos/$id/': typeof AppOrcamentosIdIndexRoute
@@ -348,6 +364,7 @@ export interface FileRoutesByTo {
   '/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
   '/biblioteca-mestra/knowledge-builder': typeof AppBibliotecaMestraKnowledgeBuilderRoute
   '/biblioteca-mestra/sistemas': typeof AppBibliotecaMestraSistemasRoute
+  '/biblioteca-mestra/subempreitadas': typeof AppBibliotecaMestraSubempreitadasRoute
   '/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
   '/biblioteca-mestra/templates': typeof AppBibliotecaMestraTemplatesRoute
   '/biblioteca-mestra/unidades': typeof AppBibliotecaMestraUnidadesRoute
@@ -366,6 +383,7 @@ export interface FileRoutesByTo {
   '/obras/$id/procurement': typeof AppObrasIdProcurementRoute
   '/obras/$id/relatorios': typeof AppObrasIdRelatoriosRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
+  '/orcamentos/$id/subempreitadas': typeof AppOrcamentosIdSubempreitadasRoute
   '/procurement/pacotes/$id': typeof AppProcurementPacotesIdRoute
   '/obras/$id': typeof AppObrasIdIndexRoute
   '/orcamentos/$id': typeof AppOrcamentosIdIndexRoute
@@ -393,6 +411,7 @@ export interface FileRoutesById {
   '/_app/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
   '/_app/biblioteca-mestra/knowledge-builder': typeof AppBibliotecaMestraKnowledgeBuilderRoute
   '/_app/biblioteca-mestra/sistemas': typeof AppBibliotecaMestraSistemasRoute
+  '/_app/biblioteca-mestra/subempreitadas': typeof AppBibliotecaMestraSubempreitadasRoute
   '/_app/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
   '/_app/biblioteca-mestra/templates': typeof AppBibliotecaMestraTemplatesRoute
   '/_app/biblioteca-mestra/unidades': typeof AppBibliotecaMestraUnidadesRoute
@@ -412,6 +431,7 @@ export interface FileRoutesById {
   '/_app/obras/$id/procurement': typeof AppObrasIdProcurementRoute
   '/_app/obras/$id/relatorios': typeof AppObrasIdRelatoriosRoute
   '/_app/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
+  '/_app/orcamentos/$id/subempreitadas': typeof AppOrcamentosIdSubempreitadasRoute
   '/_app/procurement/pacotes/$id': typeof AppProcurementPacotesIdRoute
   '/_app/obras/$id/': typeof AppObrasIdIndexRoute
   '/_app/orcamentos/$id/': typeof AppOrcamentosIdIndexRoute
@@ -439,6 +459,7 @@ export interface FileRouteTypes {
     | '/biblioteca-mestra/keywords'
     | '/biblioteca-mestra/knowledge-builder'
     | '/biblioteca-mestra/sistemas'
+    | '/biblioteca-mestra/subempreitadas'
     | '/biblioteca-mestra/subespecialidades'
     | '/biblioteca-mestra/templates'
     | '/biblioteca-mestra/unidades'
@@ -458,6 +479,7 @@ export interface FileRouteTypes {
     | '/obras/$id/procurement'
     | '/obras/$id/relatorios'
     | '/orcamentos/$id/decomposicao'
+    | '/orcamentos/$id/subempreitadas'
     | '/procurement/pacotes/$id'
     | '/obras/$id/'
     | '/orcamentos/$id/'
@@ -482,6 +504,7 @@ export interface FileRouteTypes {
     | '/biblioteca-mestra/keywords'
     | '/biblioteca-mestra/knowledge-builder'
     | '/biblioteca-mestra/sistemas'
+    | '/biblioteca-mestra/subempreitadas'
     | '/biblioteca-mestra/subespecialidades'
     | '/biblioteca-mestra/templates'
     | '/biblioteca-mestra/unidades'
@@ -500,6 +523,7 @@ export interface FileRouteTypes {
     | '/obras/$id/procurement'
     | '/obras/$id/relatorios'
     | '/orcamentos/$id/decomposicao'
+    | '/orcamentos/$id/subempreitadas'
     | '/procurement/pacotes/$id'
     | '/obras/$id'
     | '/orcamentos/$id'
@@ -526,6 +550,7 @@ export interface FileRouteTypes {
     | '/_app/biblioteca-mestra/keywords'
     | '/_app/biblioteca-mestra/knowledge-builder'
     | '/_app/biblioteca-mestra/sistemas'
+    | '/_app/biblioteca-mestra/subempreitadas'
     | '/_app/biblioteca-mestra/subespecialidades'
     | '/_app/biblioteca-mestra/templates'
     | '/_app/biblioteca-mestra/unidades'
@@ -545,6 +570,7 @@ export interface FileRouteTypes {
     | '/_app/obras/$id/procurement'
     | '/_app/obras/$id/relatorios'
     | '/_app/orcamentos/$id/decomposicao'
+    | '/_app/orcamentos/$id/subempreitadas'
     | '/_app/procurement/pacotes/$id'
     | '/_app/obras/$id/'
     | '/_app/orcamentos/$id/'
@@ -717,6 +743,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBibliotecaMestraSubespecialidadesRouteImport
       parentRoute: typeof AppBibliotecaMestraRoute
     }
+    '/_app/biblioteca-mestra/subempreitadas': {
+      id: '/_app/biblioteca-mestra/subempreitadas'
+      path: '/subempreitadas'
+      fullPath: '/biblioteca-mestra/subempreitadas'
+      preLoaderRoute: typeof AppBibliotecaMestraSubempreitadasRouteImport
+      parentRoute: typeof AppBibliotecaMestraRoute
+    }
     '/_app/biblioteca-mestra/sistemas': {
       id: '/_app/biblioteca-mestra/sistemas'
       path: '/sistemas'
@@ -793,6 +826,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/procurement/pacotes/$id'
       preLoaderRoute: typeof AppProcurementPacotesIdRouteImport
       parentRoute: typeof AppProcurementPacotesRoute
+    }
+    '/_app/orcamentos/$id/subempreitadas': {
+      id: '/_app/orcamentos/$id/subempreitadas'
+      path: '/orcamentos/$id/subempreitadas'
+      fullPath: '/orcamentos/$id/subempreitadas'
+      preLoaderRoute: typeof AppOrcamentosIdSubempreitadasRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/orcamentos/$id/decomposicao': {
       id: '/_app/orcamentos/$id/decomposicao'
@@ -874,6 +914,7 @@ interface AppBibliotecaMestraRouteChildren {
   AppBibliotecaMestraKeywordsRoute: typeof AppBibliotecaMestraKeywordsRoute
   AppBibliotecaMestraKnowledgeBuilderRoute: typeof AppBibliotecaMestraKnowledgeBuilderRoute
   AppBibliotecaMestraSistemasRoute: typeof AppBibliotecaMestraSistemasRoute
+  AppBibliotecaMestraSubempreitadasRoute: typeof AppBibliotecaMestraSubempreitadasRoute
   AppBibliotecaMestraSubespecialidadesRoute: typeof AppBibliotecaMestraSubespecialidadesRoute
   AppBibliotecaMestraTemplatesRoute: typeof AppBibliotecaMestraTemplatesRoute
   AppBibliotecaMestraUnidadesRoute: typeof AppBibliotecaMestraUnidadesRoute
@@ -889,6 +930,8 @@ const AppBibliotecaMestraRouteChildren: AppBibliotecaMestraRouteChildren = {
   AppBibliotecaMestraKnowledgeBuilderRoute:
     AppBibliotecaMestraKnowledgeBuilderRoute,
   AppBibliotecaMestraSistemasRoute: AppBibliotecaMestraSistemasRoute,
+  AppBibliotecaMestraSubempreitadasRoute:
+    AppBibliotecaMestraSubempreitadasRoute,
   AppBibliotecaMestraSubespecialidadesRoute:
     AppBibliotecaMestraSubespecialidadesRoute,
   AppBibliotecaMestraTemplatesRoute: AppBibliotecaMestraTemplatesRoute,
@@ -956,6 +999,7 @@ interface AppRouteChildren {
   AppObrasIndexRoute: typeof AppObrasIndexRoute
   AppOrcamentosIndexRoute: typeof AppOrcamentosIndexRoute
   AppOrcamentosIdDecomposicaoRoute: typeof AppOrcamentosIdDecomposicaoRoute
+  AppOrcamentosIdSubempreitadasRoute: typeof AppOrcamentosIdSubempreitadasRoute
   AppOrcamentosIdIndexRoute: typeof AppOrcamentosIdIndexRoute
 }
 
@@ -973,6 +1017,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppObrasIndexRoute: AppObrasIndexRoute,
   AppOrcamentosIndexRoute: AppOrcamentosIndexRoute,
   AppOrcamentosIdDecomposicaoRoute: AppOrcamentosIdDecomposicaoRoute,
+  AppOrcamentosIdSubempreitadasRoute: AppOrcamentosIdSubempreitadasRoute,
   AppOrcamentosIdIndexRoute: AppOrcamentosIdIndexRoute,
 }
 
