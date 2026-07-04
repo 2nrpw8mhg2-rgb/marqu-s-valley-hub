@@ -38,6 +38,7 @@ import { Route as AppBibliotecaMestraEspecialidadesRouteImport } from './routes/
 import { Route as AppBibliotecaMestraCategoriasRouteImport } from './routes/_app/biblioteca-mestra.categorias'
 import { Route as AppBibliotecaMestraArtigosRouteImport } from './routes/_app/biblioteca-mestra.artigos'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AppOrcamentosIdIndexRouteImport } from './routes/_app/orcamentos.$id.index'
 import { Route as AppObrasIdIndexRouteImport } from './routes/_app/obras.$id.index'
 import { Route as AppProcurementPacotesIdRouteImport } from './routes/_app/procurement.pacotes.$id'
@@ -210,6 +211,11 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppOrcamentosIdIndexRoute = AppOrcamentosIdIndexRouteImport.update({
   id: '/orcamentos/$id/',
   path: '/orcamentos/$id/',
@@ -291,6 +297,7 @@ export interface FileRoutesByFullPath {
   '/documentos': typeof AppDocumentosRoute
   '/motor-classificacao': typeof AppMotorClassificacaoRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
   '/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
@@ -333,6 +340,7 @@ export interface FileRoutesByTo {
   '/documentos': typeof AppDocumentosRoute
   '/motor-classificacao': typeof AppMotorClassificacaoRoute
   '/subempreiteiros': typeof AppSubempreiteirosRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
   '/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
@@ -377,6 +385,7 @@ export interface FileRoutesById {
   '/_app/documentos': typeof AppDocumentosRoute
   '/_app/motor-classificacao': typeof AppMotorClassificacaoRoute
   '/_app/subempreiteiros': typeof AppSubempreiteirosRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_app/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
   '/_app/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
@@ -422,6 +431,7 @@ export interface FileRouteTypes {
     | '/documentos'
     | '/motor-classificacao'
     | '/subempreiteiros'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/biblioteca-mestra/artigos'
     | '/biblioteca-mestra/categorias'
@@ -464,6 +474,7 @@ export interface FileRouteTypes {
     | '/documentos'
     | '/motor-classificacao'
     | '/subempreiteiros'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/biblioteca-mestra/artigos'
     | '/biblioteca-mestra/categorias'
@@ -507,6 +518,7 @@ export interface FileRouteTypes {
     | '/_app/documentos'
     | '/_app/motor-classificacao'
     | '/_app/subempreiteiros'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_app/biblioteca-mestra/artigos'
     | '/_app/biblioteca-mestra/categorias'
@@ -545,6 +557,7 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
 }
 
@@ -751,6 +764,13 @@ declare module '@tanstack/react-router' {
       path: '/.mcp/invoke-tool/$tool'
       fullPath: '/.mcp/invoke-tool/$tool'
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/orcamentos/$id/': {
@@ -966,6 +986,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
 }
 export const routeTree = rootRouteImport
