@@ -1317,6 +1317,9 @@ export type Database = {
           subempreitada_confianca: number | null
           subempreitada_id: string | null
           subempreitada_origem: string | null
+          subempreitada_razao: string | null
+          subempreitada_sugerida_id: string | null
+          subempreitada_termos_match: Json | null
           subempreitada_validada_manual: boolean
           unidade: string | null
           unidade_normalizada: string | null
@@ -1346,6 +1349,9 @@ export type Database = {
           subempreitada_confianca?: number | null
           subempreitada_id?: string | null
           subempreitada_origem?: string | null
+          subempreitada_razao?: string | null
+          subempreitada_sugerida_id?: string | null
+          subempreitada_termos_match?: Json | null
           subempreitada_validada_manual?: boolean
           unidade?: string | null
           unidade_normalizada?: string | null
@@ -1375,6 +1381,9 @@ export type Database = {
           subempreitada_confianca?: number | null
           subempreitada_id?: string | null
           subempreitada_origem?: string | null
+          subempreitada_razao?: string | null
+          subempreitada_sugerida_id?: string | null
+          subempreitada_termos_match?: Json | null
           subempreitada_validada_manual?: boolean
           unidade?: string | null
           unidade_normalizada?: string | null
@@ -1398,6 +1407,13 @@ export type Database = {
           {
             foreignKeyName: "orcamento_artigos_subempreitada_id_fkey"
             columns: ["subempreitada_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamento_artigos_subempreitada_sugerida_id_fkey"
+            columns: ["subempreitada_sugerida_id"]
             isOneToOne: false
             referencedRelation: "subempreitadas"
             referencedColumns: ["id"]

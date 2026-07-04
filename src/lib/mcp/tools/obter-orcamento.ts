@@ -24,12 +24,13 @@ export default defineTool({
     const { data: artigosRaw, error: e3 } = await sb
       .from("orcamento_artigos")
       .select(
-        "id, capitulo_id, codigo, descricao, unidade, quantidade, preco_unitario, updated_at, subempreitada_id, subempreitada_confianca, subempreitada_origem, subempreitada_validada_manual, subempreitada:subempreitadas(codigo, nome)",
+        "id, capitulo_id, codigo, descricao, unidade, quantidade, preco_unitario, updated_at, subempreitada_id, subempreitada_sugerida_id, subempreitada_confianca, subempreitada_origem, subempreitada_validada_manual, subempreitada_razao, subempreitada_termos_match, subempreitada:subempreitadas!subempreitada_id(codigo, nome), sugerida:subempreitadas!subempreitada_sugerida_id(codigo, nome)",
       )
       .eq("orcamento_id", id);
     if (e3) return errorResult(e3.message);
     const artigos = (artigosRaw ?? []).map((a: any) => {
       const sub = Array.isArray(a.subempreitada) ? a.subempreitada[0] : a.subempreitada;
+      const sug = Array.isArray(a.sugerida) ? a.sugerida[0] : a.sugerida;
       return {
         id: a.id,
         capitulo_id: a.capitulo_id,
@@ -42,8 +43,13 @@ export default defineTool({
         subempreitada_id: a.subempreitada_id ?? null,
         subempreitada_codigo: sub?.codigo ?? null,
         subempreitada_nome: sub?.nome ?? null,
+        subempreitada_sugerida_id: a.subempreitada_sugerida_id ?? null,
+        subempreitada_sugerida_codigo: sug?.codigo ?? null,
+        subempreitada_sugerida_nome: sug?.nome ?? null,
         subempreitada_confianca: a.subempreitada_confianca ?? null,
         subempreitada_origem: a.subempreitada_origem ?? null,
+        subempreitada_razao: a.subempreitada_razao ?? null,
+        subempreitada_termos_match: a.subempreitada_termos_match ?? [],
         subempreitada_validada_manual: a.subempreitada_validada_manual ?? false,
       };
     });
