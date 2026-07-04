@@ -16,13 +16,14 @@ export default defineTool({
     const sb = supabaseForUser(ctx);
     const { data: artigos, error } = await sb
       .from("orcamento_artigos")
-      .select("subempreitada_id, quantidade, preco_unitario, subempreitada:subempreitadas(codigo, nome)")
+      .select("subempreitada_id, subempreitada_origem, quantidade, preco_unitario, subempreitada:subempreitadas(codigo, nome)")
       .eq("orcamento_id", orcamento_id);
     if (error) return errorResult(error.message);
 
     type Agg = { subempreitada_id: string | null; codigo: string | null; nome: string; numero_artigos: number; valor_total: number };
     const map = new Map<string, Agg>();
     let totalGeral = 0;
+    const flags = { baixa_confianca: 0, conflito: 0, sem_regra: 0, sem_classificacao: 0 };
     for (const a of artigos ?? []) {
       const sub: any = Array.isArray((a as any).subempreitada) ? (a as any).subempreitada[0] : (a as any).subempreitada;
       const key = a.subempreitada_id ?? "__none__";
@@ -38,6 +39,10 @@ export default defineTool({
       cur.numero_artigos += 1;
       cur.valor_total += valor;
       map.set(key, cur);
+      if (!a.subempreitada_id) flags.sem_classificacao++;
+      if (a.subempreitada_origem === "baixa_confianca") flags.baixa_confianca++;
+      if (a.subempreitada_origem === "conflito") flags.conflito++;
+      if (a.subempreitada_origem === "sem_regra") flags.sem_regra++;
     }
     const linhas = Array.from(map.values())
       .map((r) => ({
@@ -47,6 +52,6 @@ export default defineTool({
       }))
       .sort((a, b) => b.valor_total - a.valor_total);
 
-    return jsonResult({ total_geral: Number(totalGeral.toFixed(2)), linhas });
+    return jsonResult({ total_geral: Number(totalGeral.toFixed(2)), linhas, necessita_validacao: flags });
   },
 });
