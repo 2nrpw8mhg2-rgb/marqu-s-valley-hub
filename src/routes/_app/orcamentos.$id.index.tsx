@@ -196,6 +196,13 @@ function OrcamentoEditor() {
       if (error) throw error;
     }
     qc.invalidateQueries({ queryKey: ["orcamento", id] });
+    // classificação automática por subempreitada
+    try {
+      const r = await classificarFn({ data: { orcamento_id: id } });
+      toast.success(`${r.atribuidos} de ${r.total} artigos atribuídos a subempreitada`);
+    } catch (e: any) {
+      toast.error("Classificação por subempreitada falhou: " + e.message);
+    }
   };
 
   const novaVersao = async () => {
