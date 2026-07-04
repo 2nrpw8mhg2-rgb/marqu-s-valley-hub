@@ -1,6 +1,6 @@
 // Motor de atribuição automática de subempreitada a um artigo de orçamento.
-// Puro (sem I/O). Recebe o artigo + contexto (subempreitadas + aprendizagem + artigo mestre opcional)
-// e devolve a subempreitada mais provável, confiança e origem.
+// Puro (sem I/O). Devolve subempreitada mais provável, confiança, origem,
+// razão, termos que fizeram match e conflitos — para auditoria.
 
 export type Subempreitada = {
   id: string;
@@ -14,6 +14,7 @@ export type Subempreitada = {
 export type ArtigoInput = {
   codigo: string | null;
   descricao: string;
+  unidade?: string | null;
   capitulo_descricao?: string | null;
 };
 
@@ -32,13 +33,50 @@ export type ClassificacaoOrigem =
   | "aprendizagem"
   | "artigo_mestre"
   | "regras"
+  | "baixa_confianca"
+  | "conflito"
+  | "sem_regra"
   | "ia";
 
 export type ClassificacaoResultado = {
   subempreitada_id: string | null;
+  subempreitada_sugerida_id: string | null;
   confianca: number; // 0..1
   origem: ClassificacaoOrigem;
+  razao: string;
+  termos_match: string[];
+  conflitos: Array<{ subempreitada_id: string; score: number }>;
   alternativas: Array<{ subempreitada_id: string; score: number }>;
+};
+
+// ==== Constantes de scoring (afináveis) ==================================
+export const THRESHOLD_AUTO = 0.7; // < 0.70 → não atribui automaticamente
+export const CONFLICT_DELTA = 0.2; // se best-2ª < 0.20 → conflito
+export const W_FORTE = 0.6;
+export const W_CAPITULO = 0.2;
+export const W_SINONIMO = 0.15;
+export const W_UNIDADE = 0.05;
+export const W_EXCLUSAO = -0.5;
+export const FORTES_TOPO = 4; // primeiros N termos de palavras_chave são "fortes"
+
+// Unidades típicas por código de subempreitada
+const UNIDADES_ESPERADAS: Record<string, string[]> = {
+  PEDRA: ["m2", "ml", "un"],
+  CAPOTO: ["m2"],
+  CAIX: ["un", "m2"],
+  CARPT: ["un", "ml", "m2"],
+  COZ: ["un", "ml"],
+  SANIT: ["un"],
+  AGUAS: ["ml", "un"],
+  AVAC: ["un", "ml"],
+  ELECT: ["un", "ml"],
+  PINT: ["m2"],
+  PLADUR: ["m2", "ml"],
+  REBOC: ["m2"],
+  ALVEN: ["m2"],
+  DEMOL: ["m2", "m3", "ml", "un", "vg"],
+  ESTRUT: ["m3", "kg", "m2"],
+  PAV: ["m2"],
 };
 
 /** Normaliza texto pt-PT: minúsculas, sem acentos, espaços colapsados. */
@@ -53,18 +91,92 @@ export function normalizar(t: string | null | undefined): string {
     .trim();
 }
 
+function normalizarUnidade(u: string | null | undefined): string {
+  const n = normalizar(u);
+  return n.replace(/\s+/g, "");
+}
+
 function contemTermo(haystack: string, termo: string): boolean {
   const t = normalizar(termo);
   if (!t) return false;
-  // match por palavra: usa fronteira de espaço
   return (" " + haystack + " ").includes(" " + t + " ") || haystack.includes(t);
+}
+
+type SubScore = {
+  sub: Subempreitada;
+  score: number;
+  termos: string[];
+  razoes: string[];
+};
+
+function scoreSub(
+  sub: Subempreitada,
+  desc: string,
+  cap: string,
+  unidade: string,
+): SubScore {
+  const termos: string[] = [];
+  const razoes: string[] = [];
+  let score = 0;
+
+  const fortes = sub.palavras_chave.slice(0, FORTES_TOPO);
+  const sinonimos = sub.palavras_chave.slice(FORTES_TOPO);
+
+  let hitForte = false;
+  for (const kw of fortes) {
+    if (contemTermo(desc, kw)) {
+      score += W_FORTE;
+      termos.push(kw);
+      if (!hitForte) razoes.push(`termo forte "${kw}" na descrição`);
+      hitForte = true;
+    }
+  }
+
+  let hitSinonimo = false;
+  for (const kw of sinonimos) {
+    if (contemTermo(desc, kw)) {
+      score += W_SINONIMO;
+      termos.push(kw);
+      if (!hitSinonimo) razoes.push(`sinónimo "${kw}"`);
+      hitSinonimo = true;
+    }
+  }
+
+  if (cap) {
+    for (const kw of sub.palavras_chave) {
+      if (contemTermo(cap, kw)) {
+        score += W_CAPITULO;
+        razoes.push(`capítulo contém "${kw}"`);
+        if (!termos.includes(kw)) termos.push(kw);
+        break;
+      }
+    }
+  }
+
+  const ues = UNIDADES_ESPERADAS[sub.codigo];
+  if (ues && unidade && ues.includes(unidade)) {
+    score += W_UNIDADE;
+    razoes.push(`unidade "${unidade}" compatível`);
+  }
+
+  for (const ex of sub.termos_exclusao) {
+    if (contemTermo(desc, ex) || (cap && contemTermo(cap, ex))) {
+      score += W_EXCLUSAO;
+      razoes.push(`termo negativo "${ex}"`);
+    }
+  }
+
+  if (score < 0) score = 0;
+  if (score > 1) score = 1;
+
+  return { sub, score, termos, razoes };
 }
 
 /**
  * Cascata:
  * 1. Aprendizagem manual (match exato descrição normalizada) → 1.0
  * 2. Artigo mestre com subempreitada principal → 0.95
- * 3. Regras por palavras-chave (com termos_exclusao) + sinal auxiliar do capítulo
+ * 3. Regras ponderadas com threshold e detecção de conflito
  */
 export function classificarArtigo(
   artigo: ArtigoInput,
@@ -77,65 +189,102 @@ export function classificarArtigo(
   // 1. Aprendizagem
   const hit = aprendizagem.find((a) => a.descricao_normalizada === descN);
   if (hit) {
-    return { subempreitada_id: hit.subempreitada_id, confianca: 1, origem: "aprendizagem", alternativas: [] };
+    return {
+      subempreitada_id: hit.subempreitada_id,
+      subempreitada_sugerida_id: hit.subempreitada_id,
+      confianca: 1,
+      origem: "aprendizagem",
+      razao: "match exato na aprendizagem de validações anteriores",
+      termos_match: [],
+      conflitos: [],
+      alternativas: [],
+    };
   }
 
   // 2. Artigo mestre
   if (artigoMestre?.subempreitada_principal_id) {
     return {
       subempreitada_id: artigoMestre.subempreitada_principal_id,
+      subempreitada_sugerida_id: artigoMestre.subempreitada_principal_id,
       confianca: 0.95,
       origem: "artigo_mestre",
+      razao: "subempreitada definida no Artigo Mestre",
+      termos_match: [],
+      conflitos: [],
       alternativas: [],
     };
   }
 
-  // 3. Regras por palavras-chave
+  // 3. Regras
   const haystack = normalizar(`${artigo.descricao} ${artigo.codigo ?? ""}`);
   const capN = normalizar(artigo.capitulo_descricao ?? "");
-  const scores: Array<{ sub: Subempreitada; score: number; matches: number }> = [];
+  const unN = normalizarUnidade(artigo.unidade ?? "");
 
-  for (const s of subs) {
-    if (!s.ativo) continue;
-    let score = 0;
-    let matches = 0;
-    for (const kw of s.palavras_chave) {
-      if (contemTermo(haystack, kw)) {
-        score += 10;
-        matches += 1;
-      }
-    }
-    for (const ex of s.termos_exclusao) {
-      if (contemTermo(haystack, ex)) score -= 25;
-    }
-    // sinal auxiliar do capítulo (máx 10%)
-    if (capN) {
-      for (const kw of s.palavras_chave) {
-        if (contemTermo(capN, kw)) {
-          score += 2;
-          break;
-        }
-      }
-    }
-    if (score > 0 || matches > 0) scores.push({ sub: s, score, matches });
+  const scores = subs
+    .filter((s) => s.ativo)
+    .map((s) => scoreSub(s, haystack, capN, unN))
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (scores.length === 0) {
+    return {
+      subempreitada_id: null,
+      subempreitada_sugerida_id: null,
+      confianca: 0,
+      origem: "sem_regra",
+      razao: "nenhuma regra fez match",
+      termos_match: [],
+      conflitos: [],
+      alternativas: [],
+    };
   }
 
-  scores.sort((a, b) => b.score - a.score);
   const best = scores[0];
-  if (!best || best.score <= 0) {
-    return { subempreitada_id: null, confianca: 0, origem: "regras", alternativas: [] };
+  const second = scores[1];
+  const conf = Number(best.score.toFixed(3));
+  const alternativas = scores
+    .slice(1, 4)
+    .map((s) => ({ subempreitada_id: s.sub.id, score: Number(s.score.toFixed(3)) }));
+
+  // Conflito
+  if (second && best.score - second.score < CONFLICT_DELTA) {
+    return {
+      subempreitada_id: null,
+      subempreitada_sugerida_id: best.sub.id,
+      confianca: conf,
+      origem: "conflito",
+      razao: `conflito entre ${best.sub.codigo} (${conf}) e ${second.sub.codigo} (${second.score.toFixed(3)}) — diferença < ${CONFLICT_DELTA}`,
+      termos_match: best.termos,
+      conflitos: [
+        { subempreitada_id: best.sub.id, score: conf },
+        { subempreitada_id: second.sub.id, score: Number(second.score.toFixed(3)) },
+      ],
+      alternativas,
+    };
   }
 
-  // Confiança normalizada: cresce com score, saturando por volta de 40-60.
-  // 1 match = ~0.55, 2 = ~0.72, 3+ = >0.80, com penalização por termos de exclusão.
-  const conf = Math.max(0, Math.min(0.94, best.score / (best.score + 10)));
-
-  const alternativas = scores.slice(1, 4).map((s) => ({ subempreitada_id: s.sub.id, score: s.score }));
+  // Threshold
+  if (conf < THRESHOLD_AUTO) {
+    return {
+      subempreitada_id: null,
+      subempreitada_sugerida_id: best.sub.id,
+      confianca: conf,
+      origem: "baixa_confianca",
+      razao: `confiança ${conf} inferior ao threshold ${THRESHOLD_AUTO}; sugestão ${best.sub.codigo} — ${best.razoes.join("; ")}`,
+      termos_match: best.termos,
+      conflitos: [],
+      alternativas,
+    };
+  }
 
   return {
     subempreitada_id: best.sub.id,
-    confianca: Number(conf.toFixed(3)),
+    subempreitada_sugerida_id: best.sub.id,
+    confianca: conf,
     origem: "regras",
+    razao: best.razoes.join("; ") || "match por regras",
+    termos_match: best.termos,
+    conflitos: [],
     alternativas,
   };
 }
