@@ -50,6 +50,7 @@ function OrcamentoEditor() {
   const navigate = useNavigate();
   const [importOpen, setImportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const classificarFn = useServerFn(classificarOrcamento);
 
   const { data, isLoading } = useQuery({
     queryKey: ["orcamento", id],
