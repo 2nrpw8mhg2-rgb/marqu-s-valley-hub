@@ -17,6 +17,7 @@ import bmObter from "./tools/biblioteca/obter-artigo-mestre";
 import bmCriar from "./tools/biblioteca/criar-artigo-mestre";
 import bmEditar from "./tools/biblioteca/editar-artigo-mestre";
 import bmEnriquecer from "./tools/biblioteca/enriquecer-artigo-com-ia";
+import bmEnriquecerSubesp from "./tools/biblioteca/enriquecer-subespecialidade-com-ia";
 import bmAddConhecimento from "./tools/biblioteca/adicionar-conhecimento";
 import bmCriarRelacao from "./tools/biblioteca/criar-relacao";
 import bmAuditar from "./tools/biblioteca/auditar-biblioteca";
