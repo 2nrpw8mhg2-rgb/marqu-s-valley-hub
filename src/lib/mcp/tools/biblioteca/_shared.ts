@@ -90,7 +90,7 @@ export async function recalcularQualidade(sb: SupabaseClient, artigoId: string) 
     .from("biblioteca_artigo_relacoes")
     .select("*", { count: "exact", head: true })
     .or(`artigo_origem_id.eq.${artigoId},artigo_destino_id.eq.${artigoId}`);
-  const counts = { ...c, relacao: relCount ?? 0 };
+  const counts: Record<string, number> = { ...c, relacao: relCount ?? 0 };
   const { score, completude } = calcularScoreQualidade(counts);
   await sb.from("biblioteca_artigo_qualidade").upsert({
     artigo_id: artigoId,
@@ -109,8 +109,8 @@ export async function recalcularQualidade(sb: SupabaseClient, artigoId: string) 
   return { score, completude, counts };
 }
 
-export async function registarAprendizagem(sb: SupabaseClient, artigoId: string, tipo: string, payload: unknown, autor: string | null) {
-  await sb.from("biblioteca_aprendizagem_evento").insert({ artigo_id: artigoId, tipo, payload: payload ?? {}, autor });
+export async function registarAprendizagem(sb: SupabaseClient, artigoId: string, tipo: string, payload: unknown, autor: string | null | undefined) {
+  await sb.from("biblioteca_aprendizagem_evento").insert({ artigo_id: artigoId, tipo, payload: payload ?? {}, autor: autor ?? null });
 }
 
 export async function isAdmin(sb: SupabaseClient, userId: string): Promise<boolean> {

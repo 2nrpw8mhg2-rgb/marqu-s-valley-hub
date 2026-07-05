@@ -26,7 +26,7 @@ export default defineTool({
     const { data, error } = await sb.from("biblioteca_artigo_relacoes").upsert({
       ...input,
       origem: "manual",
-      created_by: ctx.getUserId(),
+      created_by: ctx.getUserId() ?? null,
     }, { onConflict: "artigo_origem_id,artigo_destino_id,tipo_relacao" }).select("*").single();
     if (error) return errorResult(error.message);
     await registarAprendizagem(sb, input.artigo_origem_id, "relacao_criada", { destino: input.artigo_destino_id, tipo: input.tipo_relacao }, ctx.getUserId());
