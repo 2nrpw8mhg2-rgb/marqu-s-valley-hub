@@ -12,7 +12,7 @@
   "mcp": {
     "server": {
       "name": "mv-os-mcp",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "title": "MV OS MCP"
     },
     "tools": [
@@ -315,6 +315,637 @@
           "required": [
             "orcamento_id"
           ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "listar_biblioteca_completa",
+        "title": "Listar Biblioteca Mestra completa",
+        "description": "Devolve a Biblioteca Mestra paginada com especialidades, subespecialidades, categorias e artigos, incluindo métricas de qualidade.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "especialidade_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "subespecialidade_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "categoria_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "apenas_ativos": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limite": {
+              "default": 200,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "offset": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "obter_artigo_mestre",
+        "title": "Obter artigo mestre",
+        "description": "Devolve um artigo mestre com todo o conhecimento associado, relações, qualidade e histórico.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "criar_artigo_mestre",
+        "title": "Criar artigo mestre",
+        "description": "Cria um novo artigo mestre na Biblioteca com conhecimento inicial opcional. Texto normalizado para pt-PT.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "subespecialidade_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "categoria_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "codigo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "descricao": {
+              "type": "string",
+              "minLength": 3
+            },
+            "unidade": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unidade_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "observacoes": {
+              "type": "string"
+            },
+            "palavras_chave": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sinonimos": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "expressoes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "materiais": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "negativos_concorrentes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "negativos_incompativeis": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "exemplos": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "subespecialidade_id",
+            "categoria_id",
+            "codigo",
+            "descricao",
+            "unidade"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "editar_artigo_mestre",
+        "title": "Editar artigo mestre",
+        "description": "Atualiza propriedades de um artigo mestre. Regista evento de aprendizagem.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "codigo": {
+              "type": "string"
+            },
+            "descricao": {
+              "type": "string"
+            },
+            "unidade": {
+              "type": "string"
+            },
+            "unidade_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "subespecialidade_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "categoria_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "observacoes": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ativo": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "enriquecer_artigo_com_ia",
+        "title": "Enriquecer artigo com IA",
+        "description": "Analisa um artigo mestre e gera proposta de enriquecimento (palavras-chave, sinónimos, negativos, relações). Não persiste — devolve proposta para revisão. Use `aplicar_enriquecimento_ia` para gravar.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "contexto_extra": {
+              "type": "string"
+            },
+            "aplicar": {
+              "default": false,
+              "description": "Se true, aplica automaticamente (só admin).",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "adicionar_conhecimento_artigo",
+        "title": "Adicionar conhecimento a um artigo",
+        "description": "Adiciona palavras-chave, sinónimos, expressões, materiais, exemplos ou negativos a um artigo mestre. Nunca elimina o existente. Sempre pt-PT.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "artigo_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "tipo": {
+              "type": "string",
+              "enum": [
+                "palavra_chave",
+                "sinonimo",
+                "expressao",
+                "material",
+                "unidade_compativel",
+                "capitulo_tipico",
+                "exemplo_real",
+                "negativo_concorrente",
+                "negativo_incompativel"
+              ]
+            },
+            "termos": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "origem": {
+              "default": "utilizador",
+              "type": "string",
+              "enum": [
+                "utilizador",
+                "ia",
+                "aprendizagem"
+              ]
+            },
+            "exemplo_ref": {
+              "type": "object",
+              "properties": {
+                "origem": {
+                  "type": "string",
+                  "enum": [
+                    "mq",
+                    "orcamento",
+                    "obra"
+                  ]
+                },
+                "ref_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "origem"
+              ]
+            }
+          },
+          "required": [
+            "artigo_id",
+            "tipo",
+            "termos"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "criar_relacao_artigo",
+        "title": "Criar relação entre artigos",
+        "description": "Cria uma relação entre dois artigos mestre. O inverso é gerado automaticamente pelo trigger.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "artigo_origem_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "artigo_destino_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "tipo_relacao": {
+              "type": "string",
+              "enum": [
+                "complementa",
+                "depende_de",
+                "antecede",
+                "substitui",
+                "incompativel",
+                "opcional"
+              ]
+            },
+            "obrigatoriedade": {
+              "default": "frequente",
+              "type": "string",
+              "enum": [
+                "obrigatorio",
+                "muito_frequente",
+                "frequente",
+                "opcional",
+                "raro"
+              ]
+            },
+            "confianca": {
+              "default": 0.8,
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "observacoes": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "artigo_origem_id",
+            "artigo_destino_id",
+            "tipo_relacao"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "auditar_biblioteca",
+        "title": "Auditar Biblioteca Mestra",
+        "description": "Executa auditoria completa: totais, artigos sem palavras-chave, sem sinónimos, sem negativos, sem exemplos, sem relações, nunca utilizados, qualidade média e recomendações.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "especialidade_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "detetar_duplicados",
+        "title": "Detetar duplicados na Biblioteca",
+        "description": "Deteta artigos duplicados ou muito semelhantes por similaridade textual (pg_trgm) dentro da mesma subespecialidade.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "subespecialidade_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "similaridade_min": {
+              "default": 0.75,
+              "type": "number",
+              "minimum": 0.3,
+              "maximum": 1
+            },
+            "limite": {
+              "default": 100,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "detetar_lacunas",
+        "title": "Detetar lacunas na Biblioteca",
+        "description": "Cruza artigos de orçamentos reais com a Biblioteca Mestra para identificar termos frequentes sem cobertura.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "minimo_ocorrencias": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 9007199254740991
+            },
+            "limite": {
+              "default": 100,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "sugerir_reclassificacao",
+        "title": "Sugerir reclassificação de artigo",
+        "description": "Grava uma sugestão de mudança de subespecialidade/categoria para revisão humana. Nunca aplica automaticamente.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "artigo_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "nova_subespecialidade_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "nova_categoria_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "justificacao": {
+              "type": "string",
+              "minLength": 5
+            },
+            "confianca": {
+              "default": 0.7,
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "artigo_id",
+            "justificacao"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "aprovar_sugestao",
+        "title": "Aprovar ou rejeitar sugestão",
+        "description": "Aprova (aplica) ou rejeita uma sugestão pendente. Só admin.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "decisao": {
+              "type": "string",
+              "enum": [
+                "aceitar",
+                "rejeitar"
+              ]
+            },
+            "nota": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "decisao"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "listar_sugestoes",
+        "title": "Listar sugestões pendentes",
+        "description": "Devolve sugestões pendentes de revisão humana.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "estado": {
+              "default": "pendente",
+              "type": "string",
+              "enum": [
+                "pendente",
+                "aceite",
+                "rejeitada",
+                "expirada"
+              ]
+            },
+            "tipo": {
+              "type": "string",
+              "enum": [
+                "reclassificar",
+                "fundir",
+                "renomear",
+                "nova_relacao",
+                "novo_conhecimento",
+                "remover"
+              ]
+            },
+            "limite": {
+              "default": 100,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "dashboard_biblioteca_qualidade",
+        "title": "Dashboard de qualidade da Biblioteca",
+        "description": "Métricas globais em tempo real: totais, score médio, cobertura, sugestões pendentes, artigos por estado.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
         },
         "outputSchema": null
       }
