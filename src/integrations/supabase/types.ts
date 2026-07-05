@@ -61,6 +61,44 @@ export type Database = {
           },
         ]
       }
+      biblioteca_aprendizagem_evento: {
+        Row: {
+          artigo_id: string | null
+          autor: string | null
+          created_at: string
+          id: string
+          origem: string
+          payload: Json
+          tipo: string
+        }
+        Insert: {
+          artigo_id?: string | null
+          autor?: string | null
+          created_at?: string
+          id?: string
+          origem?: string
+          payload?: Json
+          tipo: string
+        }
+        Update: {
+          artigo_id?: string | null
+          autor?: string | null
+          created_at?: string
+          id?: string
+          origem?: string
+          payload?: Json
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_aprendizagem_evento_artigo_id_fkey"
+            columns: ["artigo_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       biblioteca_artigo_conhecimento: {
         Row: {
           artigo_mestre_id: string
@@ -144,6 +182,68 @@ export type Database = {
             foreignKeyName: "biblioteca_artigo_keywords_artigo_id_fkey"
             columns: ["artigo_id"]
             isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      biblioteca_artigo_qualidade: {
+        Row: {
+          artigo_id: string
+          completude: number
+          n_classif_auto: number
+          n_exemplos: number
+          n_expressoes: number
+          n_materiais: number
+          n_negativos: number
+          n_palavras_chave: number
+          n_relacoes: number
+          n_sinonimos: number
+          n_utilizacoes: number
+          n_validacoes_humanas: number
+          score_qualidade: number
+          ultima_auditoria: string | null
+          updated_at: string
+        }
+        Insert: {
+          artigo_id: string
+          completude?: number
+          n_classif_auto?: number
+          n_exemplos?: number
+          n_expressoes?: number
+          n_materiais?: number
+          n_negativos?: number
+          n_palavras_chave?: number
+          n_relacoes?: number
+          n_sinonimos?: number
+          n_utilizacoes?: number
+          n_validacoes_humanas?: number
+          score_qualidade?: number
+          ultima_auditoria?: string | null
+          updated_at?: string
+        }
+        Update: {
+          artigo_id?: string
+          completude?: number
+          n_classif_auto?: number
+          n_exemplos?: number
+          n_expressoes?: number
+          n_materiais?: number
+          n_negativos?: number
+          n_palavras_chave?: number
+          n_relacoes?: number
+          n_sinonimos?: number
+          n_utilizacoes?: number
+          n_validacoes_humanas?: number
+          score_qualidade?: number
+          ultima_auditoria?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_artigo_qualidade_artigo_id_fkey"
+            columns: ["artigo_id"]
+            isOneToOne: true
             referencedRelation: "biblioteca_artigos"
             referencedColumns: ["id"]
           },
@@ -311,6 +411,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      biblioteca_auditoria_run: {
+        Row: {
+          ambito: Json
+          concluido_em: string | null
+          erro_msg: string | null
+          estado: string
+          id: string
+          iniciado_em: string
+          iniciado_por: string | null
+          resumo: Json
+        }
+        Insert: {
+          ambito?: Json
+          concluido_em?: string | null
+          erro_msg?: string | null
+          estado?: string
+          id?: string
+          iniciado_em?: string
+          iniciado_por?: string | null
+          resumo?: Json
+        }
+        Update: {
+          ambito?: Json
+          concluido_em?: string | null
+          erro_msg?: string | null
+          estado?: string
+          id?: string
+          iniciado_em?: string
+          iniciado_por?: string | null
+          resumo?: Json
+        }
+        Relationships: []
       }
       biblioteca_categorias: {
         Row: {
@@ -736,6 +869,62 @@ export type Database = {
             columns: ["especialidade_id"]
             isOneToOne: false
             referencedRelation: "biblioteca_especialidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      biblioteca_sugestao: {
+        Row: {
+          artigo_id: string | null
+          confianca: number | null
+          created_at: string
+          criado_por: string | null
+          estado: string
+          id: string
+          justificacao: string | null
+          origem: string
+          payload: Json
+          revisto_em: string | null
+          revisto_por: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          artigo_id?: string | null
+          confianca?: number | null
+          created_at?: string
+          criado_por?: string | null
+          estado?: string
+          id?: string
+          justificacao?: string | null
+          origem?: string
+          payload?: Json
+          revisto_em?: string | null
+          revisto_por?: string | null
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          artigo_id?: string | null
+          confianca?: number | null
+          created_at?: string
+          criado_por?: string | null
+          estado?: string
+          id?: string
+          justificacao?: string | null
+          origem?: string
+          payload?: Json
+          revisto_em?: string | null
+          revisto_por?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biblioteca_sugestao_artigo_id_fkey"
+            columns: ["artigo_id"]
+            isOneToOne: false
+            referencedRelation: "biblioteca_artigos"
             referencedColumns: ["id"]
           },
         ]
@@ -2009,6 +2198,13 @@ export type Database = {
       criar_pastas_padrao_obra: {
         Args: { _obra_id: string }
         Returns: undefined
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
       }
       normalizar_descricao: { Args: { _t: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
