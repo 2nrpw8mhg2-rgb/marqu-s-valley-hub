@@ -33,7 +33,7 @@ const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "project-ref-unse
 export default defineMcp({
   name: "mv-os-mcp",
   title: "MV OS MCP",
-  version: "0.4.0",
+  version: "0.5.0",
   instructions:
     "Servidor MCP do MV OS (Marquês Valley). Módulos: (1) Obras/Orçamentos/Subempreitadas — leitura e classificação. (2) Biblioteca Mestra — cérebro técnico do sistema: leitura completa, criação, edição, enriquecimento por IA, deteção de duplicados/lacunas, sugestões de reclassificação e aprendizagem contínua. Todos os textos em Português de Portugal. O utilizador tem de estar autenticado; o RLS aplica-se como esse utilizador.",
   auth: auth.oauth.issuer({

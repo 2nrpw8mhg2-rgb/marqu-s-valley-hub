@@ -12,7 +12,7 @@
   "mcp": {
     "server": {
       "name": "mv-os-mcp",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "title": "MV OS MCP"
     },
     "tools": [
