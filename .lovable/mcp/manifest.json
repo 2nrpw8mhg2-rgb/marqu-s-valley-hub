@@ -588,6 +588,104 @@
         "outputSchema": null
       },
       {
+        "name": "enriquecer_subespecialidade_com_ia",
+        "title": "Enriquecer subespecialidade com IA (lote)",
+        "description": "Enriquece em lote todos os Artigos Mestre ativos de uma subespecialidade: gera palavras-chave, sinónimos, expressões, materiais, capítulos, exemplos, negativos e (opcional) relações. Nunca apaga nem reclassifica. Modo dry-run por defeito (aplicar=false). Sempre pt-PT.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": true,
+          "idempotentHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "subespecialidade_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "palavras_chave": {
+              "default": 10,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "sinonimos": {
+              "default": 10,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "expressoes": {
+              "default": 10,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "materiais": {
+              "default": 10,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "capitulos": {
+              "default": 5,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 30
+            },
+            "exemplos": {
+              "default": 5,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 30
+            },
+            "negativos_concorrentes": {
+              "default": 10,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "negativos_incompativeis": {
+              "default": 10,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "criar_relacoes": {
+              "default": true,
+              "type": "boolean"
+            },
+            "aplicar": {
+              "default": false,
+              "type": "boolean"
+            },
+            "limite": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "offset": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "modelo": {
+              "default": "google/gemini-2.5-flash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "subespecialidade_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
         "name": "adicionar_conhecimento_artigo",
         "title": "Adicionar conhecimento a um artigo",
         "description": "Adiciona palavras-chave, sinónimos, expressões, materiais, exemplos ou negativos a um artigo mestre. Nunca elimina o existente. Sempre pt-PT.",

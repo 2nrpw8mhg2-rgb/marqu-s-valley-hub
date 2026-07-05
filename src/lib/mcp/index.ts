@@ -58,6 +58,7 @@ export default defineMcp({
     bmCriar,
     bmEditar,
     bmEnriquecer,
+    bmEnriquecerSubesp,
     bmAddConhecimento,
     bmCriarRelacao,
     bmAuditar,
