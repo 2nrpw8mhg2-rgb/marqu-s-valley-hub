@@ -1,82 +1,95 @@
-## Nova ferramenta MCP: `enriquecer_subespecialidade_com_ia`
+## Duas novas ferramentas MCP: descoberta da Biblioteca Mestra
 
-Enriquecimento em lote de todos os Artigos Mestre ativos de uma subespecialidade, com uma única chamada MCP em vez de N chamadas de `enriquecer_artigo_com_ia`.
+Objetivo: eliminar a dependência de UUIDs manuais. O ChatGPT passa a poder listar a estrutura completa e pesquisar subespecialidades por nome (tolerante a acentos/maiúsculas/parcial), obter o `id` e encadear com `enriquecer_subespecialidade_com_ia`.
 
-### Ficheiro a criar
+### Ficheiros a criar
 
-`src/lib/mcp/tools/biblioteca/enriquecer-subespecialidade-com-ia.ts`
+1. `src/lib/mcp/tools/biblioteca/listar-subespecialidades.ts`
+2. `src/lib/mcp/tools/biblioteca/pesquisar-subespecialidade.ts`
 
-Registar em `src/lib/mcp/index.ts` (import + entry no array `tools`). Bump da versão do MCP de `0.4.0` → `0.5.0`.
+E registar ambos em `src/lib/mcp/index.ts` (import + entrada no array `tools`). Bump da versão MCP: `0.5.0` → `0.6.0`.
 
-### Input (Zod)
+Nenhuma migração de BD. Usa `biblioteca_especialidades`, `biblioteca_subespecialidades`, `biblioteca_artigos`, `biblioteca_artigo_qualidade`. Ambos usam `supabaseForUser(ctx)` (RLS aplica-se), `notAuthed()` sem sessão.
 
-```
-subespecialidade_id: uuid (obrigatório)
-palavras_chave, sinonimos, expressoes, materiais, negativos_concorrentes, negativos_incompativeis: number, default 10
-capitulos, exemplos: number, default 5
-criar_relacoes: boolean, default true
-aplicar: boolean, default false
-limite?: number (default 50, máx 200 — evita timeouts e custos)
-offset?: number (default 0)
-modelo?: enum, default "google/gemini-2.5-flash"
-```
+---
 
-### Fluxo do handler
+### 1. `listar_subespecialidades`
 
-1. `notAuthed()` se sessão inválida. Cliente Supabase do utilizador (RLS aplica-se).
-2. Ler subespecialidade + nome da especialidade pai (contexto para o prompt).
-3. Listar artigos ativos da subespecialidade com paginação `limite/offset`, ordenados por `codigo`. Se vazio → devolver resumo com aviso.
-4. Para cada artigo, em série (para respeitar rate limit da IA):
-   - Ler conhecimento existente (`biblioteca_artigo_conhecimento` ativo) e indexar por `(tipo, termo.toLowerCase())` — a proposta será filtrada contra este set para nunca duplicar.
-   - Calcular `score_antes` via `contarConhecimento` + query de relações (mesma lógica de `_shared.ts`).
-   - Chamar Lovable AI Gateway (`https://ai.gateway.lovable.dev/v1/chat/completions`) com prompt pt-PT reforçado (lista negra explícita: "tijolo baiano", "alvenaria de concreto", "contrapiso", "drywall", "massa corrida" → substituir por "tijolo cerâmico", "bloco de betão", "betonilha", "placa de gesso cartonado", "argamassa de assentamento"), pedindo os counts especificados nos parâmetros. `response_format: json_object`.
-   - Normalizar via `normalizarPtPt` + filtrar termos já existentes.
-   - Se `aplicar=false`: acumular proposta no output; gravar uma linha em `biblioteca_sugestao` (`tipo: novo_conhecimento`, `origem: ia`) por artigo para permitir aprovação posterior via `aprovar_sugestao`.
-   - Se `aplicar=true`:
-     - Insert em lote em `biblioteca_artigo_conhecimento` (origem=ia, ativo=true, confianca do modelo).
-     - Se `criar_relacoes=true`: para cada relação sugerida, tentar resolver o artigo destino por código exacto dentro da mesma subespecialidade/especialidade; ignorar silenciosamente se não encontrar (relações inter-artigo requerem UUID, não inventar).
-     - `registarAprendizagem(sb, artigo_id, "enriquecido_ia_lote", {...counts}, userId)`.
-     - `recalcularQualidade(sb, artigo_id)` → `score_depois`.
-   - Try/catch por artigo: falhas individuais são registadas em `erros[]`, o lote continua.
-5. Nunca tocar em: `descricao`, `unidade`, `subespecialidade_id`, `categoria_id`, `especialidade_id`, `ativo`. Nunca fazer `delete`/`update` de conhecimento existente.
+Anotações: `readOnlyHint: true`, `destructiveHint: false`, `openWorldHint: false`, `idempotentHint: true`.
 
-### Output (JSON estruturado)
+Input (Zod):
+- `especialidade_id?: uuid` — filtro opcional
+- `apenas_ativas?: boolean` (default `true`) — só conta artigos com `ativo=true` no total principal, mas devolve sempre também o total absoluto
+- `incluir_qualidade?: boolean` (default `true`)
 
+Fluxo:
+1. Ler `biblioteca_especialidades` (id, codigo, nome), ordenar por `codigo`/`nome`.
+2. Ler `biblioteca_subespecialidades` (id, codigo, nome, especialidade_id), com filtro opcional.
+3. Contar artigos por `subespecialidade_id` em `biblioteca_artigos` — dois counts: `n_artigos_ativos` (`ativo=true`) e `n_artigos_total`.
+4. Se `incluir_qualidade`: ler `biblioteca_artigo_qualidade` para os artigos envolvidos e calcular média de `score_qualidade` por subespecialidade (arredondar a 3 casas). Se sem dados → `null`.
+5. Agregar em estrutura aninhada.
+
+Output:
 ```
 {
-  subespecialidade: { id, nome, especialidade },
-  parametros: { aplicar, criar_relacoes, limite, offset, alvos: {...} },
-  totais: {
-    artigos_encontrados, artigos_enriquecidos, artigos_ignorados,
-    palavras_chave, sinonimos, expressoes, materiais,
-    capitulos_tipicos, exemplos_reais,
-    negativos_concorrentes, negativos_incompativeis, relacoes
-  },
-  qualidade: { score_medio_antes, score_medio_depois, delta },
-  artigos: [ { id, codigo, descricao, score_antes, score_depois, adicionados: {...}, aplicado } ],
-  propostas?: [...] // só se aplicar=false
-  erros: [ { artigo_id, codigo, mensagem } ],
-  razao: "..."
+  especialidades: [
+    {
+      id, codigo, nome,
+      subespecialidades: [
+        { id, codigo, nome, n_artigos_ativos, n_artigos_total, score_medio_qualidade }
+      ]
+    }
+  ],
+  totais: { n_especialidades, n_subespecialidades, n_artigos_ativos, n_artigos_total }
 }
 ```
 
-### Salvaguardas anti-pt-BR
+---
 
-- Prompt system inclui lista de proibidos + substitutos.
-- `normalizarPtPt` aplicado a **todos** os termos antes de comparar/gravar.
-- `detetarPtBr` residual gera avisos em `erros[]` (não bloqueia).
+### 2. `pesquisar_subespecialidade`
 
-### Anotações MCP
+Anotações: `readOnlyHint: true`, `destructiveHint: false`, `openWorldHint: false`, `idempotentHint: true`.
 
-`readOnlyHint: false`, `destructiveHint: false`, `openWorldHint: true` (chama IA externa), `idempotentHint: false`.
+Input (Zod):
+- `nome: string` (obrigatório, trim, min 2)
+- `especialidade_nome?: string` — filtro tolerante pelo nome da especialidade pai
+- `apenas_ativas?: boolean` (default `true`)
+- `limite?: number` (1–20, default 10)
+
+Fluxo:
+1. Normalizar: `NFD` → remover diacríticos → `toLowerCase()` → `trim()`. Aplica-se ao input e a cada candidato.
+2. Ler todas as subespecialidades + nome da especialidade pai (join via `especialidade_id`).
+3. Se `especialidade_nome`: filtrar em memória por `includes` normalizado.
+4. Scoring por subespecialidade:
+   - exato (nome ou código): 100
+   - código exato: 95
+   - prefixo: 80
+   - contido: 60
+   - sobreposição de tokens: 30 + 10×n_tokens_partilhados
+   - descartar score 0
+5. Ordenar por score desc, cortar a `limite`.
+6. Para cada resultado: contar `n_artigos_ativos` / `n_artigos_total` e ler `score_medio_qualidade` (mesma lógica da ferramenta 1).
+7. `match_unico`: `true` se 1 resultado, ou se o top tem score 100 e o segundo <100.
+
+Output:
+```
+{
+  match_unico: boolean,
+  subespecialidade?: { id, codigo, nome, especialidade: { id, nome }, n_artigos_ativos, n_artigos_total, score_medio_qualidade },
+  correspondencias: [ { id, codigo, nome, especialidade: {...}, n_artigos_ativos, n_artigos_total, score_medio_qualidade, score_match } ],
+  razao: "..." // pt-PT, ex.: "Encontrada 1 correspondência exata." / "3 correspondências possíveis — pedir ao utilizador para especificar."
+}
+```
+
+Regras: **nunca escreve**. Sem match → `correspondencias: []` e `razao` sugere usar `listar_subespecialidades`.
+
+---
 
 ### Depois da criação
 
-Correr `app_mcp_server--extract_mcp_manifest` para regenerar `.lovable/mcp/manifest.json` (deve passar a listar 26 ferramentas, versão `0.5.0`). Publicar. No ChatGPT: **Refresh tools** no conector MV OC.
+- `app_mcp_server--extract_mcp_manifest` para regenerar `.lovable/mcp/manifest.json` (deve ficar com 27 ferramentas, versão `0.6.0`).
+- Publicar. No ChatGPT: **Refresh tools** no conector MV OC.
 
-### Notas técnicas
+### Fluxo final desbloqueado
 
-- Nenhuma migração de BD necessária — todas as tabelas usadas já existem (`biblioteca_artigos`, `biblioteca_artigo_conhecimento`, `biblioteca_artigo_relacoes`, `biblioteca_artigo_qualidade`, `biblioteca_aprendizagem_evento`, `biblioteca_sugestao`).
-- `LOVABLE_API_KEY` lida dentro do handler (nunca no top-level).
-- Processamento em série com pausa opcional entre chamadas caso o gateway devolva 429 (retry simples).
-- Cap rígido de 200 artigos por chamada protege contra timeouts do Worker.
+"Enriquece a subespecialidade Alvenarias." → `pesquisar_subespecialidade("Alvenarias")` → obtém `id` → `enriquecer_subespecialidade_com_ia({ subespecialidade_id, aplicar: false })` → proposta → confirmação → `aplicar: true`.
