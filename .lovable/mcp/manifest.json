@@ -12,7 +12,7 @@
   "mcp": {
     "server": {
       "name": "mv-os-mcp",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "title": "MV OS MCP"
     },
     "tools": [
@@ -362,6 +362,76 @@
               "maximum": 9007199254740991
             }
           }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "listar_subespecialidades",
+        "title": "Listar subespecialidades da Biblioteca Mestra",
+        "description": "Devolve a estrutura completa da Biblioteca Mestra organizada por especialidade, com id, nome, número de artigos ativos/total e score médio de qualidade por subespecialidade. Útil para descobrir IDs sem depender de UUIDs manuais.",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false,
+          "idempotentHint": true
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "especialidade_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "apenas_ativas": {
+              "default": true,
+              "type": "boolean"
+            },
+            "incluir_qualidade": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "pesquisar_subespecialidade",
+        "title": "Pesquisar subespecialidade por nome",
+        "description": "Pesquisa subespecialidades da Biblioteca Mestra por nome (tolerante a maiúsculas, acentos e correspondências parciais). Devolve o id, especialidade pai, contagens de artigos e score de qualidade. Nunca escreve dados.",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false,
+          "idempotentHint": true
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "nome": {
+              "type": "string",
+              "minLength": 2
+            },
+            "especialidade_nome": {
+              "type": "string",
+              "minLength": 2
+            },
+            "apenas_ativas": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limite": {
+              "default": 10,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            }
+          },
+          "required": [
+            "nome"
+          ]
         },
         "outputSchema": null
       },
