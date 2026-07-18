@@ -311,12 +311,11 @@ function SubempreitadasOrcamento() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8"></TableHead>
-                    <TableHead>Subempreitada</TableHead>
+                    <TableHead>Subempreitada / revisão</TableHead>
                     <TableHead className="text-right">Artigos</TableHead>
                     <TableHead className="text-right">Validação</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead className="text-right">A validar</TableHead>
-                    <TableHead className="w-36"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -334,37 +333,44 @@ function SubempreitadasOrcamento() {
                             }}
                           />
                         </TableCell>
-                        <TableCell className="font-medium">{s.nome}</TableCell>
+                        <TableCell className="font-medium">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto justify-start gap-2 px-0 py-1 font-medium hover:bg-transparent hover:text-primary"
+                            disabled={st.count === 0}
+                            onClick={() => abrirArtigosSubempreitada(s.id)}
+                          >
+                            <span>{s.nome}</span>
+                            {st.count > 0 && (
+                              <span className="inline-flex items-center whitespace-nowrap text-xs font-normal text-primary">
+                                <Eye className="mr-1 h-3.5 w-3.5" /> Ver artigos
+                              </span>
+                            )}
+                          </Button>
+                        </TableCell>
                         <TableCell className="text-right">{st.count}</TableCell>
                         <TableCell className="text-right">{st.valida > 0 && <span className="text-xs text-emerald-500">{st.valida} validados</span>}</TableCell>
                         <TableCell className="text-right font-mono">{fmtEUR(st.total)}</TableCell>
                         <TableCell className="text-right">{st.baixa > 0 && <Badge variant="outline" className="border-amber-500/40 text-amber-500">{st.baixa}</Badge>}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={st.count === 0}
-                            onClick={() => abrirArtigosSubempreitada(s.id)}
-                          >
-                            <Eye className="mr-1 h-4 w-4" /> Ver artigos
-                          </Button>
-                        </TableCell>
                       </TableRow>
                     );
                   })}
                   {stats.semSub > 0 && (
                     <TableRow>
                       <TableCell></TableCell>
-                      <TableCell className="text-muted-foreground italic">Sem subempreitada atribuída</TableCell>
+                      <TableCell>
+                        <Button type="button" variant="ghost" className="h-auto gap-2 px-0 py-1 text-muted-foreground italic" onClick={() => abrirArtigosSubempreitada("sem")}>
+                          Sem subempreitada atribuída
+                          <span className="inline-flex items-center whitespace-nowrap text-xs not-italic text-primary">
+                            <Eye className="mr-1 h-3.5 w-3.5" /> Rever
+                          </span>
+                        </Button>
+                      </TableCell>
                       <TableCell className="text-right">{stats.semSub}</TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" variant="outline" onClick={() => abrirArtigosSubempreitada("sem")}>
-                          <Eye className="mr-1 h-4 w-4" /> Rever
-                        </Button>
-                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
