@@ -54,6 +54,7 @@ export const THRESHOLD_AUTO = 0.7; // < 0.70 → não atribui automaticamente
 export const CONFLICT_DELTA = 0.2; // se best-2ª < 0.20 → conflito
 export const W_FORTE = 0.6;
 export const W_CAPITULO = 0.2;
+export const W_CAPITULO_FILHO = 0.75;
 export const W_SINONIMO = 0.15;
 export const W_UNIDADE = 0.05;
 export const W_EXCLUSAO = -0.5;
@@ -118,6 +119,7 @@ function scoreSub(
   const termos: string[] = [];
   const razoes: string[] = [];
   let score = 0;
+  const descricaoCurta = desc.length <= 32 || desc.split(" ").filter(Boolean).length <= 4;
 
   const fortes = sub.palavras_chave.slice(0, FORTES_TOPO);
   const sinonimos = sub.palavras_chave.slice(FORTES_TOPO);
@@ -145,8 +147,13 @@ function scoreSub(
   if (cap) {
     for (const kw of sub.palavras_chave) {
       if (contemTermo(cap, kw)) {
-        score += W_CAPITULO;
-        razoes.push(`capítulo contém "${kw}"`);
+        const pesoCapitulo = descricaoCurta ? W_CAPITULO_FILHO : W_CAPITULO;
+        score += pesoCapitulo;
+        razoes.push(
+          descricaoCurta
+            ? `descrição curta; contexto do artigo-pai contém "${kw}"`
+            : `capítulo contém "${kw}"`,
+        );
         if (!termos.includes(kw)) termos.push(kw);
         break;
       }

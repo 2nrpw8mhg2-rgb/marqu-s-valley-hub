@@ -23,7 +23,7 @@ async function reclassificarLote(
   let query = sb
     .from("orcamento_artigos")
     .select(
-      "id, codigo, descricao, unidade, capitulo_id, orcamento_id, subempreitada_validada_manual, capitulo:orcamento_capitulos(descricao)",
+      "id, codigo, descricao, unidade, capitulo_id, orcamento_id, subempreitada_validada_manual, capitulo:orcamento_capitulos(codigo, descricao)",
     )
     .eq("subempreitada_validada_manual", false);
   if (orcamento_id) query = query.eq("orcamento_id", orcamento_id);
@@ -32,6 +32,20 @@ async function reclassificarLote(
   if (eArt) throw new Error(eArt.message);
   if (!artigos || artigos.length === 0)
     return { total: 0, atribuidos: 0, sem_atribuir: 0, baixa_confianca: 0, conflito: 0 };
+
+  const orcamentoIds = [...new Set(artigos.map((a: any) => a.orcamento_id).filter(Boolean))];
+  const { data: capitulosRaiz, error: eCaps } = await sb
+    .from("orcamento_capitulos")
+    .select("orcamento_id, codigo, descricao")
+    .in("orcamento_id", orcamentoIds);
+  if (eCaps) throw new Error(eCaps.message);
+  const raizPorOrcamentoCodigo = new Map<string, string>();
+  for (const cap of capitulosRaiz ?? []) {
+    const codigo = (cap.codigo ?? "").trim().replace(/\.+$/, "");
+    if (/^\d+$/.test(codigo)) {
+      raizPorOrcamentoCodigo.set(`${cap.orcamento_id}:${codigo}`, cap.descricao);
+    }
+  }
 
   let atribuidos = 0;
   let semAtribuir = 0;
@@ -42,13 +56,34 @@ async function reclassificarLote(
     // Guarda dura: nunca sobrepor validações manuais
     if (a.subempreitada_validada_manual === true) continue;
 
-    const capDesc = Array.isArray(a.capitulo) ? a.capitulo[0]?.descricao : (a.capitulo as any)?.descricao;
-    const r = classificarArtigo(
-      { codigo: a.codigo, descricao: a.descricao, unidade: a.unidade ?? null, capitulo_descricao: capDesc ?? null },
+    const cap = Array.isArray(a.capitulo) ? a.capitulo[0] : (a.capitulo as any);
+    const capCodigo = (cap?.codigo ?? "").trim().replace(/\.+$/, "");
+    const codigoRaiz = capCodigo.split(".")[0];
+    const raizDesc = raizPorOrcamentoCodigo.get(`${a.orcamento_id}:${codigoRaiz}`);
+    const artigo = {
+      codigo: a.codigo,
+      descricao: a.descricao,
+      unidade: a.unidade ?? null,
+      capitulo_descricao: cap?.descricao || null,
+    };
+    let r = classificarArtigo(
+      artigo,
       subs,
       null,
       aprendizagem,
     );
+
+    // O capítulo imediato é mais específico (por exemplo, caixilharias dentro de
+    // serralharias). O capítulo-raiz só entra como contexto de recurso quando a
+    // descrição imediata não permite uma atribuição segura.
+    if (!r.subempreitada_id && raizDesc && raizDesc !== cap?.descricao) {
+      r = classificarArtigo(
+        { ...artigo, capitulo_descricao: `${cap?.descricao ?? ""} — ${raizDesc}` },
+        subs,
+        null,
+        aprendizagem,
+      );
+    }
 
     await sb
       .from("orcamento_artigos")

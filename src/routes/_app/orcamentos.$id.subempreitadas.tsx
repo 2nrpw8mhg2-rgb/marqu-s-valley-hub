@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -15,8 +15,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { fmtEUR } from "@/lib/orcamento-utils";
 import { classificarOrcamento, alterarSubempreitadaArtigo } from "@/lib/subempreitadas/classify.functions";
+import { gerarPacotesSubempreitadas } from "@/lib/subempreitadas/pacotes.functions";
 import { exportarExcelPorSubempreitada, exportarPDFPorSubempreitada, type ArtigoExport } from "@/lib/subempreitadas/export";
-import { ArrowLeft, Wand2, FileSpreadsheet, FileDown, Send, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Wand2, FileSpreadsheet, FileDown, Send, CheckCircle2, AlertTriangle, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/orcamentos/$id/subempreitadas")({
@@ -44,12 +45,16 @@ type Sub = { id: string; codigo: string; nome: string; ordem: number };
 function SubempreitadasOrcamento() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [filtroSub, setFiltroSub] = useState<string>("todas");
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
   const [texto, setTexto] = useState("");
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+  const [gerando, setGerando] = useState(false);
   const classificarFn = useServerFn(classificarOrcamento);
   const alterarFn = useServerFn(alterarSubempreitadaArtigo);
+  const gerarPacotesFn = useServerFn(gerarPacotesSubempreitadas);
 
   const { data, isLoading } = useQuery({
     queryKey: ["orc-subempreitadas", id],
@@ -134,6 +139,31 @@ function SubempreitadasOrcamento() {
     }
   };
 
+  const gerarPacotes = async () => {
+    if (stats.semSub > 0 || stats.baixaGlobal > 0) {
+      setFiltroEstado(stats.semSub > 0 ? "sem" : "baixa");
+      setActiveTab("separacao");
+      toast.error("A separação ainda precisa de validação", {
+        description: `${stats.semSub} artigo(s) sem subempreitada e ${stats.baixaGlobal} com baixa confiança.`,
+      });
+      return;
+    }
+    setGerando(true);
+    const t = toast.loading("A gerar pacotes de consulta...");
+    try {
+      const r = await gerarPacotesFn({ data: { orcamento_id: id } });
+      toast.success(
+        `${r.pacotes_criados} pacote(s) criado(s), ${r.pacotes_atualizados} atualizado(s) e ${r.artigos_incluidos} artigo(s) incluído(s).`,
+        { id: t },
+      );
+      navigate({ to: "/procurement/pacotes" });
+    } catch (e: any) {
+      toast.error(e.message ?? "Não foi possível gerar os pacotes", { id: t });
+    } finally {
+      setGerando(false);
+    }
+  };
+
   const construirArtigosExport = (): ArtigoExport[] => {
     if (!data) return [];
     return data.artigos.map((a) => {
@@ -195,11 +225,14 @@ function SubempreitadasOrcamento() {
               <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> Voltar</Button>
             </Link>
             <Button variant="outline" onClick={reclassificar}><Wand2 className="h-4 w-4 mr-1" /> Reclassificar</Button>
+            <Button onClick={gerarPacotes} disabled={gerando}>
+              <ShoppingCart className="h-4 w-4 mr-1" /> {gerando ? "A gerar..." : "Gerar pacotes"}
+            </Button>
           </div>
         }
       />
       <div className="p-6 space-y-4">
-        <Tabs defaultValue="dashboard">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="separacao">Separação por subempreitada</TabsTrigger>
@@ -212,6 +245,40 @@ function SubempreitadasOrcamento() {
               <Card className="p-4"><div className="text-xs text-muted-foreground">Necessitam validação</div><div className="text-2xl font-semibold text-amber-500">{stats.baixaGlobal}</div></Card>
               <Card className="p-4"><div className="text-xs text-muted-foreground">Subempreitadas ativas</div><div className="text-2xl font-semibold">{stats.bySub.size}</div></Card>
             </div>
+
+            <Card className={`p-4 border ${stats.semSub > 0 || stats.baixaGlobal > 0 ? "border-amber-500/40 bg-amber-500/5" : "border-emerald-500/40 bg-emerald-500/5"}`}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 font-medium">
+                    {stats.semSub > 0 || stats.baixaGlobal > 0 ? (
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    )}
+                    {stats.semSub > 0 || stats.baixaGlobal > 0
+                      ? "Revisão necessária antes de gerar"
+                      : "Separação pronta para gerar pacotes"}
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {stats.semSub > 0 || stats.baixaGlobal > 0
+                      ? `${stats.semSub} artigo(s) sem subempreitada e ${stats.baixaGlobal} com baixa confiança.`
+                      : `Os artigos estão distribuídos por ${stats.bySub.size} subempreitada(s). A geração pode ser repetida sem duplicar pacotes enquanto estiverem por preparar.`}
+                  </p>
+                </div>
+                {stats.semSub > 0 || stats.baixaGlobal > 0 ? (
+                  <Button variant="outline" onClick={() => {
+                    setFiltroEstado(stats.semSub > 0 ? "sem" : "baixa");
+                    setActiveTab("separacao");
+                  }}>
+                    Rever artigos
+                  </Button>
+                ) : (
+                  <Button onClick={gerarPacotes} disabled={gerando}>
+                    <ShoppingCart className="h-4 w-4 mr-1" /> {gerando ? "A gerar..." : "Gerar pacotes de consulta"}
+                  </Button>
+                )}
+              </div>
+            </Card>
 
             <Card>
               <div className="p-4 flex flex-wrap items-center justify-between gap-2">

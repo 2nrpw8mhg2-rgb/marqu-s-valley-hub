@@ -1861,7 +1861,9 @@ export type Database = {
           nome: string
           obra_id: string | null
           observacoes: string | null
+          origem: string
           orcamento_id: string
+          subempreitada_id: string | null
           subespecialidade_id: string | null
           updated_at: string
         }
@@ -1875,7 +1877,9 @@ export type Database = {
           nome: string
           obra_id?: string | null
           observacoes?: string | null
+          origem?: string
           orcamento_id: string
+          subempreitada_id?: string | null
           subespecialidade_id?: string | null
           updated_at?: string
         }
@@ -1889,7 +1893,9 @@ export type Database = {
           nome?: string
           obra_id?: string | null
           observacoes?: string | null
+          origem?: string
           orcamento_id?: string
+          subempreitada_id?: string | null
           subespecialidade_id?: string | null
           updated_at?: string
         }
@@ -1906,6 +1912,13 @@ export type Database = {
             columns: ["orcamento_id"]
             isOneToOne: false
             referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procurement_pacotes_subempreitada_id_fkey"
+            columns: ["subempreitada_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
             referencedColumns: ["id"]
           },
           {
