@@ -17,7 +17,7 @@ import { fmtEUR } from "@/lib/orcamento-utils";
 import { classificarOrcamento, alterarSubempreitadaArtigo } from "@/lib/subempreitadas/classify.functions";
 import { gerarPacotesSubempreitadas } from "@/lib/subempreitadas/pacotes.functions";
 import { exportarExcelPorSubempreitada, exportarPDFPorSubempreitada, type ArtigoExport } from "@/lib/subempreitadas/export";
-import { ArrowLeft, Wand2, FileSpreadsheet, FileDown, Send, CheckCircle2, AlertTriangle, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Wand2, FileSpreadsheet, FileDown, Send, CheckCircle2, AlertTriangle, ShoppingCart, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/orcamentos/$id/subempreitadas")({
@@ -145,6 +145,13 @@ function SubempreitadasOrcamento() {
     } catch (e: any) {
       toast.error(e.message);
     }
+  };
+
+  const abrirArtigosSubempreitada = (subId: string) => {
+    setFiltroSub(subId);
+    setFiltroEstado("todos");
+    setTexto("");
+    setActiveTab("separacao");
   };
 
   const gerarPacotes = async () => {
@@ -309,6 +316,7 @@ function SubempreitadasOrcamento() {
                     <TableHead className="text-right">Validação</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead className="text-right">A validar</TableHead>
+                    <TableHead className="w-36"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -331,6 +339,16 @@ function SubempreitadasOrcamento() {
                         <TableCell className="text-right">{st.valida > 0 && <span className="text-xs text-emerald-500">{st.valida} validados</span>}</TableCell>
                         <TableCell className="text-right font-mono">{fmtEUR(st.total)}</TableCell>
                         <TableCell className="text-right">{st.baixa > 0 && <Badge variant="outline" className="border-amber-500/40 text-amber-500">{st.baixa}</Badge>}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={st.count === 0}
+                            onClick={() => abrirArtigosSubempreitada(s.id)}
+                          >
+                            <Eye className="mr-1 h-4 w-4" /> Ver artigos
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -342,6 +360,11 @@ function SubempreitadasOrcamento() {
                       <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="outline" onClick={() => abrirArtigosSubempreitada("sem")}>
+                          <Eye className="mr-1 h-4 w-4" /> Rever
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
