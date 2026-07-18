@@ -33,15 +33,9 @@ export function ImportMQDialog({ open, onClose, onImport }: Props) {
   const validateAndHandle = async (f: File | null | undefined) => {
     if (!f) return;
     const isExcelExt = /\.(xlsx|xlsb)$/i.test(f.name);
-    const validMimes = [
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel.sheet.macroEnabled.12",
-      "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
-      "application/vnd.ms-excel",
-      "application/octet-stream",
-      "", // alguns browsers não preenchem o tipo em drag-and-drop
-    ];
-    if (!isExcelExt || !validMimes.includes(f.type)) {
+    // O MIME de .xlsb varia entre browsers e sistemas operativos. Validamos a
+    // extensão aqui e deixamos o leitor XLSX confirmar o conteúdo em handleFile.
+    if (!isExcelExt) {
       toast.error("Formato não suportado", {
         description: `"${f.name}" não é um ficheiro Excel suportado. Usa .xlsx ou .xlsb — formatos como .xls, .csv, .ods ou .numbers não são aceites.`,
       });
