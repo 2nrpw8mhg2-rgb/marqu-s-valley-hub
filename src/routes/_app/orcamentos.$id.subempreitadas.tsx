@@ -374,20 +374,20 @@ function SubempreitadasOrcamento() {
               <div className="ml-auto text-xs text-muted-foreground">{filtradas.length} artigos</div>
             </Card>
 
-            <Card>
-              <Table>
+            <Card className="overflow-hidden">
+              <Table className="min-w-[1680px] table-fixed">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-24">Código</TableHead>
-                    <TableHead className="w-32">Capítulo</TableHead>
-                    <TableHead>Descrição</TableHead>
+                    <TableHead className="w-48">Capítulo</TableHead>
+                    <TableHead className="w-[560px]">Descrição completa</TableHead>
                     <TableHead className="w-16">Un.</TableHead>
                     <TableHead className="text-right w-20">Qtd.</TableHead>
                     <TableHead className="text-right w-24">Preço</TableHead>
                     <TableHead className="text-right w-24">Total</TableHead>
                     <TableHead className="w-56">Subempreitada</TableHead>
                     <TableHead className="w-32">Confiança</TableHead>
-                    <TableHead className="w-24">Estado</TableHead>
+                    <TableHead className="w-28">Estado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -396,15 +396,15 @@ function SubempreitadasOrcamento() {
                     const conf = a.subempreitada_confianca ?? 0;
                     const baixa = conf < 0.7 && !a.subempreitada_validada_manual;
                     return (
-                      <TableRow key={a.id}>
-                        <TableCell className="font-mono text-xs">{a.codigo ?? "—"}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground truncate max-w-32">{cap?.codigo ?? ""} {cap?.descricao ?? ""}</TableCell>
-                        <TableCell className="text-sm">{a.descricao}</TableCell>
-                        <TableCell className="text-xs">{a.unidade ?? ""}</TableCell>
-                        <TableCell className="text-right text-xs">{a.quantidade}</TableCell>
-                        <TableCell className="text-right text-xs">{fmtEUR(a.preco_unitario)}</TableCell>
-                        <TableCell className="text-right text-xs font-mono">{fmtEUR(a.quantidade * a.preco_unitario)}</TableCell>
-                        <TableCell>
+                      <TableRow key={a.id} className="align-top">
+                        <TableCell className="align-top font-mono text-xs">{a.codigo ?? "—"}</TableCell>
+                        <TableCell className="align-top text-xs text-muted-foreground whitespace-normal break-words">{cap?.codigo ?? ""} {cap?.descricao ?? ""}</TableCell>
+                        <TableCell className="align-top text-sm leading-relaxed whitespace-normal break-words">{a.descricao}</TableCell>
+                        <TableCell className="align-top text-xs">{a.unidade ?? ""}</TableCell>
+                        <TableCell className="align-top text-right text-xs">{a.quantidade}</TableCell>
+                        <TableCell className="align-top text-right text-xs">{fmtEUR(a.preco_unitario)}</TableCell>
+                        <TableCell className="align-top text-right text-xs font-mono">{fmtEUR(a.quantidade * a.preco_unitario)}</TableCell>
+                        <TableCell className="align-top">
                           <Select value={a.subempreitada_id ?? "__none__"} onValueChange={(v) => alterar(a.id, v === "__none__" ? null : v)}>
                             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
@@ -413,7 +413,7 @@ function SubempreitadasOrcamento() {
                             </SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="align-top">
                           {a.subempreitada_id ? (
                             <div className="flex items-center gap-1">
                               <Progress value={conf * 100} className="h-1.5" />
@@ -421,7 +421,7 @@ function SubempreitadasOrcamento() {
                             </div>
                           ) : <span className="text-xs text-muted-foreground">—</span>}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="align-top">
                           {a.subempreitada_validada_manual ? (
                             <Badge variant="secondary" className="text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Validado</Badge>
                           ) : !a.subempreitada_id ? (
