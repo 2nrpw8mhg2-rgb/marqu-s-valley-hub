@@ -23,9 +23,11 @@ async function reclassificarLote(
   let query = sb
     .from("orcamento_artigos")
     .select(
-      "id, codigo, descricao, unidade, capitulo_id, orcamento_id, subempreitada_validada_manual, capitulo:orcamento_capitulos(codigo, descricao)",
+      "id, codigo, descricao, unidade, capitulo_id, orcamento_id, subempreitada_id, subempreitada_validada_manual, capitulo:orcamento_capitulos(codigo, descricao)",
     )
-    .eq("subempreitada_validada_manual", false);
+    // Uma escolha manual com subempreitada é definitiva; artigos deixados
+    // manualmente como "sem" devem poder beneficiar de regras novas.
+    .or("subempreitada_validada_manual.eq.false,subempreitada_id.is.null");
   if (orcamento_id) query = query.eq("orcamento_id", orcamento_id);
 
   const { data: artigos, error: eArt } = await query;
@@ -53,8 +55,8 @@ async function reclassificarLote(
   let confl = 0;
 
   for (const a of artigos) {
-    // Guarda dura: nunca sobrepor validações manuais
-    if (a.subempreitada_validada_manual === true) continue;
+    // Guarda dura: nunca sobrepor uma subempreitada efetivamente validada.
+    if (a.subempreitada_validada_manual === true && a.subempreitada_id) continue;
 
     const cap = Array.isArray(a.capitulo) ? a.capitulo[0] : (a.capitulo as any);
     const capCodigo = (cap?.codigo ?? "").trim().replace(/\.+$/, "");
@@ -212,10 +214,12 @@ export const alterarSubempreitadaArtigo = createServerFn({ method: "POST" })
       .update({
         subempreitada_id: data.subempreitada_id,
         subempreitada_sugerida_id: data.subempreitada_id,
-        subempreitada_confianca: 1,
-        subempreitada_origem: "manual",
-        subempreitada_validada_manual: true,
-        subempreitada_razao: "validação manual",
+        subempreitada_confianca: data.subempreitada_id ? 1 : 0,
+        subempreitada_origem: data.subempreitada_id ? "manual" : "sem_regra",
+        subempreitada_validada_manual: Boolean(data.subempreitada_id),
+        subempreitada_razao: data.subempreitada_id
+          ? "validação manual"
+          : "sem atribuição; disponível para reclassificação",
         subempreitada_termos_match: [],
       })
       .eq("id", data.artigo_id);
