@@ -147,6 +147,7 @@ function SubempreitadasOrcamento() {
   };
 
   const gerarPacotes = async () => {
+    if (!stats) return;
     if (stats.semSub > 0 || stats.baixaGlobal > 0) {
       setFiltroEstado(stats.semSub > 0 ? "sem" : "baixa");
       setActiveTab("separacao");
@@ -155,6 +156,7 @@ function SubempreitadasOrcamento() {
       });
       return;
     }
+
     setGerando(true);
     const t = toast.loading("A gerar pacotes de consulta...");
     try {

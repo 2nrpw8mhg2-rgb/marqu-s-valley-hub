@@ -1861,8 +1861,8 @@ export type Database = {
           nome: string
           obra_id: string | null
           observacoes: string | null
-          origem: string
           orcamento_id: string
+          origem: string
           subempreitada_id: string | null
           subespecialidade_id: string | null
           updated_at: string
@@ -1877,8 +1877,8 @@ export type Database = {
           nome: string
           obra_id?: string | null
           observacoes?: string | null
-          origem?: string
           orcamento_id: string
+          origem?: string
           subempreitada_id?: string | null
           subespecialidade_id?: string | null
           updated_at?: string
@@ -1893,8 +1893,8 @@ export type Database = {
           nome?: string
           obra_id?: string | null
           observacoes?: string | null
-          origem?: string
           orcamento_id?: string
+          origem?: string
           subempreitada_id?: string | null
           subespecialidade_id?: string | null
           updated_at?: string
@@ -2211,6 +2211,14 @@ export type Database = {
       criar_pastas_padrao_obra: {
         Args: { _obra_id: string }
         Returns: undefined
+      }
+      gerar_pacotes_por_subempreitada: {
+        Args: { p_orcamento_id: string }
+        Returns: {
+          artigos_incluidos: number
+          pacotes_atualizados: number
+          pacotes_criados: number
+        }[]
       }
       normalizar_descricao: { Args: { _t: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
