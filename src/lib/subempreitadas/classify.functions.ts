@@ -83,7 +83,7 @@ async function reclassificarLote(
           aprendizagem,
         )
       : null;
-    const classificacaoRaiz = raizDesc && descricaoCurta
+    const classificacaoRaiz = raizDesc
       ? classificarArtigo(
           { codigo: codigoRaiz, descricao: raizDesc, unidade: null, capitulo_descricao: null },
           subs,
@@ -93,7 +93,7 @@ async function reclassificarLote(
       : null;
     const herdada = classificacaoPai?.subempreitada_id
       ? classificacaoPai
-      : classificacaoRaiz?.subempreitada_id
+      : descricaoCurta && classificacaoRaiz?.subempreitada_id
         ? classificacaoRaiz
         : null;
     let r = herdada
@@ -104,6 +104,23 @@ async function reclassificarLote(
           razao: `herdada do artigo-pai: ${herdada.razao}`,
         }
       : classificarArtigo(artigo, subs, null, aprendizagem);
+
+    // Artigos diretamente sob um capítulo principal nem sempre repetem o nome
+    // da arte (ex.: PSS, telas finais e apoio geral dentro de Estaleiro). Se o
+    // próprio artigo não for conclusivo, herda a classificação inequívoca da
+    // raiz. Uma classificação específica encontrada no artigo tem prioridade.
+    if (
+      !r.subempreitada_id &&
+      capCodigo === codigoRaiz &&
+      classificacaoRaiz?.subempreitada_id
+    ) {
+      r = {
+        ...classificacaoRaiz,
+        confianca: Math.max(classificacaoRaiz.confianca, 0.9),
+        origem: "regras",
+        razao: `herdada do capítulo principal: ${classificacaoRaiz.razao}`,
+      };
+    }
 
     // O capítulo imediato é mais específico (por exemplo, caixilharias dentro de
     // serralharias). O capítulo-raiz só entra como contexto de recurso quando a
