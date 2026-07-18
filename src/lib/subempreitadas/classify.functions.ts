@@ -60,18 +60,50 @@ async function reclassificarLote(
     const capCodigo = (cap?.codigo ?? "").trim().replace(/\.+$/, "");
     const codigoRaiz = capCodigo.split(".")[0];
     const raizDesc = raizPorOrcamentoCodigo.get(`${a.orcamento_id}:${codigoRaiz}`);
+    const descricaoCurta =
+      a.descricao.length <= 48 || a.descricao.trim().split(/\s+/).length <= 6;
     const artigo = {
       codigo: a.codigo,
       descricao: a.descricao,
       unidade: a.unidade ?? null,
       capitulo_descricao: cap?.descricao || null,
     };
-    let r = classificarArtigo(
-      artigo,
-      subs,
-      null,
-      aprendizagem,
-    );
+    const classificacaoPai = cap?.descricao && descricaoCurta
+      ? classificarArtigo(
+          {
+            codigo: cap.codigo,
+            // O início do descritivo identifica o trabalho; o restante costuma
+            // enumerar acessórios de várias artes e criava falsos conflitos.
+            descricao: cap.descricao.slice(0, 220),
+            unidade: null,
+            capitulo_descricao: null,
+          },
+          subs,
+          null,
+          aprendizagem,
+        )
+      : null;
+    const classificacaoRaiz = raizDesc && descricaoCurta
+      ? classificarArtigo(
+          { codigo: codigoRaiz, descricao: raizDesc, unidade: null, capitulo_descricao: null },
+          subs,
+          null,
+          aprendizagem,
+        )
+      : null;
+    const herdada = classificacaoPai?.subempreitada_id
+      ? classificacaoPai
+      : classificacaoRaiz?.subempreitada_id
+        ? classificacaoRaiz
+        : null;
+    let r = herdada
+      ? {
+          ...herdada,
+          confianca: Math.max(herdada.confianca, 0.9),
+          origem: "regras" as const,
+          razao: `herdada do artigo-pai: ${herdada.razao}`,
+        }
+      : classificarArtigo(artigo, subs, null, aprendizagem);
 
     // O capítulo imediato é mais específico (por exemplo, caixilharias dentro de
     // serralharias). O capítulo-raiz só entra como contexto de recurso quando a
@@ -85,7 +117,7 @@ async function reclassificarLote(
       );
     }
 
-    await sb
+    const { error: eUpdate } = await sb
       .from("orcamento_artigos")
       .update({
         subempreitada_id: r.subempreitada_id,
@@ -96,6 +128,9 @@ async function reclassificarLote(
         subempreitada_termos_match: r.termos_match,
       })
       .eq("id", a.id);
+    if (eUpdate) {
+      throw new Error(`Não foi possível guardar a classificação do artigo ${a.codigo ?? a.id}: ${eUpdate.message}`);
+    }
 
     if (r.subempreitada_id) atribuidos++;
     else semAtribuir++;

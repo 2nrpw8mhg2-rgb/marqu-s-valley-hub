@@ -52,7 +52,7 @@ export type ClassificacaoResultado = {
 // ==== Constantes de scoring (afináveis) ==================================
 export const THRESHOLD_AUTO = 0.7; // < 0.70 → não atribui automaticamente
 export const CONFLICT_DELTA = 0.2; // se best-2ª < 0.20 → conflito
-export const W_FORTE = 0.6;
+export const W_FORTE = 0.75;
 export const W_CAPITULO = 0.2;
 export const W_CAPITULO_FILHO = 0.75;
 export const W_SINONIMO = 0.15;

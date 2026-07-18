@@ -79,12 +79,17 @@ function SubempreitadasOrcamento() {
     const bySub = new Map<string, { count: number; total: number; baixa: number; valida: number }>();
     let semSub = 0;
     let baixaGlobal = 0;
+    let conflitos = 0;
+    let semRegra = 0;
     let totalGlobal = 0;
     for (const a of data.artigos) {
       const t = a.quantidade * a.preco_unitario;
       totalGlobal += t;
       if (!a.subempreitada_id) {
         semSub++;
+        if (a.subempreitada_origem === "conflito") conflitos++;
+        else if (a.subempreitada_origem === "baixa_confianca") baixaGlobal++;
+        else semRegra++;
         continue;
       }
       const cur = bySub.get(a.subempreitada_id) ?? { count: 0, total: 0, baixa: 0, valida: 0 };
@@ -97,7 +102,7 @@ function SubempreitadasOrcamento() {
       }
       bySub.set(a.subempreitada_id, cur);
     }
-    return { bySub, semSub, baixaGlobal, totalGlobal };
+    return { bySub, semSub, baixaGlobal, conflitos, semRegra, totalGlobal };
   }, [data]);
 
   const capMap = useMemo(() => new Map((data?.capitulos ?? []).map((c) => [c.id, c])), [data]);
@@ -111,7 +116,9 @@ function SubempreitadasOrcamento() {
         if (filtroSub === "sem" && a.subempreitada_id) return false;
         if (filtroSub !== "sem" && a.subempreitada_id !== filtroSub) return false;
       }
-      if (filtroEstado === "baixa" && ((a.subempreitada_confianca ?? 0) >= 0.7 || a.subempreitada_validada_manual)) return false;
+      if (filtroEstado === "baixa" && a.subempreitada_origem !== "baixa_confianca") return false;
+      if (filtroEstado === "conflito" && a.subempreitada_origem !== "conflito") return false;
+      if (filtroEstado === "sem_regra" && a.subempreitada_origem !== "sem_regra") return false;
       if (filtroEstado === "validado" && !a.subempreitada_validada_manual) return false;
       if (filtroEstado === "sem" && a.subempreitada_id) return false;
       if (t && !`${a.codigo ?? ""} ${a.descricao}`.toLowerCase().includes(t)) return false;
@@ -123,7 +130,7 @@ function SubempreitadasOrcamento() {
     const t = toast.loading("A reclassificar...");
     try {
       const r = await classificarFn({ data: { orcamento_id: id } });
-      toast.success(`${r.atribuidos} de ${r.total} artigos classificados`, { id: t });
+      toast.success(`${r.atribuidos} de ${r.total} artigos classificados; ${r.sem_atribuir} necessitam de revisão.`, { id: t });
       qc.invalidateQueries({ queryKey: ["orc-subempreitadas", id] });
     } catch (e: any) {
       toast.error(e.message, { id: t });
@@ -144,7 +151,7 @@ function SubempreitadasOrcamento() {
       setFiltroEstado(stats.semSub > 0 ? "sem" : "baixa");
       setActiveTab("separacao");
       toast.error("A separação ainda precisa de validação", {
-        description: `${stats.semSub} artigo(s) sem subempreitada e ${stats.baixaGlobal} com baixa confiança.`,
+        description: `${stats.semRegra} sem regra, ${stats.baixaGlobal} com baixa confiança e ${stats.conflitos} com conflito.`,
       });
       return;
     }
@@ -261,7 +268,7 @@ function SubempreitadasOrcamento() {
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {stats.semSub > 0 || stats.baixaGlobal > 0
-                      ? `${stats.semSub} artigo(s) sem subempreitada e ${stats.baixaGlobal} com baixa confiança.`
+                      ? `${stats.semRegra} sem regra, ${stats.baixaGlobal} com baixa confiança e ${stats.conflitos} com conflito.`
                       : `Os artigos estão distribuídos por ${stats.bySub.size} subempreitada(s). A geração pode ser repetida sem duplicar pacotes enquanto estiverem por preparar.`}
                   </p>
                 </div>
@@ -356,6 +363,8 @@ function SubempreitadasOrcamento() {
                 <SelectContent>
                   <SelectItem value="todos">Todos os estados</SelectItem>
                   <SelectItem value="baixa">Baixa confiança</SelectItem>
+                  <SelectItem value="conflito">Conflito</SelectItem>
+                  <SelectItem value="sem_regra">Sem regra</SelectItem>
                   <SelectItem value="validado">Validado manualmente</SelectItem>
                   <SelectItem value="sem">Sem subempreitada</SelectItem>
                 </SelectContent>
@@ -414,7 +423,13 @@ function SubempreitadasOrcamento() {
                           {a.subempreitada_validada_manual ? (
                             <Badge variant="secondary" className="text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Validado</Badge>
                           ) : !a.subempreitada_id ? (
-                            <Badge variant="outline" className="text-xs">Sem</Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {a.subempreitada_origem === "conflito"
+                                ? "Conflito"
+                                : a.subempreitada_origem === "baixa_confianca"
+                                  ? "Baixa"
+                                  : "Sem regra"}
+                            </Badge>
                           ) : baixa ? (
                             <Badge variant="outline" className="border-amber-500/40 text-amber-500 text-xs"><AlertTriangle className="h-3 w-3 mr-1" />Validar</Badge>
                           ) : (
