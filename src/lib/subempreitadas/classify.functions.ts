@@ -227,12 +227,15 @@ export const alterarSubempreitadaArtigo = createServerFn({ method: "POST" })
 
     if (data.subempreitada_id) {
       const descN = normalizar(art.descricao);
-      await sb.from("subempreitada_aprendizagem").insert({
-        descricao_normalizada: descN,
-        subempreitada_id: data.subempreitada_id,
-        user_id: context.userId,
-        peso: 1,
-      });
+      // Evita aprender descrições genéricas que se repetem em artes diferentes.
+      if (descN.length >= 30 && descN.split(" ").length >= 5) {
+        await sb.from("subempreitada_aprendizagem").insert({
+          descricao_normalizada: descN,
+          subempreitada_id: data.subempreitada_id,
+          user_id: context.userId,
+          peso: 1,
+        });
+      }
     }
     return { ok: true };
   });

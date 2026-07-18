@@ -107,7 +107,10 @@ function normalizarUnidade(u: string | null | undefined): string {
 function contemTermo(haystack: string, termo: string): boolean {
   const t = normalizar(termo);
   if (!t) return false;
-  return (" " + haystack + " ").includes(" " + t + " ") || haystack.includes(t);
+  // Só aceita palavras/expressões completas. O fallback antigo com includes()
+  // fazia, por exemplo, "aro" coincidir dentro de nomes de marcas, referências
+  // e outras palavras sem qualquer relação com carpintaria.
+  return (` ${haystack} `).includes(` ${t} `);
 }
 
 type SubScore = {
@@ -202,11 +205,25 @@ export function classificarArtigo(
   const descN = normalizar(artigo.descricao);
 
   // 1. Aprendizagem
-  const hit = aprendizagem.find((a) => a.descricao_normalizada === descN);
-  if (hit) {
+  // Descrições curtas/repetitivas ("Para PAV.1A", "idem", etc.) não têm
+  // contexto suficiente para ensinar uma arte. Agrupa ainda eventuais registos
+  // duplicados para não escolher arbitrariamente a primeira correção guardada.
+  const aprendizagemAplicavel = descN.length >= 30 && descN.split(" ").length >= 5;
+  const pesosAprendidos = new Map<string, number>();
+  if (aprendizagemAplicavel) {
+    for (const a of aprendizagem) {
+      if (a.descricao_normalizada === descN) {
+        pesosAprendidos.set(a.subempreitada_id, (pesosAprendidos.get(a.subempreitada_id) ?? 0) + a.peso);
+      }
+    }
+  }
+  const hitsAprendidos = [...pesosAprendidos.entries()].sort((a, b) => b[1] - a[1]);
+  const hit = hitsAprendidos[0];
+  const aprendizagemInequivoca = hit && (!hitsAprendidos[1] || hit[1] > hitsAprendidos[1][1]);
+  if (hit && aprendizagemInequivoca) {
     return {
-      subempreitada_id: hit.subempreitada_id,
-      subempreitada_sugerida_id: hit.subempreitada_id,
+      subempreitada_id: hit[0],
+      subempreitada_sugerida_id: hit[0],
       confianca: 1,
       origem: "aprendizagem",
       razao: "match exato na aprendizagem de validações anteriores",
@@ -241,7 +258,10 @@ export function classificarArtigo(
   const inicio = normalizar(`${artigo.descricao.slice(0, 240)} ${artigo.codigo ?? ""}`);
   const scoresInicio = subs
     .filter((s) => s.ativo)
-    .map((s) => scoreSub(s, inicio, "", unN, true))
+    // Mantém a distinção entre termos principais e sinónimos. Tratar todas as
+    // palavras-chave como fortes atribuía o artigo por acessórios mencionados
+    // incidentalmente no primeiro parágrafo.
+    .map((s) => scoreSub(s, inicio, "", unN, false))
     .filter((r) => r.score > 0)
     .sort((a, b) => b.score - a.score);
   const melhorInicio = scoresInicio[0];
