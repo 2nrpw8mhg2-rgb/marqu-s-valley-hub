@@ -1,0 +1,46 @@
+-- Dá prioridade aos termos efetivamente usados nos mapas de equipamentos.
+UPDATE public.subempreitadas
+SET palavras_chave = ARRAY[
+  'equipamento sanitario',
+  'torneira',
+  'acessorios sanitarios',
+  'sanita',
+  'autoclismo',
+  'lavatorio',
+  'base de duche',
+  'banheira',
+  'bide',
+  'misturadora',
+  'loica sanitaria',
+  'bancada para banho',
+  'toalheiro',
+  'seca toalhas',
+  'porta piacabas',
+  'porta rolos',
+  'cuba para lavandaria',
+  'sifao',
+  'valvula'
+]
+WHERE codigo = 'SANIT';
+
+UPDATE public.subempreitadas
+SET palavras_chave = ARRAY[
+  'miele',
+  'maquina de lavar louca',
+  'frigorifico',
+  'congelador',
+  'eletrodomestico',
+  'placa de inducao',
+  'placa ind',
+  'placa vitroceramica',
+  'forno',
+  'exaustor',
+  'garrafeira',
+  'maquina lavar louca',
+  'micro ondas',
+  'microondas',
+  'fridge',
+  'no frost',
+  'icemaker'
+]
+WHERE codigo = 'ELETRO';

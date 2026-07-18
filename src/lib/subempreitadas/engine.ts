@@ -120,14 +120,15 @@ function scoreSub(
   desc: string,
   cap: string,
   unidade: string,
+  todasFortes = false,
 ): SubScore {
   const termos: string[] = [];
   const razoes: string[] = [];
   let score = 0;
   const descricaoCurta = desc.length <= 32 || desc.split(" ").filter(Boolean).length <= 4;
 
-  const fortes = sub.palavras_chave.slice(0, FORTES_TOPO);
-  const sinonimos = sub.palavras_chave.slice(FORTES_TOPO);
+  const fortes = todasFortes ? sub.palavras_chave : sub.palavras_chave.slice(0, FORTES_TOPO);
+  const sinonimos = todasFortes ? [] : sub.palavras_chave.slice(FORTES_TOPO);
 
   let hitForte = false;
   for (const kw of fortes) {
@@ -238,7 +239,7 @@ export function classificarArtigo(
   const inicio = normalizar(`${artigo.descricao.slice(0, 240)} ${artigo.codigo ?? ""}`);
   const scoresInicio = subs
     .filter((s) => s.ativo)
-    .map((s) => scoreSub(s, inicio, "", unN))
+    .map((s) => scoreSub(s, inicio, "", unN, true))
     .filter((r) => r.score > 0)
     .sort((a, b) => b.score - a.score);
   const melhorInicio = scoresInicio[0];
