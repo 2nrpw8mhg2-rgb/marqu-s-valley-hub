@@ -12,7 +12,7 @@ import { ImportMQDialog } from "@/components/orcamentos/ImportMQDialog";
 import { exportToExcel, exportToPDF, type ExportData } from "@/lib/orcamento-export";
 import { fmtEUR, fmtNum, lineTotal } from "@/lib/orcamento-utils";
 import type { ParsedRow } from "@/lib/mq-parser";
-import { Upload, FileDown, FileSpreadsheet, Trash2, Plus, ArrowLeft, GitBranch, Save, Layers, Users } from "lucide-react";
+import { Upload, FileDown, FileSpreadsheet, Trash2, Plus, ArrowLeft, GitBranch, Save, Layers, Users, ChevronDown, ChevronRight, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { classificarOrcamento } from "@/lib/subempreitadas/classify.functions";
@@ -50,6 +50,7 @@ function OrcamentoEditor() {
   const navigate = useNavigate();
   const [importOpen, setImportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [collapsedCaps, setCollapsedCaps] = useState<Set<string>>(new Set());
   const classificarFn = useServerFn(classificarOrcamento);
 
   const { data, isLoading } = useQuery({
@@ -325,9 +326,30 @@ function OrcamentoEditor() {
         </Card>
 
         <Card className="bg-card border-border overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">Artigos do mapa de quantidades</p>
+              <p className="text-xs text-muted-foreground">
+                Clica numa descrição para a expandir. Usa o lápis apenas quando precisares de editar.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setCollapsedCaps(new Set(grouped.map(({ cap }) => cap.id)))}
+              >
+                Recolher capítulos
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setCollapsedCaps(new Set())}>
+                Expandir capítulos
+              </Button>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
+              <thead className="sticky top-0 z-10 bg-muted text-xs uppercase tracking-wider text-muted-foreground shadow-sm">
                 <tr>
                   <th className="text-left px-3 py-2 w-24">Código</th>
                   <th className="text-left px-3 py-2">Descrição</th>
@@ -346,12 +368,34 @@ function OrcamentoEditor() {
                   </td></tr>
                 )}
                 {grouped.map(({ cap, items }) => (
-                  <CapGroup key={cap.id} cap={cap} items={items} updateArt={updateArt} removeArt={removeArt} addArt={() => addArt(cap.id)} />
+                  <CapGroup
+                    key={cap.id}
+                    cap={cap}
+                    items={items}
+                    collapsed={collapsedCaps.has(cap.id)}
+                    onToggle={() => setCollapsedCaps((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(cap.id)) next.delete(cap.id); else next.add(cap.id);
+                      return next;
+                    })}
+                    updateArt={updateArt}
+                    removeArt={removeArt}
+                    addArt={() => addArt(cap.id)}
+                  />
                 ))}
                 {semCap.length > 0 && (
                   <CapGroup
                     cap={{ id: "", codigo: null, descricao: "Sem capítulo", ordem: 9999 }}
-                    items={semCap} updateArt={updateArt} removeArt={removeArt} addArt={() => addArt(null)}
+                    items={semCap}
+                    collapsed={collapsedCaps.has("__sem_capitulo__")}
+                    onToggle={() => setCollapsedCaps((prev) => {
+                      const next = new Set(prev);
+                      if (next.has("__sem_capitulo__")) next.delete("__sem_capitulo__"); else next.add("__sem_capitulo__");
+                      return next;
+                    })}
+                    updateArt={updateArt}
+                    removeArt={removeArt}
+                    addArt={() => addArt(null)}
                   />
                 )}
                 <tr className="bg-muted/30">
@@ -380,34 +424,102 @@ function OrcamentoEditor() {
   );
 }
 
-function CapGroup({ cap, items, updateArt, removeArt, addArt }: {
+function CapGroup({ cap, items, collapsed, onToggle, updateArt, removeArt, addArt }: {
   cap: Cap;
   items: { a: Art; i: number }[];
+  collapsed: boolean;
+  onToggle: () => void;
   updateArt: (i: number, patch: Partial<Art>) => void;
   removeArt: (i: number) => void;
   addArt: () => void;
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
+
+  const toggleDescription = (id: string) => {
+    setExpandedDescriptions((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <>
       <tr className="bg-primary/5 border-t border-border">
-        <td className="px-3 py-2 font-mono text-xs text-primary">{cap.codigo}</td>
-        <td colSpan={6} className="px-3 py-2 font-semibold uppercase tracking-wide text-sm">{cap.descricao}</td>
+        <td className="px-2 py-2">
+          <button type="button" onClick={onToggle} className="flex items-center gap-1 font-mono text-xs text-primary">
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {cap.codigo}
+          </button>
+        </td>
+        <td colSpan={6} className="px-3 py-2">
+          <button type="button" onClick={onToggle} className="text-left font-semibold uppercase tracking-wide text-sm">
+            {cap.descricao}
+            <span className="ml-2 text-xs font-normal normal-case text-muted-foreground">{items.length} artigo(s)</span>
+          </button>
+        </td>
         <td className="px-2">
           <Button size="icon" variant="ghost" onClick={addArt} title="Adicionar artigo"><Plus className="h-3.5 w-3.5" /></Button>
         </td>
       </tr>
-      {items.map(({ a, i }) => (
-        <tr key={a.id} className="border-t border-border hover:bg-muted/20">
-          <td className="px-2"><Input className="h-8 text-xs font-mono" value={a.codigo ?? ""} onChange={(e) => updateArt(i, { codigo: e.target.value })} /></td>
-          <td className="px-2"><Input className="h-8 text-xs" value={a.descricao} onChange={(e) => updateArt(i, { descricao: e.target.value })} /></td>
-          <td className="px-2"><Input className="h-8 text-xs" value={a.unidade ?? ""} onChange={(e) => updateArt(i, { unidade: e.target.value })} /></td>
-          <td className="px-2"><Input className="h-8 text-xs text-right tabular-nums" type="number" step="0.01" value={a.quantidade} onChange={(e) => updateArt(i, { quantidade: Number(e.target.value) })} /></td>
-          <td className="px-2"><Input className="h-8 text-xs text-right tabular-nums" type="number" step="0.01" value={a.preco_unitario} onChange={(e) => updateArt(i, { preco_unitario: Number(e.target.value) })} /></td>
-          <td className="px-2"><Input className="h-8 text-xs text-right tabular-nums" type="number" step="0.1" value={a.margem_pct} onChange={(e) => updateArt(i, { margem_pct: Number(e.target.value) })} /></td>
-          <td className="px-3 py-1 text-right tabular-nums text-xs font-medium">{fmtNum(lineTotal(a))} €</td>
-          <td className="px-1"><Button size="icon" variant="ghost" onClick={() => removeArt(i)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button></td>
-        </tr>
-      ))}
+      {!collapsed && items.map(({ a, i }) => {
+        const editing = editingId === a.id;
+        const expanded = expandedDescriptions.has(a.id);
+        return (
+          <tr key={a.id} className="border-t border-border align-top hover:bg-muted/20">
+            {editing ? (
+              <>
+                <td className="px-2 py-2"><Input className="h-9 text-xs font-mono" value={a.codigo ?? ""} onChange={(e) => updateArt(i, { codigo: e.target.value })} /></td>
+                <td className="px-2 py-2">
+                  <textarea
+                    className="min-h-28 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                    value={a.descricao}
+                    onChange={(e) => updateArt(i, { descricao: e.target.value })}
+                  />
+                </td>
+                <td className="px-2 py-2"><Input className="h-9 text-xs" value={a.unidade ?? ""} onChange={(e) => updateArt(i, { unidade: e.target.value })} /></td>
+                <td className="px-2 py-2"><Input className="h-9 text-xs text-right tabular-nums" type="number" step="0.01" value={a.quantidade} onChange={(e) => updateArt(i, { quantidade: Number(e.target.value) })} /></td>
+                <td className="px-2 py-2"><Input className="h-9 text-xs text-right tabular-nums" type="number" step="0.01" value={a.preco_unitario} onChange={(e) => updateArt(i, { preco_unitario: Number(e.target.value) })} /></td>
+                <td className="px-2 py-2"><Input className="h-9 text-xs text-right tabular-nums" type="number" step="0.1" value={a.margem_pct} onChange={(e) => updateArt(i, { margem_pct: Number(e.target.value) })} /></td>
+              </>
+            ) : (
+              <>
+                <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{a.codigo || "—"}</td>
+                <td className="px-3 py-3">
+                  <button type="button" onClick={() => toggleDescription(a.id)} className="block w-full text-left">
+                    <span className={`whitespace-pre-wrap text-sm leading-relaxed ${expanded ? "" : "line-clamp-2"}`}>
+                      {a.descricao}
+                    </span>
+                    {a.descricao.length > 120 && (
+                      <span className="mt-1 inline-block text-xs font-medium text-primary">
+                        {expanded ? "Mostrar menos" : "Ler descrição completa"}
+                      </span>
+                    )}
+                  </button>
+                </td>
+                <td className="px-3 py-3 text-xs">{a.unidade || "—"}</td>
+                <td className="px-3 py-3 text-right text-xs tabular-nums">{fmtNum(a.quantidade)}</td>
+                <td className="px-3 py-3 text-right text-xs tabular-nums">{fmtEUR(a.preco_unitario)}</td>
+                <td className="px-3 py-3 text-right text-xs tabular-nums">{fmtNum(a.margem_pct)}%</td>
+              </>
+            )}
+            <td className="px-3 py-3 text-right tabular-nums text-xs font-medium">{fmtEUR(lineTotal(a))}</td>
+            <td className="px-1 py-2">
+              <div className="flex">
+                <Button size="icon" variant="ghost" onClick={() => setEditingId(editing ? null : a.id)} title={editing ? "Terminar edição" : "Editar artigo"}>
+                  {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                </Button>
+                {editing && (
+                  <Button size="icon" variant="ghost" onClick={() => removeArt(i)} title="Eliminar artigo">
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            </td>
+          </tr>
+        );
+      })}
     </>
   );
 }
