@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +51,7 @@ function SubempreitadasOrcamento() {
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
   const [texto, setTexto] = useState("");
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+  const [subExpandida, setSubExpandida] = useState<string | null>(null);
   const [gerando, setGerando] = useState(false);
   const classificarFn = useServerFn(classificarOrcamento);
   const alterarFn = useServerFn(alterarSubempreitadaArtigo);
@@ -153,6 +154,9 @@ function SubempreitadasOrcamento() {
     setTexto("");
     setActiveTab("separacao");
   };
+
+  const artigosDaSubempreitada = (subId: string) =>
+    data?.artigos.filter((a) => a.subempreitada_id === subId) ?? [];
 
   const gerarPacotes = async () => {
     if (!stats) return;
@@ -321,8 +325,11 @@ function SubempreitadasOrcamento() {
                 <TableBody>
                   {data.subs.map((s) => {
                     const st = stats.bySub.get(s.id) ?? { count: 0, total: 0, baixa: 0, valida: 0 };
+                    const expandida = subExpandida === s.id;
+                    const artigosSub = expandida ? artigosDaSubempreitada(s.id) : [];
                     return (
-                      <TableRow key={s.id}>
+                      <Fragment key={s.id}>
+                      <TableRow>
                         <TableCell>
                           <Checkbox
                             checked={selecionadas.has(s.id)}
@@ -339,12 +346,12 @@ function SubempreitadasOrcamento() {
                             variant="ghost"
                             className="h-auto justify-start gap-2 px-0 py-1 font-medium hover:bg-transparent hover:text-primary"
                             disabled={st.count === 0}
-                            onClick={() => abrirArtigosSubempreitada(s.id)}
+                            onClick={() => setSubExpandida(expandida ? null : s.id)}
                           >
                             <span>{s.nome}</span>
                             {st.count > 0 && (
                               <span className="inline-flex items-center whitespace-nowrap text-xs font-normal text-primary">
-                                <Eye className="mr-1 h-3.5 w-3.5" /> Ver artigos
+                                <Eye className="mr-1 h-3.5 w-3.5" /> {expandida ? "Ocultar artigos" : "Ver artigos"}
                               </span>
                             )}
                           </Button>
@@ -354,6 +361,43 @@ function SubempreitadasOrcamento() {
                         <TableCell className="text-right font-mono">{fmtEUR(st.total)}</TableCell>
                         <TableCell className="text-right">{st.baixa > 0 && <Badge variant="outline" className="border-amber-500/40 text-amber-500">{st.baixa}</Badge>}</TableCell>
                       </TableRow>
+                      {expandida && (
+                        <TableRow className="bg-muted/20 hover:bg-muted/20">
+                          <TableCell colSpan={6} className="p-0">
+                            <div className="border-y bg-background p-4">
+                              <div className="mb-3 flex items-center justify-between gap-2">
+                                <div className="font-medium">Artigos de {s.nome}</div>
+                                <Badge variant="secondary">{artigosSub.length} artigos</Badge>
+                              </div>
+                              <div className="space-y-2">
+                                {artigosSub.map((a) => {
+                                  const cap = a.capitulo_id ? capMap.get(a.capitulo_id) : null;
+                                  return (
+                                    <div key={a.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[7rem_minmax(0,1fr)_16rem]">
+                                      <div>
+                                        <div className="font-mono text-xs font-medium">{a.codigo ?? "—"}</div>
+                                        <div className="mt-1 text-xs text-muted-foreground">{cap?.codigo ?? ""}</div>
+                                      </div>
+                                      <div className="min-w-0 whitespace-normal break-words text-sm leading-relaxed">{a.descricao}</div>
+                                      <div>
+                                        <div className="mb-1 text-xs text-muted-foreground">Alterar subempreitada</div>
+                                        <Select value={a.subempreitada_id ?? "__none__"} onValueChange={(v) => alterar(a.id, v === "__none__" ? null : v)}>
+                                          <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="__none__">— sem —</SelectItem>
+                                            {data.subs.map((destino) => (<SelectItem key={destino.id} value={destino.id}>{destino.nome}</SelectItem>))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      </Fragment>
                     );
                   })}
                   {stats.semSub > 0 && (
