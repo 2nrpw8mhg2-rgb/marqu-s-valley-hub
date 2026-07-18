@@ -78,6 +78,11 @@ const UNIDADES_ESPERADAS: Record<string, string[]> = {
   DEMOL: ["m2", "m3", "ml", "un", "vg"],
   ESTRUT: ["m3", "kg", "m2"],
   PAV: ["m2"],
+  BETON: ["m2", "m3"],
+  CERAM: ["m2"],
+  MADEIRA: ["m2", "ml"],
+  VINIL: ["m2"],
+  PAVEXT: ["m2", "m3", "ml"],
 };
 
 /** Normaliza texto pt-PT: minúsculas, sem acentos, espaços colapsados. */
