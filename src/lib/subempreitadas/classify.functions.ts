@@ -59,6 +59,8 @@ async function reclassificarLote(
     const cap = Array.isArray(a.capitulo) ? a.capitulo[0] : (a.capitulo as any);
     const capCodigo = (cap?.codigo ?? "").trim().replace(/\.+$/, "");
     const codigoRaiz = capCodigo.split(".")[0];
+    const artigoCodigo = (a.codigo ?? "").trim().replace(/\.+$/, "");
+    const artigoCodigoPartes = artigoCodigo.split(".").filter(Boolean);
     const raizDesc = raizPorOrcamentoCodigo.get(`${a.orcamento_id}:${codigoRaiz}`);
     const descricaoCurta =
       a.descricao.length <= 48 || a.descricao.trim().split(/\s+/).length <= 6;
@@ -111,7 +113,9 @@ async function reclassificarLote(
     // raiz. Uma classificação específica encontrada no artigo tem prioridade.
     if (
       !r.subempreitada_id &&
-      capCodigo === codigoRaiz &&
+      artigoCodigoPartes.length > 0 &&
+      artigoCodigoPartes.length <= 2 &&
+      artigoCodigoPartes[0] === codigoRaiz &&
       classificacaoRaiz?.subempreitada_id
     ) {
       r = {
