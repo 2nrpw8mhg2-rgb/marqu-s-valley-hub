@@ -227,6 +227,38 @@ export function classificarArtigo(
   const capN = normalizar(artigo.capitulo_descricao ?? "");
   const unN = normalizarUnidade(artigo.unidade ?? "");
 
+  // Em descritivos extensos, o primeiro parágrafo identifica normalmente a
+  // arte principal; o restante enumera acessórios de outras especialidades.
+  // Uma correspondência inequívoca logo no início evita falsos conflitos.
+  const inicio = normalizar(`${artigo.descricao.slice(0, 240)} ${artigo.codigo ?? ""}`);
+  const scoresInicio = subs
+    .filter((s) => s.ativo)
+    .map((s) => scoreSub(s, inicio, "", unN))
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score);
+  const melhorInicio = scoresInicio[0];
+  const segundoInicio = scoresInicio[1];
+  if (
+    melhorInicio &&
+    melhorInicio.score >= THRESHOLD_AUTO &&
+    (!segundoInicio || melhorInicio.score - segundoInicio.score >= CONFLICT_DELTA)
+  ) {
+    const confianca = Number(melhorInicio.score.toFixed(3));
+    return {
+      subempreitada_id: melhorInicio.sub.id,
+      subempreitada_sugerida_id: melhorInicio.sub.id,
+      confianca,
+      origem: "regras",
+      razao: `trabalho principal identificado no início do descritivo; ${melhorInicio.razoes.join("; ")}`,
+      termos_match: melhorInicio.termos,
+      conflitos: [],
+      alternativas: scoresInicio.slice(1, 4).map((s) => ({
+        subempreitada_id: s.sub.id,
+        score: Number(s.score.toFixed(3)),
+      })),
+    };
+  }
+
   const scores = subs
     .filter((s) => s.ativo)
     .map((s) => scoreSub(s, haystack, capN, unN))
