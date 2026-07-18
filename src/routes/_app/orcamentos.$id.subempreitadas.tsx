@@ -58,6 +58,7 @@ function SubempreitadasOrcamento() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["orc-subempreitadas", id],
+    refetchOnMount: "always",
     queryFn: async () => {
       const [{ data: orc }, { data: arts }, { data: caps }, { data: subs }] = await Promise.all([
         supabase.from("orcamentos").select("id, nome, obra:obras(nome, cliente)").eq("id", id).single(),
@@ -312,8 +313,7 @@ function SubempreitadasOrcamento() {
                 </TableHeader>
                 <TableBody>
                   {data.subs.map((s) => {
-                    const st = stats.bySub.get(s.id);
-                    if (!st) return null;
+                    const st = stats.bySub.get(s.id) ?? { count: 0, total: 0, baixa: 0, valida: 0 };
                     return (
                       <TableRow key={s.id}>
                         <TableCell>

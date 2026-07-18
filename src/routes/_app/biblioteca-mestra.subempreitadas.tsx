@@ -41,6 +41,7 @@ function SubempreitadasAdmin() {
 
   const { data: subs = [] } = useQuery({
     queryKey: ["subempreitadas"],
+    refetchOnMount: "always",
     queryFn: async () => {
       const { data, error } = await supabase.from("subempreitadas").select("*").order("ordem");
       if (error) throw error;
