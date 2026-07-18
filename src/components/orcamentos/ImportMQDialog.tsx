@@ -32,15 +32,18 @@ export function ImportMQDialog({ open, onClose, onImport }: Props) {
 
   const validateAndHandle = async (f: File | null | undefined) => {
     if (!f) return;
-    const isXlsxExt = /\.xlsx$/i.test(f.name);
+    const isExcelExt = /\.(xlsx|xlsb)$/i.test(f.name);
     const validMimes = [
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "application/vnd.ms-excel.sheet.macroEnabled.12",
+      "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
+      "application/vnd.ms-excel",
+      "application/octet-stream",
       "", // alguns browsers não preenchem o tipo em drag-and-drop
     ];
-    if (!isXlsxExt || !validMimes.includes(f.type)) {
+    if (!isExcelExt || !validMimes.includes(f.type)) {
       toast.error("Formato não suportado", {
-        description: `"${f.name}" não é um ficheiro .xlsx válido. Converte primeiro para Excel (.xlsx) — formatos como .xls, .csv, .ods ou .numbers não são aceites.`,
+        description: `"${f.name}" não é um ficheiro Excel suportado. Usa .xlsx ou .xlsb — formatos como .xls, .csv, .ods ou .numbers não são aceites.`,
       });
       return;
     }
@@ -99,7 +102,7 @@ export function ImportMQDialog({ open, onClose, onImport }: Props) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-primary" />
-            Importar Mapa de Quantidades (.xlsx)
+            Importar Mapa de Quantidades (.xlsx ou .xlsb)
           </DialogTitle>
         </DialogHeader>
 
@@ -116,10 +119,10 @@ export function ImportMQDialog({ open, onClose, onImport }: Props) {
           >
             <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
             <p className="font-medium">Arrasta o ficheiro Excel ou clica para escolher</p>
-            <p className="text-xs text-muted-foreground mt-1">Apenas .xlsx · máx. 20 MB</p>
+            <p className="text-xs text-muted-foreground mt-1">Formatos .xlsx e .xlsb · máx. 20 MB</p>
             <input
               type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              accept=".xlsx,.xlsb,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.binary.macroEnabled.12"
               className="hidden"
               onChange={(e) => validateAndHandle(e.target.files?.[0])}
             />
@@ -208,6 +211,9 @@ export function ImportMQDialog({ open, onClose, onImport }: Props) {
               Detectados <strong>{parsed.filter(r => !r.isCapitulo).length}</strong> artigos
               e <strong>{parsed.filter(r => r.isCapitulo).length}</strong> capítulos.
             </div>
+            <p className="text-xs text-muted-foreground">
+              As linhas descritivas sem medição são usadas como contexto das linhas filhas e as notas gerais são ignoradas.
+            </p>
             <div className="border border-border rounded-md overflow-auto max-h-80">
               <table className="text-xs w-full">
                 <thead className="bg-muted sticky top-0">

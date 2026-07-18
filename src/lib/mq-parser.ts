@@ -124,7 +124,10 @@ function isUnitLike(v: any): boolean {
 function isHeaderText(v: any): boolean {
   const n = NORM(textOf(v));
   if (!n) return false;
-  return Object.values(HEADER_HINTS).some((hints) => hints.some((h) => n === h || n.startsWith(h) || n.includes(h)));
+  // Aqui a comparação tem de ser restrita. Procurar fragmentos como "un",
+  // "n" ou "valor" dentro de uma descrição longa descartava artigos reais.
+  if (Object.values(HEADER_HINTS).some((hints) => hints.some((h) => n === h))) return true;
+  return /^(art|artigo|item|codigo|cod|ref|referencia|descricao|descric|descricao dos trabalhos|designacao|design|desc|natureza|unidade|quantidade|medicao|preco unitario|preco parcial|preco total)$/.test(n);
 }
 
 function isMeaningfulDescription(v: any): boolean {
@@ -142,8 +145,54 @@ function isTotalRow(descricao: string, unidade: string | null, qtd: number): boo
 
 function isSimpleChapterCode(codigo: string | null): boolean {
   if (!codigo) return false;
-  const c = codigo.trim();
+  const c = codigo.trim().replace(/\.+$/, "");
   return /^\d{1,3}(\.\d{1,3}){0,2}$/.test(c) || /^[A-Z]$/i.test(c);
+}
+
+function hierarchicalCode(codigo: string | null): string | null {
+  if (!codigo) return null;
+  const c = codigo.trim().replace(/\s+/g, "").replace(/\.+$/, "");
+  return /^\d{1,3}(\.\d{1,3})*$/.test(c) ? c : null;
+}
+
+function isDescendantCode(candidate: string | null, parent: string): boolean {
+  const child = hierarchicalCode(candidate);
+  return !!child && child !== parent && child.startsWith(`${parent}.`);
+}
+
+function hasMeasurement(row: any[], map: ColumnMap): boolean {
+  const unidade = map.unidade != null ? textOf(row[map.unidade]) : "";
+  const quantidade = map.quantidade != null ? toNum(row[map.quantidade]) : 0;
+  const preco = map.preco != null ? toNum(row[map.preco]) : 0;
+  return !!unidade || quantidade !== 0 || preco !== 0;
+}
+
+/**
+ * Alguns MQT usam uma linha descritiva sem medição como pai de várias linhas
+ * medidas (ex.: 8.1 "Caixilharia..." seguido de 8.1.1 "VE.02", 1 un).
+ * Reconhecer esse pai como capítulo preserva o contexto técnico das linhas
+ * filhas no modelo plano de capítulos/artigos usado pela aplicação.
+ */
+function hasMeasuredChildren(rows: any[][], rowIndex: number, map: ColumnMap, codigo: string): boolean {
+  const parent = hierarchicalCode(codigo);
+  if (!parent) return false;
+  const parentDepth = parent.split(".").length;
+
+  for (let i = rowIndex + 1; i < Math.min(rows.length, rowIndex + 80); i++) {
+    const row = rows[i] || [];
+    const nextCode = map.codigo != null ? textOf(row[map.codigo]) || null : null;
+    const nextHierarchical = hierarchicalCode(nextCode);
+
+    if (nextHierarchical) {
+      if (isDescendantCode(nextHierarchical, parent)) return true;
+      const nextDepth = nextHierarchical.split(".").length;
+      if (nextDepth <= parentDepth) return false;
+    }
+
+    // Também cobre descrições longas seguidas de uma verba medida sem código.
+    if (!nextHierarchical && hasMeasurement(row, map)) return true;
+  }
+  return false;
 }
 
 function looksLikeArticleWork(descricao: string): boolean {
@@ -309,7 +358,15 @@ export function parseRows(rows: any[][], headerRowIdx: number, map: ColumnMap): 
       isSimpleChapterCode(codigo) &&
       NORM(descricao).split(" ").filter(Boolean).length <= 5 &&
       !looksLikeArticleWork(descricao);
-    const isCapitulo = semMedicao && (looksLikeChapterTitle(descricao) || shortNeutralTitle);
+    const structuredParent =
+      semMedicao &&
+      !!codigo &&
+      hasMeasuredChildren(rows, i, map, codigo);
+    const isCapitulo = semMedicao && (looksLikeChapterTitle(descricao) || shortNeutralTitle || structuredParent);
+
+    // Notas, condições gerais e continuações sem medição não são artigos.
+    // Quando têm filhos medidos, structuredParent preserva-as como contexto.
+    if (semMedicao && !isCapitulo) continue;
 
     out.push({ isCapitulo, sourceRow: i, codigo, descricao, unidade, quantidade: qtd, preco_unitario: preco });
   }
