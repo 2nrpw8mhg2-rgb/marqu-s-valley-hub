@@ -83,6 +83,8 @@ const UNIDADES_ESPERADAS: Record<string, string[]> = {
   MADEIRA: ["m2", "ml"],
   VINIL: ["m2"],
   PAVEXT: ["m2", "m3", "ml"],
+  ACUST: ["m2", "ml"],
+  RAD: ["m2", "ml", "un"],
 };
 
 /** Normaliza texto pt-PT: minúsculas, sem acentos, espaços colapsados. */
