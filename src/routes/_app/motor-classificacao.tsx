@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
@@ -38,6 +38,18 @@ type ClsRow = {
   confianca: number; estado: EstadoCls;
   metodo_match: Metodo; motivo: string | null; candidatos: Candidato[] | null;
 };
+
+type CapituloMae = {
+  id: string;
+  codigo: string | null;
+  descricao: string;
+};
+
+function pareceDesdobramento(descricao: string) {
+  const texto = descricao.trim();
+  const palavras = texto.split(/\s+/).filter(Boolean);
+  return texto.length <= 48 || palavras.length <= 6;
+}
 
 async function fetchClassificacaoRows(orcamentoId: string, estadoFilter = "all", search = "") {
   const out: ClsRow[] = [];
@@ -97,6 +109,7 @@ function CentroClassificacao() {
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [dialogRow, setDialogRow] = useState<ClsRow | null>(null);
+  const [capituloMae, setCapituloMae] = useState<CapituloMae | null>(null);
   const [panelRow, setPanelRow] = useState<ClsRow | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ total: number; done: number; classificados: number; pendentes: number; porAnalisar: number } | null>(null);
@@ -268,6 +281,47 @@ function CentroClassificacao() {
     qc.invalidateQueries({ queryKey: ["cc-rows"] });
     qc.invalidateQueries({ queryKey: ["cc-classificacao-counts"] });
     setDialogRow(null);
+  };
+
+  const atribuirArtigoMae = async (capitulo: CapituloMae, artigoMestreId: string) => {
+    const art: any = artMap.get(artigoMestreId);
+    if (!art) return;
+    const sub: any = subMap.get(art.subespecialidade_id);
+    const especialidadeId = sub?.especialidade_id ?? null;
+
+    const { data: filhos, error: filhosError } = await supabase
+      .from("orcamento_artigos")
+      .select("id, descricao")
+      .eq("orcamento_id", orcamento)
+      .eq("capitulo_id", capitulo.id);
+    if (filhosError) return toast.error(filhosError.message);
+
+    const ids = (filhos ?? [])
+      .filter((filho: any) => pareceDesdobramento(filho.descricao ?? ""))
+      .map((filho: any) => filho.id);
+    if (ids.length === 0) return toast.error("Este artigo-mãe não tem linhas de desdobramento");
+
+    const { data: u } = await supabase.auth.getUser();
+    const { error } = await supabase.from("classificacao_artigos").update({
+      artigo_mestre_id: artigoMestreId,
+      categoria_id: art.categoria_id,
+      subespecialidade_id: art.subespecialidade_id,
+      especialidade_id: especialidadeId,
+      confianca: 100,
+      estado: "validado",
+      metodo_match: "manual",
+      motivo: `Herdado do artigo-mãe ${capitulo.codigo ? `${capitulo.codigo} — ` : ""}${capitulo.descricao}`,
+      validado_por: u.user?.id ?? null,
+      validado_em: new Date().toISOString(),
+    }).in("artigo_origem_id", ids);
+    if (error) return toast.error(error.message);
+
+    // A memória usa a descrição técnica do cabeçalho, nunca os códigos locais dos filhos.
+    await aprenderClassificacao(capitulo.descricao, artigoMestreId);
+    toast.success(`${ids.length} desdobramento(s) associados ao artigo-mãe`);
+    setCapituloMae(null);
+    qc.invalidateQueries({ queryKey: ["cc-rows"] });
+    qc.invalidateQueries({ queryKey: ["cc-classificacao-counts"] });
   };
 
   const stats = useMemo(() => {
@@ -461,7 +515,19 @@ function CentroClassificacao() {
                           {showCapitulo && (
                             <TableRow className="bg-muted/60 hover:bg-muted/60">
                               <TableCell colSpan={6} className="py-2 text-xs font-semibold text-foreground">
-                                {capitulo.codigo ? `${capitulo.codigo} — ` : ""}{capitulo.descricao ?? "Capítulo"}
+                                <div className="flex items-start justify-between gap-4">
+                                  <span>{capitulo.codigo ? `${capitulo.codigo} — ` : ""}{capitulo.descricao ?? "Capítulo"}</span>
+                                  {capitulo.descricao && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="shrink-0 bg-background"
+                                      onClick={() => setCapituloMae({ id: capitulo.id, codigo: capitulo.codigo, descricao: capitulo.descricao! })}
+                                    >
+                                      Associar artigo-mãe
+                                    </Button>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           )}
@@ -519,10 +585,10 @@ function CentroClassificacao() {
       </div>
 
       <SearchBibliotecaDialog
-        open={!!dialogRow} onClose={() => setDialogRow(null)}
-        onPick={(artId) => dialogRow && atribuir(dialogRow, artId)}
+        open={!!dialogRow || !!capituloMae} onClose={() => { setDialogRow(null); setCapituloMae(null); }}
+        onPick={(artId) => capituloMae ? atribuirArtigoMae(capituloMae, artId) : dialogRow && atribuir(dialogRow, artId)}
         esps={esps} subs={subs} cats={cats} arts={arts}
-        suggestion={dialogRow?.descricao_original ?? ""}
+        suggestion={capituloMae?.descricao ?? dialogRow?.descricao_original ?? ""}
       />
       <ClassificacaoSidePanel
         row={panelRow as PanelRow | null}
@@ -567,6 +633,10 @@ function SearchBibliotecaDialog({
   const [subId, setSubId] = useState<string>("all");
   const [catId, setCatId] = useState<string>("all");
   const [q, setQ] = useState(suggestion);
+
+  useEffect(() => {
+    if (open) setQ(suggestion);
+  }, [open, suggestion]);
 
   const filteredSubs = subs.filter((s) => espId === "all" || s.especialidade_id === espId);
   const filteredCats = cats.filter((c) => {
