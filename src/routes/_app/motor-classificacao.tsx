@@ -508,6 +508,7 @@ function CentroClassificacao() {
                       const trail = [espNome, subNome, catNome, art?.descricao].filter(Boolean) as string[];
                       const acao = calcularProximaAcao({ estado: r.estado, metodo: r.metodo_match, confianca: r.confianca, candidatos: r.candidatos });
                       const capitulo = r.orcamento_artigos?.capitulo ?? null;
+                      const eDesdobramento = !!capitulo && pareceDesdobramento(r.descricao_original);
                       const prevCapituloId = rows[index - 1]?.orcamento_artigos?.capitulo?.id ?? null;
                       const showCapitulo = !!capitulo && capitulo.id !== prevCapituloId;
                       const onAcao = () => {
@@ -558,7 +559,23 @@ function CentroClassificacao() {
                             <TableCell><ResultadoIABadge metodo={r.metodo_match} estado={r.estado} /></TableCell>
                             <TableCell><ConfiancaBar value={r.confianca} /></TableCell>
                             <TableCell onClick={(e) => e.stopPropagation()}>
-                              <ProximaAcaoChip acao={acao} onClick={onAcao} />
+                              {eDesdobramento && !r.artigo_mestre_id ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-primary border-primary/40"
+                                  title="Este código herda a classificação da descrição técnica apresentada acima"
+                                  onClick={() => setCapituloMae({
+                                    id: capitulo.id,
+                                    codigo: capitulo.codigo,
+                                    descricao: capitulo.descricao ?? r.descricao_original,
+                                  })}
+                                >
+                                  Associar ao artigo-mãe
+                                </Button>
+                              ) : (
+                                <ProximaAcaoChip acao={acao} onClick={onAcao} />
+                              )}
                             </TableCell>
                             <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex gap-1 justify-end">
