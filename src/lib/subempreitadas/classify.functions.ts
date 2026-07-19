@@ -23,7 +23,7 @@ async function reclassificarLote(
   let query = sb
     .from("orcamento_artigos")
     .select(
-      "id, codigo, descricao, unidade, capitulo_id, orcamento_id, subempreitada_id, subempreitada_validada_manual, capitulo:orcamento_capitulos(codigo, descricao)",
+      "id, codigo, descricao, unidade, capitulo_id, orcamento_id, subempreitada_id, subempreitada_validada_manual, capitulo:orcamento_capitulos(codigo, descricao, subempreitada_id, subempreitada_validada_manual)",
     )
     // Uma escolha manual com subempreitada é definitiva; artigos deixados
     // manualmente como "sem" devem poder beneficiar de regras novas.
@@ -34,6 +34,35 @@ async function reclassificarLote(
   if (eArt) throw new Error(eArt.message);
   if (!artigos || artigos.length === 0)
     return { total: 0, atribuidos: 0, sem_atribuir: 0, baixa_confianca: 0, conflito: 0 };
+
+  // Aproveita a classificação existente do Motor de Classificação. Quando um
+  // artigo do orçamento já está ligado a um Artigo Mestre, a subempreitada
+  // principal desse mestre é a fonte mais fiável depois da validação manual.
+  const artigoIds = artigos.map((a: any) => a.id);
+  const { data: classificacoes, error: eClass } = await sb
+    .from("classificacao_artigos")
+    .select("artigo_origem_id, artigo_mestre_id")
+    .in("artigo_origem_id", artigoIds)
+    .not("artigo_mestre_id", "is", null);
+  if (eClass) throw new Error(eClass.message);
+
+  const mestreIdPorArtigo = new Map<string, string>();
+  for (const c of classificacoes ?? []) {
+    if (c.artigo_mestre_id) mestreIdPorArtigo.set(c.artigo_origem_id, c.artigo_mestre_id);
+  }
+  const mestreIds = [...new Set(mestreIdPorArtigo.values())];
+  const subPorMestre = new Map<string, string>();
+  if (mestreIds.length > 0) {
+    const { data: mestres, error: eMestres } = await sb
+      .from("biblioteca_artigos")
+      .select("id, subempreitada_principal_id")
+      .in("id", mestreIds)
+      .eq("ativo", true);
+    if (eMestres) throw new Error(eMestres.message);
+    for (const m of mestres ?? []) {
+      if (m.subempreitada_principal_id) subPorMestre.set(m.id, m.subempreitada_principal_id);
+    }
+  }
 
   const orcamentoIds = [...new Set(artigos.map((a: any) => a.orcamento_id).filter(Boolean))];
   const { data: capitulosRaiz, error: eCaps } = await sb
@@ -72,6 +101,11 @@ async function reclassificarLote(
       unidade: a.unidade ?? null,
       capitulo_descricao: cap?.descricao || null,
     };
+    const mestreId = mestreIdPorArtigo.get(a.id);
+    const subMestreId = mestreId ? subPorMestre.get(mestreId) : undefined;
+    const artigoMestre = subMestreId ? { subempreitada_principal_id: subMestreId } : null;
+    const subCapituloId = cap?.subempreitada_validada_manual ? cap?.subempreitada_id : null;
+    const regraCapitulo = subCapituloId ? { subempreitada_principal_id: subCapituloId } : null;
     const classificacaoPai = cap?.descricao && descricaoCurta
       ? classificarArtigo(
           {
@@ -100,7 +134,15 @@ async function reclassificarLote(
       : descricaoCurta && classificacaoRaiz?.subempreitada_id
         ? classificacaoRaiz
         : null;
-    let r = herdada
+    let r = artigoMestre
+      ? classificarArtigo(artigo, subs, artigoMestre, aprendizagem)
+      : regraCapitulo
+        ? {
+            ...classificarArtigo(artigo, subs, regraCapitulo, aprendizagem),
+            origem: "regras" as const,
+            razao: `regra validada do capítulo "${cap?.descricao ?? cap?.codigo}"`,
+          }
+      : herdada
       ? {
           ...herdada,
           confianca: Math.max(herdada.confianca, 0.9),

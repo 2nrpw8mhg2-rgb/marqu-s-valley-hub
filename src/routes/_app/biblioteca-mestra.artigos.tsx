@@ -42,6 +42,7 @@ function ArtigosPage() {
   const [tipoFilter, setTipoFilter] = useState<string>("all");
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
   const [onlyPorClassificar, setOnlyPorClassificar] = useState(false);
+  const [onlySemSubempreitada, setOnlySemSubempreitada] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<EditState | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -80,6 +81,10 @@ function ArtigosPage() {
     queryKey: ["bm-unidades"],
     queryFn: async () => (await supabase.from("biblioteca_unidades").select("*").eq("ativa", true).order("ordem")).data as Unidade[],
   });
+  const { data: subempreitadas = [] } = useQuery({
+    queryKey: ["subempreitadas-ativas"],
+    queryFn: async () => (await supabase.from("subempreitadas").select("id, codigo, nome").eq("ativo", true).order("ordem")).data as Array<{ id: string; codigo: string; nome: string }>,
+  });
 
   const subMap = useMemo(() => new Map(subs.map((s) => [s.id, s])), [subs]);
   const espMap = useMemo(() => new Map(esps.map((e) => [e.id, e])), [esps]);
@@ -115,6 +120,7 @@ function ArtigosPage() {
     if (tipoFilter !== "all" && r.tipo !== tipoFilter) return false;
     if (estadoFilter !== "all" && r.estado_ia !== estadoFilter) return false;
     if (onlyPorClassificar && !(cat?.nome === "Por Classificar" && cat.ordem === 0)) return false;
+    if (onlySemSubempreitada && r.subempreitada_principal_id) return false;
     if (search.trim()) {
       const t = search.toLowerCase();
       const kwHit = (kwsByArt.get(r.id) ?? []).some((k) => k.termo.toLowerCase().includes(t));
@@ -174,6 +180,10 @@ function ArtigosPage() {
         tipo: e.tipo,
         estado_ia: e.estado_ia ?? "validado",
         observacoes: e.observacoes ?? null,
+        subempreitada_principal_id: e.subempreitada_principal_id ?? null,
+        subempreitada_secundaria_id: e.subempreitada_secundaria_id ?? null,
+        confianca_subempreitada: e.subempreitada_principal_id ? 1 : null,
+        origem_classificacao_subempreitada: e.subempreitada_principal_id ? "manual" : null,
         ativo: e.ativo ?? true,
       };
       let artigoId = e.id;
@@ -335,6 +345,13 @@ function ArtigosPage() {
           >
             Apenas "Por Classificar"
           </Button>
+          <Button
+            variant={onlySemSubempreitada ? "default" : "outline"}
+            size="sm"
+            onClick={() => setOnlySemSubempreitada((v) => !v)}
+          >
+            Sem subempreitada
+          </Button>
         </div>
 
         {selected.size > 0 && (
@@ -370,6 +387,7 @@ function ArtigosPage() {
                 <TableHead>Descrição</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead className="w-28">Tipo</TableHead>
+                <TableHead className="w-52">Subempreitada</TableHead>
                 <TableHead className="w-16">Un.</TableHead>
                 <TableHead className="w-36">Estado IA</TableHead>
                 <TableHead>Palavras-chave</TableHead>
@@ -377,8 +395,8 @@ function ArtigosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground">A carregar...</TableCell></TableRow>}
-              {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground">Sem artigos</TableCell></TableRow>}
+              {isLoading && <TableRow><TableCell colSpan={10} className="text-center py-10 text-muted-foreground">A carregar...</TableCell></TableRow>}
+              {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center py-10 text-muted-foreground">Sem artigos</TableCell></TableRow>}
               {filtered.map((r) => {
                 const sub = subMap.get(r.subespecialidade_id);
                 const esp = sub ? espMap.get(sub.especialidade_id) : null;
@@ -398,6 +416,11 @@ function ArtigosPage() {
                       <div className={isPorClassificar ? "text-amber-700 dark:text-amber-400 font-medium" : ""}>{cat?.nome ?? "—"}</div>
                     </TableCell>
                     <TableCell><Badge variant="outline" className="text-xs">{tipoLabel}</Badge></TableCell>
+                    <TableCell className="text-sm">
+                      {subempreitadas.find((s) => s.id === r.subempreitada_principal_id)?.nome ?? (
+                        <span className="text-amber-600">Por definir</span>
+                      )}
+                    </TableCell>
                     <TableCell>{unidade?.simbolo ?? r.unidade ?? "—"}</TableCell>
                     <TableCell>
                       {estado && (
@@ -500,6 +523,34 @@ function ArtigosPage() {
                   <SelectTrigger><SelectValue placeholder="Seleciona..." /></SelectTrigger>
                   <SelectContent>
                     {ARTIGO_TIPOS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Subempreitada principal</Label>
+                <Select
+                  value={editing?.subempreitada_principal_id ?? "__none__"}
+                  onValueChange={(v) => setEditing({ ...editing, subempreitada_principal_id: v === "__none__" ? null : v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Por definir —</SelectItem>
+                    {subempreitadas.map((s) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Subempreitada secundária</Label>
+                <Select
+                  value={editing?.subempreitada_secundaria_id ?? "__none__"}
+                  onValueChange={(v) => setEditing({ ...editing, subempreitada_secundaria_id: v === "__none__" ? null : v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                    {subempreitadas.map((s) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

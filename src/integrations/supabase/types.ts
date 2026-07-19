@@ -1616,6 +1616,8 @@ export type Database = {
           descricao: string
           id: string
           orcamento_id: string
+          subempreitada_id: string | null
+          subempreitada_validada_manual: boolean
           ordem: number
         }
         Insert: {
@@ -1624,6 +1626,8 @@ export type Database = {
           descricao: string
           id?: string
           orcamento_id: string
+          subempreitada_id?: string | null
+          subempreitada_validada_manual?: boolean
           ordem?: number
         }
         Update: {
@@ -1632,6 +1636,8 @@ export type Database = {
           descricao?: string
           id?: string
           orcamento_id?: string
+          subempreitada_id?: string | null
+          subempreitada_validada_manual?: boolean
           ordem?: number
         }
         Relationships: [

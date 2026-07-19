@@ -39,7 +39,7 @@ type Artigo = {
   subempreitada_validada_manual: boolean;
 };
 
-type Cap = { id: string; codigo: string | null; descricao: string };
+type Cap = { id: string; codigo: string | null; descricao: string; subempreitada_id: string | null; subempreitada_validada_manual: boolean };
 type Sub = { id: string; codigo: string; nome: string; ordem: number };
 
 function SubempreitadasOrcamento() {
@@ -64,7 +64,7 @@ function SubempreitadasOrcamento() {
       const [{ data: orc }, { data: arts }, { data: caps }, { data: subs }] = await Promise.all([
         supabase.from("orcamentos").select("id, nome, obra:obras(nome, cliente)").eq("id", id).single(),
         supabase.from("orcamento_artigos").select("*").eq("orcamento_id", id).order("ordem"),
-        supabase.from("orcamento_capitulos").select("id, codigo, descricao").eq("orcamento_id", id),
+        supabase.from("orcamento_capitulos").select("id, codigo, descricao, subempreitada_id, subempreitada_validada_manual").eq("orcamento_id", id).order("ordem"),
         supabase.from("subempreitadas").select("id, codigo, nome, ordem").eq("ativo", true).order("ordem"),
       ]);
       return {
@@ -153,6 +153,23 @@ function SubempreitadasOrcamento() {
     setFiltroEstado("todos");
     setTexto("");
     setActiveTab("separacao");
+  };
+
+  const alterarRegraCapitulo = async (capituloId: string, subId: string | null) => {
+    const { error } = await (supabase.from("orcamento_capitulos") as any)
+      .update({
+        subempreitada_id: subId,
+        subempreitada_validada_manual: Boolean(subId),
+      })
+      .eq("id", capituloId);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await qc.invalidateQueries({ queryKey: ["orc-subempreitadas", id] });
+    toast.success("Regra do capítulo guardada", {
+      description: "Carrega em Reclassificar para aplicar a regra aos artigos ainda não validados manualmente.",
+    });
   };
 
   const artigosDaSubempreitada = (subId: string) =>
@@ -299,6 +316,35 @@ function SubempreitadasOrcamento() {
                   </Button>
                 )}
               </div>
+            </Card>
+
+            <Card className="p-4">
+              <details>
+                <summary className="cursor-pointer font-medium">Regras por capítulo/subcapítulo</summary>
+                <p className="mb-3 mt-2 text-sm text-muted-foreground">
+                  Define apenas capítulos homogéneos. O Artigo Mestre e as correções manuais continuam a ter prioridade.
+                </p>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {data.capitulos.map((cap) => (
+                    <div key={cap.id} className="grid grid-cols-[minmax(0,1fr)_16rem] items-center gap-3 rounded-md border p-3">
+                      <div className="min-w-0">
+                        <div className="font-mono text-xs text-muted-foreground">{cap.codigo ?? "—"}</div>
+                        <div className="truncate text-sm font-medium" title={cap.descricao}>{cap.descricao}</div>
+                      </div>
+                      <Select
+                        value={cap.subempreitada_id ?? "__none__"}
+                        onValueChange={(v) => alterarRegraCapitulo(cap.id, v === "__none__" ? null : v)}
+                      >
+                        <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">— Sem regra fixa —</SelectItem>
+                          {data.subs.map((s) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </details>
             </Card>
 
             <Card>
