@@ -238,6 +238,19 @@ async function reclassificarLote(
       }
     }
 
+    // A separação operacional precisa de um destino para todos os artigos.
+    // Quando existe uma melhor sugestão mas a confiança é baixa ou há conflito,
+    // coloca o artigo provisoriamente nessa subempreitada e conserva a origem e
+    // a razão originais. A interface continua a assinalá-lo para validação e o
+    // utilizador pode movê-lo, mas deixa de ficar perdido em "sem subempreitada".
+    if (!r.subempreitada_id && r.subempreitada_sugerida_id) {
+      r = {
+        ...r,
+        subempreitada_id: r.subempreitada_sugerida_id,
+        razao: `atribuição provisória — requer validação: ${r.razao}`,
+      };
+    }
+
     const { error: eUpdate } = await sb
       .from("orcamento_artigos")
       .update({
