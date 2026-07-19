@@ -41,17 +41,31 @@ async function reclassificarLote(
   const artigoIds = artigos.map((a: any) => a.id);
   const { data: classificacoes, error: eClass } = await sb
     .from("classificacao_artigos")
-    .select("artigo_origem_id, artigo_mestre_id, estado")
-    .in("artigo_origem_id", artigoIds)
-    .in("estado", ["classificado_auto", "validado"])
-    .not("artigo_mestre_id", "is", null);
+    .select("artigo_origem_id, artigo_mestre_id, estado, candidatos")
+    .in("artigo_origem_id", artigoIds);
   if (eClass) throw new Error(eClass.message);
 
   const mestreIdPorArtigo = new Map<string, string>();
+  const candidatoMestrePorArtigo = new Map<string, { mestreId: string; score: number; margem: number }>();
   for (const c of classificacoes ?? []) {
-    if (c.artigo_mestre_id) mestreIdPorArtigo.set(c.artigo_origem_id, c.artigo_mestre_id);
+    if (c.artigo_mestre_id && (c.estado === "classificado_auto" || c.estado === "validado")) {
+      mestreIdPorArtigo.set(c.artigo_origem_id, c.artigo_mestre_id);
+    }
+    const candidatos = Array.isArray(c.candidatos) ? c.candidatos : [];
+    const primeiro = candidatos[0] as any;
+    const segundo = candidatos[1] as any;
+    if (primeiro?.artigo_mestre_id && Number(primeiro.score) >= 50) {
+      candidatoMestrePorArtigo.set(c.artigo_origem_id, {
+        mestreId: primeiro.artigo_mestre_id,
+        score: Number(primeiro.score),
+        margem: segundo ? Number(primeiro.score) - Number(segundo.score) : 100,
+      });
+    }
   }
-  const mestreIds = [...new Set(mestreIdPorArtigo.values())];
+  const mestreIds = [...new Set([
+    ...mestreIdPorArtigo.values(),
+    ...[...candidatoMestrePorArtigo.values()].map((c) => c.mestreId),
+  ])];
   const subPorMestre = new Map<string, string>();
   if (mestreIds.length > 0) {
     const { data: mestres, error: eMestres } = await sb
@@ -181,6 +195,31 @@ async function reclassificarLote(
         null,
         aprendizagem,
       );
+    }
+
+    // Consenso entre dois motores independentes: o candidato a Artigo Mestre
+    // e as regras da subempreitada têm de apontar para a mesma arte. Um
+    // candidato isolado nunca é suficiente, e exige-se ainda margem mínima
+    // sobre o segundo candidato para evitar aceitar sinónimos ambíguos.
+    if (!r.subempreitada_id && r.subempreitada_sugerida_id) {
+      const candidato = candidatoMestrePorArtigo.get(a.id);
+      const subCandidato = candidato ? subPorMestre.get(candidato.mestreId) : undefined;
+      if (
+        candidato &&
+        candidato.margem >= 8 &&
+        subCandidato &&
+        subCandidato === r.subempreitada_sugerida_id
+      ) {
+        r = {
+          ...r,
+          subempreitada_id: subCandidato,
+          subempreitada_sugerida_id: subCandidato,
+          confianca: Math.max(0.8, r.confianca),
+          origem: "artigo_mestre",
+          razao: `consenso entre regras e candidato a Artigo Mestre (${candidato.score}%, margem ${candidato.margem} pontos)`,
+          conflitos: [],
+        };
+      }
     }
 
     const { error: eUpdate } = await sb
