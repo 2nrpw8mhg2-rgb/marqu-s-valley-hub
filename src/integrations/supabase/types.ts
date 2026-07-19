@@ -1616,9 +1616,9 @@ export type Database = {
           descricao: string
           id: string
           orcamento_id: string
+          ordem: number
           subempreitada_id: string | null
           subempreitada_validada_manual: boolean
-          ordem: number
         }
         Insert: {
           codigo?: string | null
@@ -1626,9 +1626,9 @@ export type Database = {
           descricao: string
           id?: string
           orcamento_id: string
+          ordem?: number
           subempreitada_id?: string | null
           subempreitada_validada_manual?: boolean
-          ordem?: number
         }
         Update: {
           codigo?: string | null
@@ -1636,9 +1636,9 @@ export type Database = {
           descricao?: string
           id?: string
           orcamento_id?: string
+          ordem?: number
           subempreitada_id?: string | null
           subempreitada_validada_manual?: boolean
-          ordem?: number
         }
         Relationships: [
           {
@@ -1646,6 +1646,13 @@ export type Database = {
             columns: ["orcamento_id"]
             isOneToOne: false
             referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamento_capitulos_subempreitada_id_fkey"
+            columns: ["subempreitada_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
             referencedColumns: ["id"]
           },
         ]
