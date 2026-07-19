@@ -456,7 +456,12 @@ function CentroClassificacao() {
 
             <Card className="bg-card border-border p-4 flex flex-wrap gap-3 items-end">
               <div className="space-y-1.5 min-w-[180px]">
-                <label className="text-xs text-muted-foreground">Filtrar estado</label>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs text-muted-foreground">Filtrar estado</label>
+                  <Badge variant="secondary" className="text-[10px] tabular-nums">
+                    {rows.length.toLocaleString("pt-PT")} {rows.length === 1 ? "artigo" : "artigos"}
+                  </Badge>
+                </div>
                 <Select value={estadoFilter} onValueChange={setEstadoFilter}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
