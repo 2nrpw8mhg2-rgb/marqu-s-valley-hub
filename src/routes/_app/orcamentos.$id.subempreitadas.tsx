@@ -42,6 +42,8 @@ type Artigo = {
 
 type Cap = { id: string; codigo: string | null; descricao: string; subempreitada_id: string | null; subempreitada_validada_manual: boolean };
 type Sub = { id: string; codigo: string; nome: string; ordem: number };
+type ClassificacaoMestre = { artigo_origem_id: string; artigo_mestre_id: string | null; estado: string };
+type MestreSub = { id: string; subempreitada_principal_id: string | null };
 
 function SubempreitadasOrcamento() {
   const { id } = Route.useParams();
@@ -68,11 +70,26 @@ function SubempreitadasOrcamento() {
         supabase.from("orcamento_capitulos").select("id, codigo, descricao, subempreitada_id, subempreitada_validada_manual").eq("orcamento_id", id).order("ordem"),
         supabase.from("subempreitadas").select("id, codigo, nome, ordem").eq("ativo", true).order("ordem"),
       ]);
+      const { data: classificacoes } = await supabase
+        .from("classificacao_artigos")
+        .select("artigo_origem_id, artigo_mestre_id, estado")
+        .eq("orcamento_id", id);
+      const mestreIds = [...new Set((classificacoes ?? []).map((c) => c.artigo_mestre_id).filter(Boolean))] as string[];
+      let mestres: MestreSub[] = [];
+      if (mestreIds.length > 0) {
+        const { data: mestresRaw } = await supabase
+          .from("biblioteca_artigos")
+          .select("id, subempreitada_principal_id")
+          .in("id", mestreIds);
+        mestres = (mestresRaw ?? []) as MestreSub[];
+      }
       return {
         orcamento: orc as any,
         artigos: (arts ?? []).map((a: any) => ({ ...a, quantidade: Number(a.quantidade), preco_unitario: Number(a.preco_unitario) })) as Artigo[],
         capitulos: (caps ?? []) as Cap[],
         subs: (subs ?? []) as Sub[],
+        classificacoes: (classificacoes ?? []) as ClassificacaoMestre[],
+        mestres,
       };
     },
   });
@@ -84,12 +101,21 @@ function SubempreitadasOrcamento() {
     let baixaGlobal = 0;
     let conflitos = 0;
     let semRegra = 0;
+    let semArtigoMestre = 0;
+    let artigoMestrePorValidar = 0;
+    let artigoMestreSemSubempreitada = 0;
     let totalGlobal = 0;
+    const classificacaoPorArtigo = new Map(data.classificacoes.map((c) => [c.artigo_origem_id, c]));
+    const mestrePorId = new Map(data.mestres.map((m) => [m.id, m]));
     for (const a of data.artigos) {
       const t = a.quantidade * a.preco_unitario;
       totalGlobal += t;
       if (!a.subempreitada_id) {
         semSub++;
+        const cls = classificacaoPorArtigo.get(a.id);
+        if (!cls?.artigo_mestre_id) semArtigoMestre++;
+        else if (cls.estado !== "classificado_auto" && cls.estado !== "validado") artigoMestrePorValidar++;
+        else if (!mestrePorId.get(cls.artigo_mestre_id)?.subempreitada_principal_id) artigoMestreSemSubempreitada++;
         if (a.subempreitada_origem === "conflito") conflitos++;
         else if (a.subempreitada_origem === "baixa_confianca") baixaGlobal++;
         else semRegra++;
@@ -105,7 +131,10 @@ function SubempreitadasOrcamento() {
       }
       bySub.set(a.subempreitada_id, cur);
     }
-    return { bySub, semSub, baixaGlobal, conflitos, semRegra, totalGlobal };
+    return {
+      bySub, semSub, baixaGlobal, conflitos, semRegra, totalGlobal,
+      semArtigoMestre, artigoMestrePorValidar, artigoMestreSemSubempreitada,
+    };
   }, [data]);
 
   const capMap = useMemo(() => new Map((data?.capitulos ?? []).map((c) => [c.id, c])), [data]);
@@ -305,6 +334,13 @@ function SubempreitadasOrcamento() {
                       ? `${stats.semRegra} sem regra, ${stats.baixaGlobal} com baixa confiança e ${stats.conflitos} com conflito.`
                       : `Os artigos estão distribuídos por ${stats.bySub.size} subempreitada(s). A geração pode ser repetida sem duplicar pacotes enquanto estiverem por preparar.`}
                   </p>
+                  {(stats.semSub > 0 || stats.baixaGlobal > 0) && (
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                      <Badge variant="outline">{stats.semArtigoMestre} sem Artigo Mestre</Badge>
+                      <Badge variant="outline">{stats.artigoMestrePorValidar} com Artigo Mestre por validar</Badge>
+                      <Badge variant="outline">{stats.artigoMestreSemSubempreitada} Artigos Mestres sem subempreitada</Badge>
+                    </div>
+                  )}
                 </div>
                 {stats.semSub > 0 || stats.baixaGlobal > 0 ? (
                   <Button variant="outline" onClick={() => {
