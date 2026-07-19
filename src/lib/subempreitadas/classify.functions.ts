@@ -149,6 +149,20 @@ async function reclassificarLote(
       : descricaoCurta && classificacaoRaiz?.subempreitada_id
         ? classificacaoRaiz
         : null;
+    // Um código de medição curto (G.21.1, Vi.03, Para PAV.1A...) não contém
+    // informação suficiente para ser classificado isoladamente. Mesmo quando
+    // o cabeçalho técnico produz apenas uma sugestão — por baixa confiança ou
+    // conflito — mantém o filho dentro dessa arte como proposta a validar, em
+    // vez de o deixar perdido e sem subempreitada.
+    const sugestaoPai = descricaoCurta && classificacaoPai?.subempreitada_sugerida_id
+      ? {
+          ...classificacaoPai,
+          subempreitada_id: classificacaoPai.subempreitada_sugerida_id,
+          confianca: Math.max(classificacaoPai.confianca, 0.6),
+          origem: "baixa_confianca" as const,
+          razao: `proposta herdada do artigo-pai, requer validação: ${classificacaoPai.razao}`,
+        }
+      : null;
     let r = artigoMestre
       ? classificarArtigo(artigo, subs, artigoMestre, aprendizagem)
       : regraCapitulo
@@ -164,6 +178,8 @@ async function reclassificarLote(
           origem: "regras" as const,
           razao: `herdada do artigo-pai: ${herdada.razao}`,
         }
+      : sugestaoPai
+      ? sugestaoPai
       : classificarArtigo(artigo, subs, null, aprendizagem);
 
     // Artigos diretamente sob um capítulo principal nem sempre repetem o nome
