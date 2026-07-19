@@ -699,7 +699,8 @@ async function fetchAllOrcamentoArtigos(orcamentoId: string) {
   const pageSize = 1000;
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
-      .from("orcamento_artigos").select("id, orcamento_id, descricao, unidade, quantidade, ordem, created_at")
+      .from("orcamento_artigos")
+      .select("id, orcamento_id, descricao, unidade, quantidade, ordem, created_at, capitulo_id, capitulo:orcamento_capitulos(id, codigo, descricao, ordem)")
       .eq("orcamento_id", orcamentoId)
       .order("ordem", { ascending: true })
       .order("created_at", { ascending: true })
@@ -756,7 +757,39 @@ export async function runClassificacao(orcamentoId: string, onProgress?: (snapsh
   let classificadosRun = 0;
   let pendentesRun = 0;
   for (const a of lista) {
-    const r = classifyArtigo(a as any, bib);
+    let r = classifyArtigo(a as any, bib);
+
+    // Linhas como "Para PAV.1A", "Para PAV.1B" ou "Para 1C" são medições
+    // filhas do artigo técnico apresentado no cabeçalho do capítulo. Não devem
+    // originar um novo Artigo Mestre: herdam o destino encontrado através da
+    // descrição completa do artigo-mãe.
+    const palavras = normalizar(a.descricao).split(" ").filter(Boolean);
+    const descricaoCurta = a.descricao.length <= 48 || palavras.length <= 6;
+    const capitulo = Array.isArray((a as any).capitulo)
+      ? (a as any).capitulo[0]
+      : (a as any).capitulo;
+    if (
+      descricaoCurta &&
+      capitulo?.descricao &&
+      (!r.artigo_mestre_id || r.estado === "sem_classificacao")
+    ) {
+      const classificacaoMae = classifyArtigo(
+        { ...a, descricao: capitulo.descricao } as any,
+        bib,
+      );
+      if (classificacaoMae.artigo_mestre_id) {
+        r = {
+          ...classificacaoMae,
+          artigo_origem_id: a.id,
+          orcamento_id: a.orcamento_id,
+          descricao_original: a.descricao,
+          unidade_original: a.unidade,
+          quantidade_original: a.quantidade,
+          confianca: Math.max(60, classificacaoMae.confianca),
+          motivo: `Herdado do artigo-mãe ${capitulo.codigo ? `${capitulo.codigo} — ` : ""}${capitulo.descricao}: ${classificacaoMae.motivo}`,
+        };
+      }
+    }
     toInsert.push({
       artigo_origem_id: r.artigo_origem_id,
       orcamento_id: r.orcamento_id,
