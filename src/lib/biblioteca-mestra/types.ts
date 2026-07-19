@@ -51,6 +51,10 @@ export type ArtigoMestre = {
   estado_ia: ArtigoEstadoIA;
   observacoes: string | null;
   ativo: boolean;
+  subempreitada_principal_id: string | null;
+  subempreitada_secundaria_id: string | null;
+  confianca_subempreitada: number | null;
+  origem_classificacao_subempreitada: "manual" | "regras" | "ia" | "herdada" | null;
 };
 
 export type ArtigoKeyword = {
