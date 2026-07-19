@@ -41,8 +41,9 @@ async function reclassificarLote(
   const artigoIds = artigos.map((a: any) => a.id);
   const { data: classificacoes, error: eClass } = await sb
     .from("classificacao_artigos")
-    .select("artigo_origem_id, artigo_mestre_id")
+    .select("artigo_origem_id, artigo_mestre_id, estado")
     .in("artigo_origem_id", artigoIds)
+    .in("estado", ["classificado_auto", "validado"])
     .not("artigo_mestre_id", "is", null);
   if (eClass) throw new Error(eClass.message);
 

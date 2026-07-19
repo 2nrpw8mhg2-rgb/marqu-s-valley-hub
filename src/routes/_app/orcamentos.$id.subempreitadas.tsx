@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { fmtEUR } from "@/lib/orcamento-utils";
 import { classificarOrcamento, alterarSubempreitadaArtigo } from "@/lib/subempreitadas/classify.functions";
+import { runClassificacao } from "@/lib/classificacao/engine";
 import { gerarPacotesSubempreitadas } from "@/lib/subempreitadas/pacotes.functions";
 import { exportarExcelPorSubempreitada, exportarPDFPorSubempreitada, type ArtigoExport } from "@/lib/subempreitadas/export";
 import { ArrowLeft, Wand2, FileSpreadsheet, FileDown, Send, CheckCircle2, AlertTriangle, ShoppingCart, Eye } from "lucide-react";
@@ -129,8 +130,10 @@ function SubempreitadasOrcamento() {
   }, [data, filtroSub, filtroEstado, texto]);
 
   const reclassificar = async () => {
-    const t = toast.loading("A reclassificar...");
+    const t = toast.loading("Fase 1 de 2 — a identificar Artigos Mestres...");
     try {
+      await runClassificacao(id);
+      toast.loading("Fase 2 de 2 — a separar por subempreitada...", { id: t });
       const r = await classificarFn({ data: { orcamento_id: id } });
       toast.success(`${r.atribuidos} de ${r.total} artigos classificados; ${r.sem_atribuir} necessitam de revisão.`, { id: t });
       qc.invalidateQueries({ queryKey: ["orc-subempreitadas", id] });
