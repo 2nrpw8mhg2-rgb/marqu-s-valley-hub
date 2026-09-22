@@ -426,6 +426,35 @@ function PreparacaoConsultas() {
         </Card>
       ) : null}
 
+      {orcamentoId && aRever.length > 0 && (
+        <AReverPanel
+          orcamentoId={orcamentoId}
+          linhas={(linhas ?? []) as LinhaRevisao[]}
+          subempreitadas={subempreitadas ?? []}
+          queryKey={[...queryKeyLinhas]}
+          onAlterado={atualizarTudo}
+        />
+      )}
+
+      {podeValidar && (
+        <Card className="p-4 space-y-2 border-primary/40">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+            Revisão concluída — Todos os artigos do Mapa de Quantidades têm uma subempreitada atribuída.
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={aplicarAoMQ}>
+              Validar Separação
+            </Button>
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/obras/$id/procurement" params={{ id: obraId }}>
+                Preparar Consultas a Subempreiteiros
+              </Link>
+            </Button>
+          </div>
+        </Card>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex gap-1">
           {(
