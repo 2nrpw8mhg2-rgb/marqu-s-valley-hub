@@ -55,6 +55,8 @@ import { Route as AppObrasIdMqRouteImport } from './routes/_app/obras.$id.mq'
 import { Route as AppObrasIdMedicoesRouteImport } from './routes/_app/obras.$id.medicoes'
 import { Route as AppObrasIdFinanceiraRouteImport } from './routes/_app/obras.$id.financeira'
 import { Route as AppObrasIdDocumentosRouteImport } from './routes/_app/obras.$id.documentos'
+import { Route as AppObrasIdMapasIndexRouteImport } from './routes/_app/obras.$id.mapas.index'
+import { Route as AppObrasIdMapasSubIdRouteImport } from './routes/_app/obras.$id.mapas.$subId'
 
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
@@ -304,6 +306,16 @@ const AppObrasIdDocumentosRoute = AppObrasIdDocumentosRouteImport.update({
   path: '/documentos',
   getParentRoute: () => AppObrasIdRoute,
 } as any)
+const AppObrasIdMapasIndexRoute = AppObrasIdMapasIndexRouteImport.update({
+  id: '/mapas/',
+  path: '/mapas/',
+  getParentRoute: () => AppObrasIdRoute,
+} as any)
+const AppObrasIdMapasSubIdRoute = AppObrasIdMapasSubIdRouteImport.update({
+  id: '/mapas/$subId',
+  path: '/mapas/$subId',
+  getParentRoute: () => AppObrasIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -351,6 +363,8 @@ export interface FileRoutesByFullPath {
   '/procurement/pacotes/$id': typeof AppProcurementPacotesIdRoute
   '/obras/$id/': typeof AppObrasIdIndexRoute
   '/orcamentos/$id/': typeof AppOrcamentosIdIndexRoute
+  '/obras/$id/mapas/$subId': typeof AppObrasIdMapasSubIdRoute
+  '/obras/$id/mapas/': typeof AppObrasIdMapasIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -396,6 +410,8 @@ export interface FileRoutesByTo {
   '/procurement/pacotes/$id': typeof AppProcurementPacotesIdRoute
   '/obras/$id': typeof AppObrasIdIndexRoute
   '/orcamentos/$id': typeof AppOrcamentosIdIndexRoute
+  '/obras/$id/mapas/$subId': typeof AppObrasIdMapasSubIdRoute
+  '/obras/$id/mapas': typeof AppObrasIdMapasIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -445,6 +461,8 @@ export interface FileRoutesById {
   '/_app/procurement/pacotes/$id': typeof AppProcurementPacotesIdRoute
   '/_app/obras/$id/': typeof AppObrasIdIndexRoute
   '/_app/orcamentos/$id/': typeof AppOrcamentosIdIndexRoute
+  '/_app/obras/$id/mapas/$subId': typeof AppObrasIdMapasSubIdRoute
+  '/_app/obras/$id/mapas/': typeof AppObrasIdMapasIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -494,6 +512,8 @@ export interface FileRouteTypes {
     | '/procurement/pacotes/$id'
     | '/obras/$id/'
     | '/orcamentos/$id/'
+    | '/obras/$id/mapas/$subId'
+    | '/obras/$id/mapas/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -539,6 +559,8 @@ export interface FileRouteTypes {
     | '/procurement/pacotes/$id'
     | '/obras/$id'
     | '/orcamentos/$id'
+    | '/obras/$id/mapas/$subId'
+    | '/obras/$id/mapas'
   id:
     | '__root__'
     | '/'
@@ -587,6 +609,8 @@ export interface FileRouteTypes {
     | '/_app/procurement/pacotes/$id'
     | '/_app/obras/$id/'
     | '/_app/orcamentos/$id/'
+    | '/_app/obras/$id/mapas/$subId'
+    | '/_app/obras/$id/mapas/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -924,6 +948,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppObrasIdDocumentosRouteImport
       parentRoute: typeof AppObrasIdRoute
     }
+    '/_app/obras/$id/mapas/': {
+      id: '/_app/obras/$id/mapas/'
+      path: '/mapas'
+      fullPath: '/obras/$id/mapas/'
+      preLoaderRoute: typeof AppObrasIdMapasIndexRouteImport
+      parentRoute: typeof AppObrasIdRoute
+    }
+    '/_app/obras/$id/mapas/$subId': {
+      id: '/_app/obras/$id/mapas/$subId'
+      path: '/mapas/$subId'
+      fullPath: '/obras/$id/mapas/$subId'
+      preLoaderRoute: typeof AppObrasIdMapasSubIdRouteImport
+      parentRoute: typeof AppObrasIdRoute
+    }
   }
 }
 
@@ -974,6 +1012,8 @@ interface AppObrasIdRouteChildren {
   AppObrasIdProcurementRoute: typeof AppObrasIdProcurementRoute
   AppObrasIdRelatoriosRoute: typeof AppObrasIdRelatoriosRoute
   AppObrasIdIndexRoute: typeof AppObrasIdIndexRoute
+  AppObrasIdMapasSubIdRoute: typeof AppObrasIdMapasSubIdRoute
+  AppObrasIdMapasIndexRoute: typeof AppObrasIdMapasIndexRoute
 }
 
 const AppObrasIdRouteChildren: AppObrasIdRouteChildren = {
@@ -988,6 +1028,8 @@ const AppObrasIdRouteChildren: AppObrasIdRouteChildren = {
   AppObrasIdProcurementRoute: AppObrasIdProcurementRoute,
   AppObrasIdRelatoriosRoute: AppObrasIdRelatoriosRoute,
   AppObrasIdIndexRoute: AppObrasIdIndexRoute,
+  AppObrasIdMapasSubIdRoute: AppObrasIdMapasSubIdRoute,
+  AppObrasIdMapasIndexRoute: AppObrasIdMapasIndexRoute,
 }
 
 const AppObrasIdRouteWithChildren = AppObrasIdRoute._addFileChildren(
