@@ -1181,6 +1181,196 @@ export type Database = {
           },
         ]
       }
+      consulta_ia_classificacoes: {
+        Row: {
+          artigo_id: string
+          confianca: number
+          created_at: string
+          id: string
+          justificacao: string | null
+          necessita_revisao: boolean
+          orcamento_id: string
+          run_id: string | null
+          subempreitada_id: string | null
+          sugestao_nova_subempreitada: string | null
+          trabalho_principal: string | null
+          updated_at: string
+          validado_em: string | null
+          validado_manual: boolean
+          validado_por: string | null
+        }
+        Insert: {
+          artigo_id: string
+          confianca?: number
+          created_at?: string
+          id?: string
+          justificacao?: string | null
+          necessita_revisao?: boolean
+          orcamento_id: string
+          run_id?: string | null
+          subempreitada_id?: string | null
+          sugestao_nova_subempreitada?: string | null
+          trabalho_principal?: string | null
+          updated_at?: string
+          validado_em?: string | null
+          validado_manual?: boolean
+          validado_por?: string | null
+        }
+        Update: {
+          artigo_id?: string
+          confianca?: number
+          created_at?: string
+          id?: string
+          justificacao?: string | null
+          necessita_revisao?: boolean
+          orcamento_id?: string
+          run_id?: string | null
+          subempreitada_id?: string | null
+          sugestao_nova_subempreitada?: string | null
+          trabalho_principal?: string | null
+          updated_at?: string
+          validado_em?: string | null
+          validado_manual?: boolean
+          validado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consulta_ia_classificacoes_artigo_id_fkey"
+            columns: ["artigo_id"]
+            isOneToOne: false
+            referencedRelation: "orcamento_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_classificacoes_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_classificacoes_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "consulta_ia_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_classificacoes_subempreitada_id_fkey"
+            columns: ["subempreitada_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consulta_ia_exemplos: {
+        Row: {
+          created_at: string
+          descricao: string
+          descricao_normalizada: string
+          id: string
+          subempreitada_id: string
+          trabalho_principal: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          descricao: string
+          descricao_normalizada: string
+          id?: string
+          subempreitada_id: string
+          trabalho_principal?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          descricao?: string
+          descricao_normalizada?: string
+          id?: string
+          subempreitada_id?: string
+          trabalho_principal?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consulta_ia_exemplos_subempreitada_id_fkey"
+            columns: ["subempreitada_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consulta_ia_runs: {
+        Row: {
+          atribuidos: number
+          concluido_em: string | null
+          created_at: string
+          erro: string | null
+          estado: string
+          id: string
+          modelo: string | null
+          obra_id: string | null
+          orcamento_id: string
+          processados: number
+          revisao: number
+          total_artigos: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          atribuidos?: number
+          concluido_em?: string | null
+          created_at?: string
+          erro?: string | null
+          estado?: string
+          id?: string
+          modelo?: string | null
+          obra_id?: string | null
+          orcamento_id: string
+          processados?: number
+          revisao?: number
+          total_artigos?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          atribuidos?: number
+          concluido_em?: string | null
+          created_at?: string
+          erro?: string | null
+          estado?: string
+          id?: string
+          modelo?: string | null
+          obra_id?: string | null
+          orcamento_id?: string
+          processados?: number
+          revisao?: number
+          total_artigos?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consulta_ia_runs_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_runs_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documento_pastas: {
         Row: {
           created_at: string
