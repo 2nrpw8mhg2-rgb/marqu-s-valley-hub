@@ -44,7 +44,7 @@ function ObraResumo() {
 
   const tiles = [
     {
-      to: `/obras/${id}/mq` as const,
+      to: "/obras/$id/mq" as const,
       icon: ListChecks,
       title: "Mapa de Quantidades",
       desc: stats?.artigosCount
@@ -52,24 +52,25 @@ function ObraResumo() {
         : "Sem MQ importado",
     },
     {
-      to: `/obras/${id}/documentos` as const,
+      to: "/obras/$id/documentos" as const,
       icon: FileText,
       title: "Documentos",
       desc: `${stats?.docs ?? 0} ficheiros`,
     },
     {
-      to: `/obras/${id}/orcamentacao` as const,
+      to: "/obras/$id/orcamentacao" as const,
       icon: Calculator,
       title: "Orçamentação",
       desc: `${stats?.orcs.length ?? 0} versões`,
     },
     {
-      to: `/obras/${id}/procurement` as const,
+      to: "/obras/$id/procurement" as const,
       icon: ShoppingCart,
       title: "Procurement",
       desc: "Pacotes de consulta",
     },
   ];
+
 
   return (
     <div className="p-6 space-y-6">
