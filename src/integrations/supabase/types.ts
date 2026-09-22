@@ -1185,12 +1185,14 @@ export type Database = {
         Row: {
           artigo_id: string
           confianca: number
+          confianca_ia: number | null
           created_at: string
           id: string
           justificacao: string | null
           necessita_revisao: boolean
           orcamento_id: string
           run_id: string | null
+          subempreitada_ia_id: string | null
           subempreitada_id: string | null
           sugestao_nova_subempreitada: string | null
           trabalho_principal: string | null
@@ -1202,12 +1204,14 @@ export type Database = {
         Insert: {
           artigo_id: string
           confianca?: number
+          confianca_ia?: number | null
           created_at?: string
           id?: string
           justificacao?: string | null
           necessita_revisao?: boolean
           orcamento_id: string
           run_id?: string | null
+          subempreitada_ia_id?: string | null
           subempreitada_id?: string | null
           sugestao_nova_subempreitada?: string | null
           trabalho_principal?: string | null
@@ -1219,12 +1223,14 @@ export type Database = {
         Update: {
           artigo_id?: string
           confianca?: number
+          confianca_ia?: number | null
           created_at?: string
           id?: string
           justificacao?: string | null
           necessita_revisao?: boolean
           orcamento_id?: string
           run_id?: string | null
+          subempreitada_ia_id?: string | null
           subempreitada_id?: string | null
           sugestao_nova_subempreitada?: string | null
           trabalho_principal?: string | null
@@ -1253,6 +1259,13 @@ export type Database = {
             columns: ["run_id"]
             isOneToOne: false
             referencedRelation: "consulta_ia_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_classificacoes_subempreitada_ia_id_fkey"
+            columns: ["subempreitada_ia_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
             referencedColumns: ["id"]
           },
           {
@@ -1367,6 +1380,96 @@ export type Database = {
             columns: ["run_id"]
             isOneToOne: false
             referencedRelation: "consulta_ia_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consulta_ia_revisao_auditoria: {
+        Row: {
+          artigo_id: string
+          codigo_original: string | null
+          confianca_ia: number | null
+          created_at: string
+          descricao_original: string
+          estado_anterior: Json
+          id: string
+          operacao_id: string
+          orcamento_id: string
+          run_id: string | null
+          subempreitada_atribuida_id: string
+          subempreitada_ia_id: string | null
+          sugestao_nova_subempreitada: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          artigo_id: string
+          codigo_original?: string | null
+          confianca_ia?: number | null
+          created_at?: string
+          descricao_original: string
+          estado_anterior?: Json
+          id?: string
+          operacao_id: string
+          orcamento_id: string
+          run_id?: string | null
+          subempreitada_atribuida_id: string
+          subempreitada_ia_id?: string | null
+          sugestao_nova_subempreitada?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          artigo_id?: string
+          codigo_original?: string | null
+          confianca_ia?: number | null
+          created_at?: string
+          descricao_original?: string
+          estado_anterior?: Json
+          id?: string
+          operacao_id?: string
+          orcamento_id?: string
+          run_id?: string | null
+          subempreitada_atribuida_id?: string
+          subempreitada_ia_id?: string | null
+          sugestao_nova_subempreitada?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consulta_ia_revisao_auditoria_artigo_id_fkey"
+            columns: ["artigo_id"]
+            isOneToOne: false
+            referencedRelation: "orcamento_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_revisao_auditoria_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_revisao_auditoria_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "consulta_ia_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_revisao_auditoria_subempreitada_atribuida_id_fkey"
+            columns: ["subempreitada_atribuida_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_revisao_auditoria_subempreitada_ia_id_fkey"
+            columns: ["subempreitada_ia_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
             referencedColumns: ["id"]
           },
         ]
