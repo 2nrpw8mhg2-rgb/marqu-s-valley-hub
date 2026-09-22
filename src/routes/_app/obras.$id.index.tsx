@@ -76,7 +76,7 @@ function ObraResumo() {
     <div className="p-6 space-y-6">
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {tiles.map((t) => (
-          <Link key={t.to} to={t.to}>
+          <Link key={t.to} to={t.to} params={{ id }}>
             <Card className="bg-card border-border p-4 hover:border-primary/40 transition-colors h-full">
               <div className="flex items-start justify-between">
                 <t.icon className="h-5 w-5 text-primary" />
