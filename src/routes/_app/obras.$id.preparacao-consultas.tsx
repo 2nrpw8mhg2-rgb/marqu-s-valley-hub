@@ -33,10 +33,18 @@ import {
 import { exportarExcelPorSubempreitada, exportarPDFPorSubempreitada } from "@/lib/subempreitadas/export";
 import { AReverPanel } from "@/components/consultas/AReverPanel";
 import { listarARever, podeValidarSeparacao, type LinhaRevisao } from "@/lib/consultas/revisao";
-import { Link } from "@tanstack/react-router";
+import {
+  mostraGruposSubempreitada,
+  paramsDaVista,
+  validarVista,
+  type VistaConsultas,
+} from "@/lib/consultas/vista";
+import { Link, useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/obras/$id/preparacao-consultas")({
   component: PreparacaoConsultas,
+  validateSearch: (search: Record<string, unknown>): { vista?: "arever" } =>
+    paramsDaVista(validarVista(search.vista)),
   head: () => ({
     meta: [
       { title: "Preparação de Consultas · MV OC" },
