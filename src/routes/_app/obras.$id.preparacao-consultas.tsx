@@ -487,7 +487,7 @@ function PreparacaoConsultas() {
         </Card>
       ) : null}
 
-      {orcamentoId && aRever.length > 0 && (
+      {orcamentoId && (vista === "arever" || aRever.length > 0) && (
         <AReverPanel
           orcamentoId={orcamentoId}
           linhas={(linhas ?? []) as LinhaRevisao[]}
