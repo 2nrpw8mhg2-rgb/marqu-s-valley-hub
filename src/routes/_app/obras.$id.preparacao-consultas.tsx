@@ -33,10 +33,18 @@ import {
 import { exportarExcelPorSubempreitada, exportarPDFPorSubempreitada } from "@/lib/subempreitadas/export";
 import { AReverPanel } from "@/components/consultas/AReverPanel";
 import { listarARever, podeValidarSeparacao, type LinhaRevisao } from "@/lib/consultas/revisao";
-import { Link } from "@tanstack/react-router";
+import {
+  mostraGruposSubempreitada,
+  paramsDaVista,
+  validarVista,
+  type VistaConsultas,
+} from "@/lib/consultas/vista";
+import { Link, useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/obras/$id/preparacao-consultas")({
   component: PreparacaoConsultas,
+  validateSearch: (search: Record<string, unknown>): { vista?: "arever" } =>
+    paramsDaVista(validarVista(search.vista)),
   head: () => ({
     meta: [
       { title: "Preparação de Consultas · MV OC" },
@@ -62,6 +70,12 @@ const SEM_SUB = "__sem__";
 
 function PreparacaoConsultas() {
   const { id: obraId } = Route.useParams();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/obras/$id/preparacao-consultas" });
+  const vista: VistaConsultas = validarVista(search.vista);
+  function irPara(v: VistaConsultas) {
+    navigate({ search: () => paramsDaVista(v) });
+  }
   const qc = useQueryClient();
   const preparar = useServerFn(prepararSeparacaoConsultaIA);
   const processarLotes = useServerFn(processarLotesConsultaIA);
@@ -395,17 +409,64 @@ function PreparacaoConsultas() {
         {[
           { label: "Artigos no MQ", valor: totalArtigos },
           { label: "Classificados", valor: classificados },
-          { label: "Para revisão", valor: porRever },
+          { label: "A Rever", valor: aRever.length, acao: true },
           { label: "Pendentes", valor: pendentes },
           { label: "Falhados", valor: falhados },
           { label: "Confirmados por si", valor: validados },
-        ].map((k) => (
-          <Card key={k.label} className="p-3">
-            <div className="text-xs text-muted-foreground">{k.label}</div>
-            <div className="text-2xl font-semibold tabular-nums">{k.valor}</div>
-          </Card>
-        ))}
+        ].map((k) =>
+          k.acao ? (
+            <Card
+              key={k.label}
+              role="button"
+              tabIndex={0}
+              aria-label={`Abrir a vista A Rever com ${k.valor} artigos`}
+              onClick={() => irPara("arever")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  irPara("arever");
+                }
+              }}
+              className="p-3 cursor-pointer transition-colors hover:bg-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <div className="text-xs text-muted-foreground">{k.label}</div>
+              <div className="text-2xl font-semibold tabular-nums">{k.valor}</div>
+            </Card>
+          ) : (
+            <Card key={k.label} className="p-3">
+              <div className="text-xs text-muted-foreground">{k.label}</div>
+              <div className="text-2xl font-semibold tabular-nums">{k.valor}</div>
+            </Card>
+          ),
+        )}
       </div>
+
+      <div className="flex flex-wrap items-center gap-2 border-b pb-2" role="tablist" aria-label="Vistas dos artigos">
+        <Button
+          role="tab"
+          aria-selected={vista === "todos"}
+          size="sm"
+          variant={vista === "todos" ? "default" : "ghost"}
+          onClick={() => irPara("todos")}
+        >
+          Todos
+        </Button>
+        <Button
+          role="tab"
+          aria-selected={vista === "arever"}
+          size="sm"
+          variant={vista === "arever" ? "default" : "ghost"}
+          onClick={() => irPara("arever")}
+        >
+          A Rever ({aRever.length})
+        </Button>
+        {vista === "arever" && (
+          <Button size="sm" variant="outline" className="ml-auto" onClick={() => irPara("todos")}>
+            Voltar a todos os artigos
+          </Button>
+        )}
+      </div>
+
 
       {estado && !estado.completo && totalArtigos > 0 && (
         <Card className="p-3 border-amber-500/40 text-sm space-y-1">
@@ -426,7 +487,7 @@ function PreparacaoConsultas() {
         </Card>
       ) : null}
 
-      {orcamentoId && aRever.length > 0 && (
+      {orcamentoId && (vista === "arever" || aRever.length > 0) && (
         <AReverPanel
           orcamentoId={orcamentoId}
           linhas={(linhas ?? []) as LinhaRevisao[]}
@@ -455,6 +516,7 @@ function PreparacaoConsultas() {
         </Card>
       )}
 
+      {mostraGruposSubempreitada(vista) && (
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex gap-1">
           {(
@@ -504,11 +566,13 @@ function PreparacaoConsultas() {
           <Download className="h-4 w-4" /> PDF
         </Button>
       </div>
+      )}
 
       {isFetching && <p className="text-sm text-muted-foreground">A carregar artigos…</p>}
 
       <div className="space-y-5">
-        {agrupadas.map(([subId, arts]) => (
+        {mostraGruposSubempreitada(vista) &&
+          agrupadas.map(([subId, arts]) => (
           <Card key={subId} className="overflow-hidden">
             <div className="px-4 py-2.5 border-b bg-muted/40 flex items-center justify-between">
               <div className="font-medium text-sm">
