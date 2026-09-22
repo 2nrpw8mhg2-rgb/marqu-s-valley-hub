@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, FileText, ClipboardList, ShoppingCart, FileCheck2, CalendarDays, Wallet, Ruler, BarChart3, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, FileText, ClipboardList, ShoppingCart, FileCheck2, CalendarDays, Wallet, Ruler, BarChart3, LayoutDashboard, Sparkles } from "lucide-react";
 
 const TABS = [
   { to: "", label: "Resumo", icon: LayoutDashboard },
