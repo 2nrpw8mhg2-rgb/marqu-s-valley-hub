@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Download,
   FileSpreadsheet,
+  FolderOpen,
   Loader2,
   Sparkles,
 } from "lucide-react";
@@ -350,6 +351,11 @@ function PreparacaoConsultas() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/obras/$id/mapas" params={{ id: obraId }}>
+              <FolderOpen className="h-4 w-4" /> Ver Mapas por Subempreitada
+            </Link>
+          </Button>
           <Select value={orcamentoId ?? ""} onValueChange={(v) => setOrcamentoId(v)}>
             <SelectTrigger className="w-[260px]">
               <SelectValue placeholder="Escolher Mapa de Quantidades" />
