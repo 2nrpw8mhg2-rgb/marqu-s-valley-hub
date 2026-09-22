@@ -10,7 +10,7 @@ type ResultadoGeracao = {
 
 export const gerarPacotesSubempreitadas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) =>
+  .inputValidator((data: unknown) =>
     z.object({ orcamento_id: z.string().uuid() }).parse(data),
   )
   .handler(async ({ data, context }) => {

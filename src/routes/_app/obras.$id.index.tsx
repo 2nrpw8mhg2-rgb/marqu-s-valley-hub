@@ -44,7 +44,7 @@ function ObraResumo() {
 
   const tiles = [
     {
-      to: `/obras/${id}/mq` as const,
+      to: "/obras/$id/mq" as const,
       icon: ListChecks,
       title: "Mapa de Quantidades",
       desc: stats?.artigosCount
@@ -52,30 +52,31 @@ function ObraResumo() {
         : "Sem MQ importado",
     },
     {
-      to: `/obras/${id}/documentos` as const,
+      to: "/obras/$id/documentos" as const,
       icon: FileText,
       title: "Documentos",
       desc: `${stats?.docs ?? 0} ficheiros`,
     },
     {
-      to: `/obras/${id}/orcamentacao` as const,
+      to: "/obras/$id/orcamentacao" as const,
       icon: Calculator,
       title: "Orçamentação",
       desc: `${stats?.orcs.length ?? 0} versões`,
     },
     {
-      to: `/obras/${id}/procurement` as const,
+      to: "/obras/$id/procurement" as const,
       icon: ShoppingCart,
       title: "Procurement",
       desc: "Pacotes de consulta",
     },
   ];
 
+
   return (
     <div className="p-6 space-y-6">
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {tiles.map((t) => (
-          <Link key={t.to} to={t.to}>
+          <Link key={t.to} to={t.to} params={{ id }}>
             <Card className="bg-card border-border p-4 hover:border-primary/40 transition-colors h-full">
               <div className="flex items-start justify-between">
                 <t.icon className="h-5 w-5 text-primary" />
