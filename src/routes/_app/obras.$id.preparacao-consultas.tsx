@@ -194,55 +194,56 @@ function PreparacaoConsultas() {
     return [...grupos.entries()].sort((a, b) => (a[0] === SEM_SUB ? 1 : b[0] === SEM_SUB ? -1 : 0));
   }, [visiveis]);
 
-  async function correrLotes(lotes: string[][], runId: string, jaFeitos: number, total: number) {
-    const porFalhar: string[] = [];
-    let feitos = jaFeitos;
-    for (const lote of lotes) {
-      try {
-        const r = await processar({ data: { run_id: runId, orcamento_id: orcamentoId!, artigo_ids: lote } });
-        porFalhar.push(...r.falhados);
-      } catch (e: any) {
-        porFalhar.push(...lote);
-        toast.error(e?.message ?? "Um lote falhou. Pode repetir apenas os artigos afetados.");
+  // Ao abrir a página, o estado guardado no servidor é lido automaticamente:
+  // execuções incompletas são detetadas sem criar qualquer execução nova.
+  const { data: estado, refetch: recarregarEstado } = useQuery({
+    queryKey: ["consultas-estado", orcamentoId],
+    enabled: Boolean(orcamentoId),
+    queryFn: () => estadoFn({ data: { orcamento_id: orcamentoId! } }),
+  });
+
+  async function atualizarTudo() {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["consultas-linhas", orcamentoId] }),
+      recarregarEstado(),
+    ]);
+  }
+
+  /**
+   * Execução incremental: cada chamada trata o próximo conjunto pendente e
+   * grava-o de imediato no servidor. Fechar ou recarregar a página não perde
+   * trabalho — basta voltar a carregar em «Continuar separação».
+   */
+  async function continuarSeparacao() {
+    if (!orcamentoId || aCorrer) return;
+    setACorrer(true);
+    setParar(false);
+    try {
+      const inicio = await preparar({ data: { orcamento_id: orcamentoId, obra_id: obraId } });
+      let runId = inicio.run_id;
+      let restantes = inicio.pendentes;
+      await atualizarTudo();
+
+      while (restantes > 0) {
+        const r = await processarLotes({ data: { run_id: runId, orcamento_id: orcamentoId } });
+        await atualizarTudo();
+        restantes = r.estado.pendentes + r.estado.falhados;
+        if (r.lotes_processados === 0) break;
+        if (parar) {
+          toast.info("Separação interrompida. O trabalho já feito ficou guardado.");
+          return;
+        }
       }
-      feitos += lote.length;
-      setProgresso({ feitos, total });
-    }
-    setFalhados(porFalhar);
-    await qc.invalidateQueries({ queryKey: ["consultas-linhas", orcamentoId] });
-    const est = await estadoFn({ data: { orcamento_id: orcamentoId! } });
-    setEstado(est);
-    return porFalhar;
-  }
 
-  async function separarComIA() {
-    if (!orcamentoId) return;
-    setACorrer(true);
-    setFalhados([]);
-    try {
-      const inicio = await iniciar({ data: { orcamento_id: orcamentoId, obra_id: obraId } });
-      setProgresso({ feitos: inicio.ja_validados, total: inicio.total_artigos });
-      const restantes = await correrLotes(inicio.lotes, inicio.run_id, inicio.ja_validados, inicio.total_artigos);
-      if (restantes.length === 0) toast.success("Separação concluída. Reveja as classificações assinaladas.");
-      else toast.warning(`${restantes.length} artigos ficaram por classificar. Pode repetir só esses.`);
+      const fim = await estadoFn({ data: { orcamento_id: orcamentoId } });
+      if (fim.completo) toast.success("Todos os artigos estão classificados. Reveja os assinalados.");
+      else
+        toast.warning(
+          `Ficaram ${fim.pendentes + fim.falhados} artigos por classificar. Pode continuar ou repetir os falhados.`,
+        );
     } catch (e: any) {
-      toast.error(e?.message ?? "Não foi possível iniciar a separação.");
-    } finally {
-      setACorrer(false);
-    }
-  }
-
-  async function repetirFalhados() {
-    if (!orcamentoId || falhados.length === 0) return;
-    setACorrer(true);
-    try {
-      const inicio = await iniciar({ data: { orcamento_id: orcamentoId, obra_id: obraId } });
-      const lotes: string[][] = [];
-      for (let i = 0; i < falhados.length; i += 20) lotes.push(falhados.slice(i, i + 20));
-      const restantes = await correrLotes(lotes, inicio.run_id, 0, falhados.length);
-      if (restantes.length === 0) toast.success("Todos os artigos em falta foram classificados.");
-    } catch (e: any) {
-      toast.error(e?.message ?? "Não foi possível repetir os artigos em falta.");
+      toast.error(e?.message ?? "Não foi possível continuar a separação.");
+      await atualizarTudo();
     } finally {
       setACorrer(false);
     }
@@ -250,10 +251,13 @@ function PreparacaoConsultas() {
 
   async function verificar() {
     if (!orcamentoId) return;
-    const est = await estadoFn({ data: { orcamento_id: orcamentoId } });
-    setEstado(est);
-    setFalhados(est.artigos_em_falta);
-    toast.info(est.completo ? "Todos os artigos estão processados." : `${est.em_falta} artigos ainda por processar.`);
+    const { data: est } = await recarregarEstado();
+    if (!est) return;
+    toast.info(
+      est.completo
+        ? "Todos os artigos estão classificados."
+        : `${est.pendentes + est.falhados} artigos ainda por classificar.`,
+    );
   }
 
   async function confirmarSelecionados(subId: string | null) {
