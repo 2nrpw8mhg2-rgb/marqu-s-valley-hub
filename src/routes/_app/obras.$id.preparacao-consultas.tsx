@@ -316,6 +316,15 @@ function PreparacaoConsultas() {
   const validados = estado?.validados ?? 0;
   const percentagem = estado?.percentagem ?? 0;
 
+  const queryKeyLinhas = ["consultas-linhas", orcamentoId] as const;
+  const aRever = useMemo(() => listarARever(linhas ?? []), [linhas]);
+  const podeValidar = podeValidarSeparacao({
+    total: totalArtigos,
+    pendentes,
+    falhados,
+    a_rever: aRever.length,
+  });
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
