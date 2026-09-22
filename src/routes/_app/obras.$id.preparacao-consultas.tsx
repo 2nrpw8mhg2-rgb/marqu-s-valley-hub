@@ -26,8 +26,8 @@ import {
 import {
   aplicarSeparacaoConsultaIA,
   estadoSeparacaoConsultaIA,
-  iniciarSeparacaoConsultaIA,
-  processarLoteConsultaIA,
+  prepararSeparacaoConsultaIA,
+  processarLotesConsultaIA,
   validarClassificacoesConsultaIA,
 } from "@/lib/consultas/separacao.functions";
 import { exportarExcelPorSubempreitada, exportarPDFPorSubempreitada } from "@/lib/subempreitadas/export";
