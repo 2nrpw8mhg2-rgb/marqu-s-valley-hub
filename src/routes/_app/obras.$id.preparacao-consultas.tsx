@@ -350,44 +350,56 @@ function PreparacaoConsultas() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={separarComIA} disabled={!orcamentoId || aCorrer}>
+          <Button onClick={continuarSeparacao} disabled={!orcamentoId || aCorrer}>
             {aCorrer ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            Separar Artigos por Subempreitada com IA
+            {emFalta > 0 && classificados > 0
+              ? `Processar ${emFalta} artigos em falta`
+              : "Separar Artigos por Subempreitada com IA"}
           </Button>
+          {aCorrer && (
+            <Button variant="outline" onClick={() => setParar(true)}>
+              Parar
+            </Button>
+          )}
         </div>
       </div>
 
-      {progresso && (
+      {totalArtigos > 0 && (
         <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
             <span>
-              {aCorrer ? "A analisar artigos com IA…" : "Análise terminada"} — {progresso.feitos} de {progresso.total}
+              {aCorrer ? "A analisar artigos com IA…" : "Progresso guardado"} — {classificados} de {totalArtigos}{" "}
+              artigos classificados ({percentagem}%)
             </span>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={verificar} disabled={aCorrer}>
                 Verificar integridade
               </Button>
-              {falhados.length > 0 && (
-                <Button size="sm" variant="outline" onClick={repetirFalhados} disabled={aCorrer}>
-                  Repetir {falhados.length} artigos em falta
+              {falhados > 0 && (
+                <Button size="sm" variant="outline" onClick={continuarSeparacao} disabled={aCorrer}>
+                  Repetir {falhados} falhados
+                </Button>
+              )}
+              {emFalta > 0 && (
+                <Button size="sm" onClick={continuarSeparacao} disabled={aCorrer}>
+                  Continuar separação
                 </Button>
               )}
             </div>
           </div>
           <div className="h-2 rounded bg-muted overflow-hidden">
-            <div
-              className="h-full bg-primary transition-all"
-              style={{ width: `${Math.min(100, (progresso.feitos / Math.max(1, progresso.total)) * 100)}%` }}
-            />
+            <div className="h-full bg-primary transition-all" style={{ width: `${Math.min(100, percentagem)}%` }} />
           </div>
         </Card>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {[
           { label: "Artigos no MQ", valor: totalArtigos },
-          { label: "Analisados pela IA", valor: classificados },
-          { label: "A necessitar revisão", valor: porRever },
+          { label: "Classificados", valor: classificados },
+          { label: "Para revisão", valor: porRever },
+          { label: "Pendentes", valor: pendentes },
+          { label: "Falhados", valor: falhados },
           { label: "Confirmados por si", valor: validados },
         ].map((k) => (
           <Card key={k.label} className="p-3">
@@ -397,11 +409,16 @@ function PreparacaoConsultas() {
         ))}
       </div>
 
-      {estado && !estado.completo && (
-        <Card className="p-3 border-amber-500/40 text-sm flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
-          Separação incompleta: {estado.em_falta} artigos por processar, {estado.duplicados} duplicações,{" "}
-          {estado.sem_subempreitada} sem subempreitada válida.
+      {estado && !estado.completo && totalArtigos > 0 && (
+        <Card className="p-3 border-amber-500/40 text-sm space-y-1">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            Separação incompleta: {pendentes} pendentes, {falhados} falhados, {estado.sem_subempreitada} sem
+            subempreitada válida. A organização do Mapa de Quantidades fica bloqueada até não faltar nenhum artigo.
+          </div>
+          {estado.erros_lotes?.length ? (
+            <div className="text-xs text-muted-foreground">Último erro: {estado.erros_lotes[0]}</div>
+          ) : null}
         </Card>
       )}
       {estado?.sugestoes_novas?.length ? (
