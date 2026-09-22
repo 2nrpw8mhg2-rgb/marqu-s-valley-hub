@@ -7,6 +7,7 @@ const TABS = [
   { to: "", label: "Resumo", icon: LayoutDashboard },
   { to: "/documentos", label: "Documentos", icon: FileText },
   { to: "/preparacao-orcamento", label: "Preparação de Orçamento", icon: ClipboardList },
+  { to: "/preparacao-consultas", label: "Preparação de Consultas", icon: Sparkles },
   { to: "/procurement", label: "Procurement", icon: ShoppingCart },
   { to: "/orcamento-final", label: "Orçamento Final", icon: FileCheck2, soon: true },
   { to: "/planeamento", label: "Planeamento", icon: CalendarDays, soon: true },
