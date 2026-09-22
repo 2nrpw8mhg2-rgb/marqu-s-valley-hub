@@ -76,20 +76,18 @@ const SEM_SUB = "__sem__";
 function PreparacaoConsultas() {
   const { id: obraId } = Route.useParams();
   const qc = useQueryClient();
-  const iniciar = useServerFn(iniciarSeparacaoConsultaIA);
-  const processar = useServerFn(processarLoteConsultaIA);
+  const preparar = useServerFn(prepararSeparacaoConsultaIA);
+  const processarLotes = useServerFn(processarLotesConsultaIA);
   const estadoFn = useServerFn(estadoSeparacaoConsultaIA);
   const validar = useServerFn(validarClassificacoesConsultaIA);
   const aplicar = useServerFn(aplicarSeparacaoConsultaIA);
 
   const [orcamentoId, setOrcamentoId] = useState<string | null>(null);
   const [aCorrer, setACorrer] = useState(false);
-  const [progresso, setProgresso] = useState<{ feitos: number; total: number } | null>(null);
-  const [falhados, setFalhados] = useState<string[]>([]);
+  const [parar, setParar] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [filtro, setFiltro] = useState<"todos" | "revisao" | "sem">("todos");
   const [destino, setDestino] = useState<string>(SEM_SUB);
-  const [estado, setEstado] = useState<Awaited<ReturnType<typeof estadoSeparacaoConsultaIA>> | null>(null);
 
   const { data: obra } = useQuery({
     queryKey: ["obra", obraId],
