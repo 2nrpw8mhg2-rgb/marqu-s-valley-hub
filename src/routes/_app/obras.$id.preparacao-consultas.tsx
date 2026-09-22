@@ -566,11 +566,13 @@ function PreparacaoConsultas() {
           <Download className="h-4 w-4" /> PDF
         </Button>
       </div>
+      )}
 
       {isFetching && <p className="text-sm text-muted-foreground">A carregar artigos…</p>}
 
       <div className="space-y-5">
-        {agrupadas.map(([subId, arts]) => (
+        {mostraGruposSubempreitada(vista) &&
+          agrupadas.map(([subId, arts]) => (
           <Card key={subId} className="overflow-hidden">
             <div className="px-4 py-2.5 border-b bg-muted/40 flex items-center justify-between">
               <div className="font-medium text-sm">
