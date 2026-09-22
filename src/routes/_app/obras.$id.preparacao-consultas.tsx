@@ -31,6 +31,9 @@ import {
   validarClassificacoesConsultaIA,
 } from "@/lib/consultas/separacao.functions";
 import { exportarExcelPorSubempreitada, exportarPDFPorSubempreitada } from "@/lib/subempreitadas/export";
+import { AReverPanel } from "@/components/consultas/AReverPanel";
+import { listarARever, podeValidarSeparacao, type LinhaRevisao } from "@/lib/consultas/revisao";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/obras/$id/preparacao-consultas")({
   component: PreparacaoConsultas,
@@ -53,23 +56,7 @@ export const Route = createFileRoute("/_app/obras/$id/preparacao-consultas")({
   }),
 });
 
-type Linha = {
-  artigo_id: string;
-  codigo: string | null;
-  descricao: string;
-  unidade: string | null;
-  quantidade: number;
-  preco_unitario: number;
-  capitulo_codigo: string | null;
-  capitulo_descricao: string | null;
-  subempreitada_id: string | null;
-  trabalho_principal: string | null;
-  confianca: number;
-  justificacao: string | null;
-  necessita_revisao: boolean;
-  validado_manual: boolean;
-  sugestao_nova_subempreitada: string | null;
-};
+type Linha = LinhaRevisao & { preco_unitario: number };
 
 const SEM_SUB = "__sem__";
 
