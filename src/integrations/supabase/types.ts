@@ -1305,6 +1305,72 @@ export type Database = {
           },
         ]
       }
+      consulta_ia_lotes: {
+        Row: {
+          artigo_ids: string[]
+          ausentes: number
+          classificados: number
+          concluido_em: string | null
+          created_at: string
+          erro: string | null
+          estado: string
+          id: string
+          indice: number
+          iniciado_em: string | null
+          orcamento_id: string
+          run_id: string
+          tentativas: number
+          updated_at: string
+        }
+        Insert: {
+          artigo_ids?: string[]
+          ausentes?: number
+          classificados?: number
+          concluido_em?: string | null
+          created_at?: string
+          erro?: string | null
+          estado?: string
+          id?: string
+          indice: number
+          iniciado_em?: string | null
+          orcamento_id: string
+          run_id: string
+          tentativas?: number
+          updated_at?: string
+        }
+        Update: {
+          artigo_ids?: string[]
+          ausentes?: number
+          classificados?: number
+          concluido_em?: string | null
+          created_at?: string
+          erro?: string | null
+          estado?: string
+          id?: string
+          indice?: number
+          iniciado_em?: string | null
+          orcamento_id?: string
+          run_id?: string
+          tentativas?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consulta_ia_lotes_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_lotes_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "consulta_ia_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consulta_ia_runs: {
         Row: {
           atribuidos: number

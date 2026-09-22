@@ -26,8 +26,8 @@ import {
 import {
   aplicarSeparacaoConsultaIA,
   estadoSeparacaoConsultaIA,
-  iniciarSeparacaoConsultaIA,
-  processarLoteConsultaIA,
+  prepararSeparacaoConsultaIA,
+  processarLotesConsultaIA,
   validarClassificacoesConsultaIA,
 } from "@/lib/consultas/separacao.functions";
 import { exportarExcelPorSubempreitada, exportarPDFPorSubempreitada } from "@/lib/subempreitadas/export";
@@ -76,20 +76,18 @@ const SEM_SUB = "__sem__";
 function PreparacaoConsultas() {
   const { id: obraId } = Route.useParams();
   const qc = useQueryClient();
-  const iniciar = useServerFn(iniciarSeparacaoConsultaIA);
-  const processar = useServerFn(processarLoteConsultaIA);
+  const preparar = useServerFn(prepararSeparacaoConsultaIA);
+  const processarLotes = useServerFn(processarLotesConsultaIA);
   const estadoFn = useServerFn(estadoSeparacaoConsultaIA);
   const validar = useServerFn(validarClassificacoesConsultaIA);
   const aplicar = useServerFn(aplicarSeparacaoConsultaIA);
 
   const [orcamentoId, setOrcamentoId] = useState<string | null>(null);
   const [aCorrer, setACorrer] = useState(false);
-  const [progresso, setProgresso] = useState<{ feitos: number; total: number } | null>(null);
-  const [falhados, setFalhados] = useState<string[]>([]);
+  const [parar, setParar] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [filtro, setFiltro] = useState<"todos" | "revisao" | "sem">("todos");
   const [destino, setDestino] = useState<string>(SEM_SUB);
-  const [estado, setEstado] = useState<Awaited<ReturnType<typeof estadoSeparacaoConsultaIA>> | null>(null);
 
   const { data: obra } = useQuery({
     queryKey: ["obra", obraId],
@@ -196,55 +194,56 @@ function PreparacaoConsultas() {
     return [...grupos.entries()].sort((a, b) => (a[0] === SEM_SUB ? 1 : b[0] === SEM_SUB ? -1 : 0));
   }, [visiveis]);
 
-  async function correrLotes(lotes: string[][], runId: string, jaFeitos: number, total: number) {
-    const porFalhar: string[] = [];
-    let feitos = jaFeitos;
-    for (const lote of lotes) {
-      try {
-        const r = await processar({ data: { run_id: runId, orcamento_id: orcamentoId!, artigo_ids: lote } });
-        porFalhar.push(...r.falhados);
-      } catch (e: any) {
-        porFalhar.push(...lote);
-        toast.error(e?.message ?? "Um lote falhou. Pode repetir apenas os artigos afetados.");
+  // Ao abrir a página, o estado guardado no servidor é lido automaticamente:
+  // execuções incompletas são detetadas sem criar qualquer execução nova.
+  const { data: estado, refetch: recarregarEstado } = useQuery({
+    queryKey: ["consultas-estado", orcamentoId],
+    enabled: Boolean(orcamentoId),
+    queryFn: () => estadoFn({ data: { orcamento_id: orcamentoId! } }),
+  });
+
+  async function atualizarTudo() {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["consultas-linhas", orcamentoId] }),
+      recarregarEstado(),
+    ]);
+  }
+
+  /**
+   * Execução incremental: cada chamada trata o próximo conjunto pendente e
+   * grava-o de imediato no servidor. Fechar ou recarregar a página não perde
+   * trabalho — basta voltar a carregar em «Continuar separação».
+   */
+  async function continuarSeparacao() {
+    if (!orcamentoId || aCorrer) return;
+    setACorrer(true);
+    setParar(false);
+    try {
+      const inicio = await preparar({ data: { orcamento_id: orcamentoId, obra_id: obraId } });
+      let runId = inicio.run_id;
+      let restantes = inicio.pendentes;
+      await atualizarTudo();
+
+      while (restantes > 0) {
+        const r = await processarLotes({ data: { run_id: runId, orcamento_id: orcamentoId } });
+        await atualizarTudo();
+        restantes = r.estado.pendentes + r.estado.falhados;
+        if (r.lotes_processados === 0) break;
+        if (parar) {
+          toast.info("Separação interrompida. O trabalho já feito ficou guardado.");
+          return;
+        }
       }
-      feitos += lote.length;
-      setProgresso({ feitos, total });
-    }
-    setFalhados(porFalhar);
-    await qc.invalidateQueries({ queryKey: ["consultas-linhas", orcamentoId] });
-    const est = await estadoFn({ data: { orcamento_id: orcamentoId! } });
-    setEstado(est);
-    return porFalhar;
-  }
 
-  async function separarComIA() {
-    if (!orcamentoId) return;
-    setACorrer(true);
-    setFalhados([]);
-    try {
-      const inicio = await iniciar({ data: { orcamento_id: orcamentoId, obra_id: obraId } });
-      setProgresso({ feitos: inicio.ja_validados, total: inicio.total_artigos });
-      const restantes = await correrLotes(inicio.lotes, inicio.run_id, inicio.ja_validados, inicio.total_artigos);
-      if (restantes.length === 0) toast.success("Separação concluída. Reveja as classificações assinaladas.");
-      else toast.warning(`${restantes.length} artigos ficaram por classificar. Pode repetir só esses.`);
+      const fim = await estadoFn({ data: { orcamento_id: orcamentoId } });
+      if (fim.completo) toast.success("Todos os artigos estão classificados. Reveja os assinalados.");
+      else
+        toast.warning(
+          `Ficaram ${fim.pendentes + fim.falhados} artigos por classificar. Pode continuar ou repetir os falhados.`,
+        );
     } catch (e: any) {
-      toast.error(e?.message ?? "Não foi possível iniciar a separação.");
-    } finally {
-      setACorrer(false);
-    }
-  }
-
-  async function repetirFalhados() {
-    if (!orcamentoId || falhados.length === 0) return;
-    setACorrer(true);
-    try {
-      const inicio = await iniciar({ data: { orcamento_id: orcamentoId, obra_id: obraId } });
-      const lotes: string[][] = [];
-      for (let i = 0; i < falhados.length; i += 20) lotes.push(falhados.slice(i, i + 20));
-      const restantes = await correrLotes(lotes, inicio.run_id, 0, falhados.length);
-      if (restantes.length === 0) toast.success("Todos os artigos em falta foram classificados.");
-    } catch (e: any) {
-      toast.error(e?.message ?? "Não foi possível repetir os artigos em falta.");
+      toast.error(e?.message ?? "Não foi possível continuar a separação.");
+      await atualizarTudo();
     } finally {
       setACorrer(false);
     }
@@ -252,10 +251,13 @@ function PreparacaoConsultas() {
 
   async function verificar() {
     if (!orcamentoId) return;
-    const est = await estadoFn({ data: { orcamento_id: orcamentoId } });
-    setEstado(est);
-    setFalhados(est.artigos_em_falta);
-    toast.info(est.completo ? "Todos os artigos estão processados." : `${est.em_falta} artigos ainda por processar.`);
+    const { data: est } = await recarregarEstado();
+    if (!est) return;
+    toast.info(
+      est.completo
+        ? "Todos os artigos estão classificados."
+        : `${est.pendentes + est.falhados} artigos ainda por classificar.`,
+    );
   }
 
   async function confirmarSelecionados(subId: string | null) {
@@ -315,10 +317,15 @@ function PreparacaoConsultas() {
     });
   }
 
-  const totalArtigos = linhas?.length ?? 0;
-  const classificados = (linhas ?? []).filter((l) => l.confianca > 0 || l.subempreitada_id || l.justificacao).length;
-  const porRever = (linhas ?? []).filter((l) => l.necessita_revisao && !l.validado_manual).length;
-  const validados = (linhas ?? []).filter((l) => l.validado_manual).length;
+  // Todos os números vêm de classificações efetivamente guardadas, nunca de lotes tentados.
+  const totalArtigos = estado?.total ?? linhas?.length ?? 0;
+  const classificados = estado?.classificados ?? 0;
+  const pendentes = estado?.pendentes ?? 0;
+  const falhados = estado?.falhados ?? 0;
+  const emFalta = pendentes + falhados;
+  const porRever = estado?.necessitam_revisao ?? 0;
+  const validados = estado?.validados ?? 0;
+  const percentagem = estado?.percentagem ?? 0;
 
   return (
     <div className="p-6 space-y-5">
@@ -343,44 +350,56 @@ function PreparacaoConsultas() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={separarComIA} disabled={!orcamentoId || aCorrer}>
+          <Button onClick={continuarSeparacao} disabled={!orcamentoId || aCorrer}>
             {aCorrer ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            Separar Artigos por Subempreitada com IA
+            {emFalta > 0 && classificados > 0
+              ? `Processar ${emFalta} artigos em falta`
+              : "Separar Artigos por Subempreitada com IA"}
           </Button>
+          {aCorrer && (
+            <Button variant="outline" onClick={() => setParar(true)}>
+              Parar
+            </Button>
+          )}
         </div>
       </div>
 
-      {progresso && (
+      {totalArtigos > 0 && (
         <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
             <span>
-              {aCorrer ? "A analisar artigos com IA…" : "Análise terminada"} — {progresso.feitos} de {progresso.total}
+              {aCorrer ? "A analisar artigos com IA…" : "Progresso guardado"} — {classificados} de {totalArtigos}{" "}
+              artigos classificados ({percentagem}%)
             </span>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={verificar} disabled={aCorrer}>
                 Verificar integridade
               </Button>
-              {falhados.length > 0 && (
-                <Button size="sm" variant="outline" onClick={repetirFalhados} disabled={aCorrer}>
-                  Repetir {falhados.length} artigos em falta
+              {falhados > 0 && (
+                <Button size="sm" variant="outline" onClick={continuarSeparacao} disabled={aCorrer}>
+                  Repetir {falhados} falhados
+                </Button>
+              )}
+              {emFalta > 0 && (
+                <Button size="sm" onClick={continuarSeparacao} disabled={aCorrer}>
+                  Continuar separação
                 </Button>
               )}
             </div>
           </div>
           <div className="h-2 rounded bg-muted overflow-hidden">
-            <div
-              className="h-full bg-primary transition-all"
-              style={{ width: `${Math.min(100, (progresso.feitos / Math.max(1, progresso.total)) * 100)}%` }}
-            />
+            <div className="h-full bg-primary transition-all" style={{ width: `${Math.min(100, percentagem)}%` }} />
           </div>
         </Card>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {[
           { label: "Artigos no MQ", valor: totalArtigos },
-          { label: "Analisados pela IA", valor: classificados },
-          { label: "A necessitar revisão", valor: porRever },
+          { label: "Classificados", valor: classificados },
+          { label: "Para revisão", valor: porRever },
+          { label: "Pendentes", valor: pendentes },
+          { label: "Falhados", valor: falhados },
           { label: "Confirmados por si", valor: validados },
         ].map((k) => (
           <Card key={k.label} className="p-3">
@@ -390,11 +409,16 @@ function PreparacaoConsultas() {
         ))}
       </div>
 
-      {estado && !estado.completo && (
-        <Card className="p-3 border-amber-500/40 text-sm flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
-          Separação incompleta: {estado.em_falta} artigos por processar, {estado.duplicados} duplicações,{" "}
-          {estado.sem_subempreitada} sem subempreitada válida.
+      {estado && !estado.completo && totalArtigos > 0 && (
+        <Card className="p-3 border-amber-500/40 text-sm space-y-1">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            Separação incompleta: {pendentes} pendentes, {falhados} falhados, {estado.sem_subempreitada} sem
+            subempreitada válida. A organização do Mapa de Quantidades fica bloqueada até não faltar nenhum artigo.
+          </div>
+          {estado.erros_lotes?.length ? (
+            <div className="text-xs text-muted-foreground">Último erro: {estado.erros_lotes[0]}</div>
+          ) : null}
         </Card>
       )}
       {estado?.sugestoes_novas?.length ? (
