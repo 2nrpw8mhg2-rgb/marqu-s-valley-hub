@@ -317,10 +317,15 @@ function PreparacaoConsultas() {
     });
   }
 
-  const totalArtigos = linhas?.length ?? 0;
-  const classificados = (linhas ?? []).filter((l) => l.confianca > 0 || l.subempreitada_id || l.justificacao).length;
-  const porRever = (linhas ?? []).filter((l) => l.necessita_revisao && !l.validado_manual).length;
-  const validados = (linhas ?? []).filter((l) => l.validado_manual).length;
+  // Todos os números vêm de classificações efetivamente guardadas, nunca de lotes tentados.
+  const totalArtigos = estado?.total ?? linhas?.length ?? 0;
+  const classificados = estado?.classificados ?? 0;
+  const pendentes = estado?.pendentes ?? 0;
+  const falhados = estado?.falhados ?? 0;
+  const emFalta = pendentes + falhados;
+  const porRever = estado?.necessitam_revisao ?? 0;
+  const validados = estado?.validados ?? 0;
+  const percentagem = estado?.percentagem ?? 0;
 
   return (
     <div className="p-6 space-y-5">
