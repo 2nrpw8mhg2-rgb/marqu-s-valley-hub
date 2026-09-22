@@ -494,8 +494,8 @@ function PreparacaoConsultas() {
         <Button size="sm" variant="outline" disabled={selecionados.size === 0} onClick={() => confirmarSelecionados(null)}>
           <CheckCircle2 className="h-4 w-4" /> Confirmar como está
         </Button>
-        <Button size="sm" variant="outline" onClick={aplicarAoMQ} disabled={!orcamentoId}>
-          Organizar Mapa de Quantidades
+        <Button size="sm" variant="outline" onClick={aplicarAoMQ} disabled={!orcamentoId || !podeValidar}>
+          Validar Separação
         </Button>
         <Button size="sm" variant="outline" onClick={() => exportar("excel")} disabled={!totalArtigos}>
           <FileSpreadsheet className="h-4 w-4" /> Excel
