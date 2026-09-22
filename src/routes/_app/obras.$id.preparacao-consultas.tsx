@@ -128,7 +128,7 @@ function PreparacaoConsultas() {
       const { data: cls, error: e2 } = await supabase
         .from("consulta_ia_classificacoes")
         .select(
-          "artigo_id, subempreitada_id, trabalho_principal, confianca, justificacao, necessita_revisao, validado_manual, sugestao_nova_subempreitada",
+          "artigo_id, subempreitada_id, subempreitada_ia_id, confianca, confianca_ia, trabalho_principal, justificacao, necessita_revisao, validado_manual, sugestao_nova_subempreitada",
         )
         .eq("orcamento_id", orcamentoId!);
       if (e2) throw e2;
@@ -147,8 +147,10 @@ function PreparacaoConsultas() {
           capitulo_codigo: cap?.codigo ?? null,
           capitulo_descricao: cap?.descricao ?? null,
           subempreitada_id: c?.subempreitada_id ?? null,
+          subempreitada_ia_id: c?.subempreitada_ia_id ?? c?.subempreitada_id ?? null,
           trabalho_principal: c?.trabalho_principal ?? null,
           confianca: Number(c?.confianca ?? 0),
+          confianca_ia: Number(c?.confianca_ia ?? c?.confianca ?? 0),
           justificacao: c?.justificacao ?? null,
           necessita_revisao: Boolean(c?.necessita_revisao),
           validado_manual: Boolean(c?.validado_manual),
