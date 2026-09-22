@@ -6,7 +6,25 @@
  * que permanece isolado e intacto.
  */
 
-export const TAMANHO_LOTE_IA = 20;
+export { TAMANHO_LOTE_PADRAO, MAX_LOTES_CONCORRENTES, MAX_TENTATIVAS_LOTE } from "./reconciliacao";
+
+/** Tamanho de lote em vigor (reduzido de 20 para 10 após o diagnóstico de cobertura). */
+export const TAMANHO_LOTE_IA = 10;
+
+export type EstadoLote = "pendente" | "em_execucao" | "concluido" | "falhado";
+
+export type LoteConsulta = {
+  id: string;
+  run_id: string;
+  orcamento_id: string;
+  indice: number;
+  artigo_ids: string[];
+  estado: EstadoLote;
+  tentativas: number;
+  erro: string | null;
+  classificados: number;
+  ausentes: number;
+};
 
 export type ArtigoConsulta = {
   id: string;
