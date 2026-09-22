@@ -31,6 +31,9 @@ import {
   validarClassificacoesConsultaIA,
 } from "@/lib/consultas/separacao.functions";
 import { exportarExcelPorSubempreitada, exportarPDFPorSubempreitada } from "@/lib/subempreitadas/export";
+import { AReverPanel } from "@/components/consultas/AReverPanel";
+import { listarARever, podeValidarSeparacao, type LinhaRevisao } from "@/lib/consultas/revisao";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/obras/$id/preparacao-consultas")({
   component: PreparacaoConsultas,
@@ -53,23 +56,7 @@ export const Route = createFileRoute("/_app/obras/$id/preparacao-consultas")({
   }),
 });
 
-type Linha = {
-  artigo_id: string;
-  codigo: string | null;
-  descricao: string;
-  unidade: string | null;
-  quantidade: number;
-  preco_unitario: number;
-  capitulo_codigo: string | null;
-  capitulo_descricao: string | null;
-  subempreitada_id: string | null;
-  trabalho_principal: string | null;
-  confianca: number;
-  justificacao: string | null;
-  necessita_revisao: boolean;
-  validado_manual: boolean;
-  sugestao_nova_subempreitada: string | null;
-};
+type Linha = LinhaRevisao & { preco_unitario: number };
 
 const SEM_SUB = "__sem__";
 
@@ -141,7 +128,7 @@ function PreparacaoConsultas() {
       const { data: cls, error: e2 } = await supabase
         .from("consulta_ia_classificacoes")
         .select(
-          "artigo_id, subempreitada_id, trabalho_principal, confianca, justificacao, necessita_revisao, validado_manual, sugestao_nova_subempreitada",
+          "artigo_id, subempreitada_id, subempreitada_ia_id, confianca, confianca_ia, trabalho_principal, justificacao, necessita_revisao, validado_manual, sugestao_nova_subempreitada",
         )
         .eq("orcamento_id", orcamentoId!);
       if (e2) throw e2;
@@ -160,8 +147,10 @@ function PreparacaoConsultas() {
           capitulo_codigo: cap?.codigo ?? null,
           capitulo_descricao: cap?.descricao ?? null,
           subempreitada_id: c?.subempreitada_id ?? null,
+          subempreitada_ia_id: c?.subempreitada_ia_id ?? c?.subempreitada_id ?? null,
           trabalho_principal: c?.trabalho_principal ?? null,
           confianca: Number(c?.confianca ?? 0),
+          confianca_ia: Number(c?.confianca_ia ?? c?.confianca ?? 0),
           justificacao: c?.justificacao ?? null,
           necessita_revisao: Boolean(c?.necessita_revisao),
           validado_manual: Boolean(c?.validado_manual),
@@ -327,6 +316,15 @@ function PreparacaoConsultas() {
   const validados = estado?.validados ?? 0;
   const percentagem = estado?.percentagem ?? 0;
 
+  const queryKeyLinhas = ["consultas-linhas", orcamentoId] as const;
+  const aRever = useMemo(() => listarARever(linhas ?? []), [linhas]);
+  const podeValidar = podeValidarSeparacao({
+    total: totalArtigos,
+    pendentes,
+    falhados,
+    a_rever: aRever.length,
+  });
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -428,6 +426,35 @@ function PreparacaoConsultas() {
         </Card>
       ) : null}
 
+      {orcamentoId && aRever.length > 0 && (
+        <AReverPanel
+          orcamentoId={orcamentoId}
+          linhas={(linhas ?? []) as LinhaRevisao[]}
+          subempreitadas={subempreitadas ?? []}
+          queryKey={[...queryKeyLinhas]}
+          onAlterado={atualizarTudo}
+        />
+      )}
+
+      {podeValidar && (
+        <Card className="p-4 space-y-2 border-primary/40">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+            Revisão concluída — Todos os artigos do Mapa de Quantidades têm uma subempreitada atribuída.
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={aplicarAoMQ}>
+              Validar Separação
+            </Button>
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/obras/$id/procurement" params={{ id: obraId }}>
+                Preparar Consultas a Subempreiteiros
+              </Link>
+            </Button>
+          </div>
+        </Card>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex gap-1">
           {(
@@ -467,8 +494,8 @@ function PreparacaoConsultas() {
         <Button size="sm" variant="outline" disabled={selecionados.size === 0} onClick={() => confirmarSelecionados(null)}>
           <CheckCircle2 className="h-4 w-4" /> Confirmar como está
         </Button>
-        <Button size="sm" variant="outline" onClick={aplicarAoMQ} disabled={!orcamentoId}>
-          Organizar Mapa de Quantidades
+        <Button size="sm" variant="outline" onClick={aplicarAoMQ} disabled={!orcamentoId || !podeValidar}>
+          Validar Separação
         </Button>
         <Button size="sm" variant="outline" onClick={() => exportar("excel")} disabled={!totalArtigos}>
           <FileSpreadsheet className="h-4 w-4" /> Excel
