@@ -70,6 +70,12 @@ const SEM_SUB = "__sem__";
 
 function PreparacaoConsultas() {
   const { id: obraId } = Route.useParams();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/obras/$id/preparacao-consultas" });
+  const vista: VistaConsultas = validarVista(search.vista);
+  function irPara(v: VistaConsultas) {
+    navigate({ search: () => paramsDaVista(v) });
+  }
   const qc = useQueryClient();
   const preparar = useServerFn(prepararSeparacaoConsultaIA);
   const processarLotes = useServerFn(processarLotesConsultaIA);
