@@ -144,12 +144,14 @@ export function resumoQuantidade(artigos: ArtigoMapa[]): string | null {
 }
 
 export function agruparArtigos(artigos: ArtigoMapa[]): GrupoCapitulo[] {
-  const capitulos = new Map<string, { nome: string; artigos: ArtigoMapa[]; subs: Map<string, { nome: string; artigos: ArtigoMapa[] }> }>();
+  type GrupoInterno = { nome: string; artigos: ArtigoMapa[] };
+  type CapituloInterno = GrupoInterno & { subs: Map<string, GrupoInterno> };
+  const capitulos = new Map<string, CapituloInterno>();
   for (const artigo of artigos) {
     const h = hierarquiaArtigo(artigo);
-    const cap = capitulos.get(h.capituloId) ?? { nome: h.capitulo, artigos: [], subs: new Map() };
+    const cap: CapituloInterno = capitulos.get(h.capituloId) ?? { nome: h.capitulo, artigos: [], subs: new Map<string, GrupoInterno>() };
     cap.artigos.push(artigo);
-    const sub = cap.subs.get(h.subcapituloId) ?? { nome: h.subcapitulo, artigos: [] };
+    const sub: GrupoInterno = cap.subs.get(h.subcapituloId) ?? { nome: h.subcapitulo, artigos: [] };
     sub.artigos.push(artigo);
     cap.subs.set(h.subcapituloId, sub);
     capitulos.set(h.capituloId, cap);
