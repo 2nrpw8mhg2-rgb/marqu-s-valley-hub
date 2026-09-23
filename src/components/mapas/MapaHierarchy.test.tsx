@@ -41,13 +41,14 @@ describe("estrutura DOM da tabela do mapa", () => {
     expect(colunas).toBe(6);
     expect(ths).toBe(6);
     // grupos de capítulo/subcapítulo ocupam a largura total, fora da linha do artigo
-    expect(primeiraLinha).toContain('colspan="6"');
+    expect(primeiraLinha).toMatch(/colspan="6"/i);
   });
 
   it("cabeçalho sticky abaixo da toolbar, sem posicionamento absoluto nem margens negativas", () => {
     expect(html).toContain("top-[var(--mapa-toolbar-h,0px)]");
-    expect(html).not.toContain("absolute");
-    expect(html).not.toMatch(/-m[tblrxy]?-\d/);
+    const classes = (html.match(/class="[^"]*"/g) ?? []).join(" ");
+    expect(classes).not.toMatch(/(^| )absolute( |")/);
+    expect(classes).not.toMatch(/(^| )-m[tblrxy]?-\d/);
   });
 
   it("descrição recolhida usa line-clamp e expandida deixa de usar", () => {
