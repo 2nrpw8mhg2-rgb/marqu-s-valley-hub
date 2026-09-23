@@ -10,7 +10,22 @@ import { MapaToolbar } from "./MapaToolbar";
 
 type Props = { artigos: ArtigoMapa[]; estado: MapaSearch; onEstado: (patch: Partial<MapaSearch>, reiniciar?: boolean) => void };
 
+function useAlturaToolbar() {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [altura, setAltura] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setAltura(el.getBoundingClientRect().height));
+    ro.observe(el);
+    setAltura(el.getBoundingClientRect().height);
+    return () => ro.disconnect();
+  }, []);
+  return { ref, altura };
+}
+
 export function MapaQuantidadesView({ artigos, estado, onEstado }: Props) {
+  const toolbar = useAlturaToolbar();
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [gruposFechados, setGruposFechados] = useState<Set<string>>(new Set());
