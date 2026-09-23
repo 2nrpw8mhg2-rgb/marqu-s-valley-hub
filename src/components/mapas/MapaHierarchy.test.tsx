@@ -25,6 +25,24 @@ function render(expandidos: Set<string> = new Set()) {
   );
 }
 
+function renderComGruposLongos(descricoesGruposExpandidas = new Set<string>(), gruposFechados = new Set<string>(), onGrupo = () => {}) {
+  return renderToStaticMarkup(
+    <MapaHierarchy
+      artigos={[artigo("sete", 1, { capitulo_codigo: "7.1", capitulo_descricao: "7.1 Revestimentos interiores em madeira com descrição técnica integral muito longa" })]}
+      selecionados={new Set()}
+      expandidos={new Set()}
+      descricoesGruposExpandidas={descricoesGruposExpandidas}
+      gruposFechados={gruposFechados}
+      onSelecionar={() => {}}
+      onSelecionarTodos={() => {}}
+      onExpandirDescricao={() => {}}
+      onExpandirDescricaoGrupo={() => {}}
+      onDetalhes={() => {}}
+      onGrupo={onGrupo}
+    />,
+  );
+}
+
 describe("estrutura DOM da tabela do mapa", () => {
   const html = render();
 
@@ -58,5 +76,20 @@ describe("estrutura DOM da tabela do mapa", () => {
     const expandido = render(new Set(["a", "b"]));
     expect(expandido).not.toContain("line-clamp-3");
     expect(expandido).toContain("Recolher");
+  });
+
+  it("aplica o título truncável a capítulos e subcapítulos sem alterar o estado dos artigos", () => {
+    const html = renderComGruposLongos();
+    expect(html).toContain("line-clamp-1 max-md:line-clamp-2");
+    expect(html).toContain("7.1 Revestimentos interiores em madeira com descrição técnica integral muito longa");
+    expect(html.match(/aria-label="Expandir artigos do (capítulo|subcapítulo)/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(html).toContain("aria-expanded=\"true\"");
+  });
+
+  it("a expansão da descrição é independente do chevron do grupo", () => {
+    const fechado = renderComGruposLongos(new Set(["7::7.1"]), new Set(["7::7.1"]));
+    expect(fechado).toContain("whitespace-normal");
+    expect(fechado).toContain('aria-label="Expandir artigos do subcapítulo');
+    expect(fechado).toContain('aria-expanded="false"');
   });
 });

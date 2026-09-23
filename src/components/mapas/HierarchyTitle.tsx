@@ -28,11 +28,12 @@ export function HierarchyTitle({ texto, rotuloGrupo, expandido, onAlternar, clas
   useLayoutEffect(() => {
     medir();
     const elemento = textoRef.current;
-    if (!elemento || typeof ResizeObserver === "undefined") return;
+    if (!elemento) return;
+    window.addEventListener("resize", medir);
+    if (typeof ResizeObserver === "undefined") return () => window.removeEventListener("resize", medir);
     const observador = new ResizeObserver(medir);
     observador.observe(elemento);
     if (elemento.parentElement) observador.observe(elemento.parentElement);
-    window.addEventListener("resize", medir);
     return () => {
       observador.disconnect();
       window.removeEventListener("resize", medir);
