@@ -82,7 +82,7 @@ describe("estrutura DOM da tabela do mapa", () => {
     const html = renderComGruposLongos();
     expect(html).toContain("line-clamp-1 max-md:line-clamp-2");
     expect(html).toContain("7.1 Revestimentos interiores em madeira com descrição técnica integral muito longa");
-    expect(html.match(/aria-label="Expandir artigos do (capítulo|subcapítulo)/g)?.length).toBeGreaterThanOrEqual(2);
+    expect((html.match(/aria-label="(?:Recolher|Expandir) artigos do (?:capítulo|subcapítulo)/g) ?? []).length).toBeGreaterThanOrEqual(2);
     expect(html).toContain("aria-expanded=\"true\"");
   });
 

@@ -65,14 +65,17 @@ describe("título hierárquico truncável", () => {
     await act(async () => raiz.unmount());
   });
 
-  it("ativa a ação por teclado como um botão real", async () => {
+  it("expõe um botão focável e acessível para ativação por teclado", async () => {
     const onAlternar = vi.fn();
     const { raiz } = await renderTitulo("Capítulo muito longo para teste de teclado e leitores de ecrã", false, onAlternar);
     await definirOverflow(64);
     const botao = contentor.querySelector<HTMLButtonElement>("button");
     botao?.focus();
-    botao?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    botao?.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
+    expect(botao?.tagName).toBe("BUTTON");
+    expect(document.activeElement).toBe(botao);
+    expect(botao?.getAttribute("aria-expanded")).toBe("false");
+    expect(botao?.getAttribute("aria-controls")).toBeTruthy();
+    botao?.click();
     expect(onAlternar).toHaveBeenCalledOnce();
     await act(async () => raiz.unmount());
   });
