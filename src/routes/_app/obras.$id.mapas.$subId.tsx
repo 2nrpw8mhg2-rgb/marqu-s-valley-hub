@@ -1,13 +1,13 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MapaQuantidadesView } from "@/components/mapas/MapaQuantidadesView";
 import { AlertTriangle, Download, FileSpreadsheet, Loader2 } from "lucide-react";
 import {
   dataPT,
-  derivarCapitulos,
   derivarPastas,
   estadoMapas,
   nomeFicheiroMapa,
@@ -16,8 +16,10 @@ import { MIME_PDF, MIME_XLSX, descarregar, useMapasObra } from "@/lib/mapas/dado
 import { excelMapaBytes, type MetaMapa } from "@/lib/mapas/excel";
 import { pdfMapaBytes } from "@/lib/mapas/pdf";
 import { exigeRevisao } from "@/lib/consultas/revisao";
+import { validarMapaSearch } from "@/lib/mapas/view";
 
 export const Route = createFileRoute("/_app/obras/$id/mapas/$subId")({
+  validateSearch: validarMapaSearch,
   component: MapaSubempreitada,
   head: () => ({
     meta: [
@@ -40,7 +42,9 @@ export const Route = createFileRoute("/_app/obras/$id/mapas/$subId")({
 
 function MapaSubempreitada() {
   const { id: obraId, subId } = Route.useParams();
-  const { data, isLoading } = useMapasObra(obraId);
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/obras/$id/mapas/$subId" });
+  const { data, isLoading, isError, refetch } = useMapasObra(obraId);
   const [aExportar, setAExportar] = useState<"xlsx" | "pdf" | null>(null);
 
   const artigos = data?.artigos ?? [];
@@ -98,8 +102,19 @@ function MapaSubempreitada() {
     }
   }
 
+  function alterarVista(patch: Partial<typeof search>, reiniciar = false) {
+    navigate({
+      search: (anterior) => ({
+        ...anterior,
+        ...patch,
+        ...(reiniciar ? { pagina: 1 } : {}),
+      }),
+      replace: true,
+    });
+  }
+
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-4 p-3 sm:p-5 lg:p-6">
       <nav className="text-xs text-muted-foreground" aria-label="Percurso">
         <Link to="/obras/$id/preparacao-consultas" params={{ id: obraId }} className="hover:text-foreground">
           Preparação de Consultas
@@ -112,23 +127,25 @@ function MapaSubempreitada() {
         <span className="text-foreground">{pasta?.etiqueta ?? "—"}</span>
       </nav>
 
-      {isLoading && <p className="text-sm text-muted-foreground">A carregar mapa…</p>}
+      {isLoading && <div className="space-y-3" aria-label="A carregar mapa"><Skeleton className="h-24 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>}
+
+      {isError && <div className="rounded-md border bg-card p-8 text-center"><p className="text-sm font-medium">Não foi possível carregar o mapa.</p><Button variant="outline" className="mt-3" onClick={() => refetch()}>Tentar novamente</Button></div>}
 
       {!isLoading && !pasta && (
-        <Card className="p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-md border bg-card p-8 text-center text-sm text-muted-foreground">
           Esta subempreitada já não tem artigos atribuídos.
-        </Card>
+        </div>
       )}
 
       {pasta && (
         <>
-          <Card className="p-4 flex flex-wrap items-end justify-between gap-3">
-            <div className="space-y-1">
+          <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-b pb-4 sm:flex sm:flex-wrap sm:items-end sm:justify-between">
+            <div className="min-w-0 space-y-1">
               <div className="text-xs text-muted-foreground">
                 {meta.obra_nome}
                 {data?.obra?.cliente ? ` · ${data.obra.cliente}` : ""}
               </div>
-              <h2 className="text-xl font-semibold tracking-tight">{pasta.etiqueta}</h2>
+              <h1 className="truncate text-xl font-semibold sm:text-2xl">{pasta.etiqueta}</h1>
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <Badge variant={pasta.validada && !estado.provisorio ? "default" : "outline"}>
                   {pasta.validada && !estado.provisorio ? "Validado" : "Provisório"}
@@ -137,63 +154,29 @@ function MapaSubempreitada() {
                 <span>Versão {meta.versao}</span>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => exportar("xlsx")} disabled={aExportar !== null}>
+            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+              <Button variant="outline" size="sm" onClick={() => exportar("xlsx")} disabled={aExportar !== null}>
                 {aExportar === "xlsx" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
                 Exportar Excel
               </Button>
-              <Button variant="outline" onClick={() => exportar("pdf")} disabled={aExportar !== null}>
+              <Button variant="outline" size="sm" onClick={() => exportar("pdf")} disabled={aExportar !== null}>
                 {aExportar === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 Exportar PDF
               </Button>
             </div>
-          </Card>
+          </header>
 
           {estado.provisorio && (
-            <Card className="p-3 border-amber-500/40 text-sm flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5" />
+            <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 p-3 text-sm">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
               <span>
                 Separação incompleta ({estado.motivos.join(", ")}). As exportações saem marcadas como{" "}
                 <strong>PROVISÓRIAS</strong>.
               </span>
-            </Card>
+            </div>
           )}
 
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-xs text-muted-foreground">
-                  <tr className="border-b">
-                    <th className="text-left p-2 w-24">Código</th>
-                    <th className="text-left p-2 min-w-[320px]">Descrição original</th>
-                    <th className="text-left p-2 w-16">Un.</th>
-                    <th className="text-right p-2 w-24">Quantidade</th>
-                    <th className="text-left p-2 w-40">Capítulo</th>
-                    <th className="text-left p-2 w-40">Subcapítulo</th>
-                    <th className="text-left p-2 w-48">Observações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pasta.artigos.map((a) => {
-                    const c = derivarCapitulos(a);
-                    return (
-                      <tr key={a.artigo_id} className="border-b last:border-0 align-top">
-                        <td className="p-2 font-mono text-xs">{a.codigo ?? "—"}</td>
-                        <td className="p-2 whitespace-pre-wrap break-words">{a.descricao}</td>
-                        <td className="p-2">{a.unidade ?? "—"}</td>
-                        <td className="p-2 text-right tabular-nums">{a.quantidade}</td>
-                        <td className="p-2 text-xs">{c.capitulo || "—"}</td>
-                        <td className="p-2 text-xs">{c.subcapitulo || "—"}</td>
-                        <td className="p-2 text-xs text-muted-foreground whitespace-pre-wrap break-words">
-                          {a.observacoes ?? a.referencia_documental ?? "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          <MapaQuantidadesView artigos={pasta.artigos} estado={search} onEstado={alterarVista} />
         </>
       )}
     </div>
