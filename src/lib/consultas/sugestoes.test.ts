@@ -8,7 +8,7 @@ import {
   sugestaoNovaComum,
 } from "./sugestoes";
 import { aplicarAtribuicaoOtimista, listarARever, type LinhaRevisao } from "./revisao";
-import { construirPastas } from "@/lib/mapas/pastas";
+import { derivarPastas } from "@/lib/mapas/pastas";
 
 /** Fixtures do caso real, sem tocar nos artigos reais. */
 const LAREIRAS = "Lareiras e Braseiras";
@@ -81,7 +81,7 @@ describe("aceitação de sugestões novas", () => {
 
   it("cria a pasta dinâmica correspondente em Mapas por Subempreitada", () => {
     const linhas = aplicarAtribuicaoOtimista([linha({ artigo_id: "a" })], ["a"], "sub-nova-lareiras");
-    const pastas = construirPastas(
+    const pastas = derivarPastas(
       linhas.map((l) => ({
         artigo_id: l.artigo_id,
         codigo: l.codigo,
@@ -96,11 +96,13 @@ describe("aceitação de sugestões novas", () => {
         necessita_revisao: l.necessita_revisao,
         confianca: l.confianca,
         classificado: l.classificado,
+        observacoes: null,
+        sugestao_nova_subempreitada: l.sugestao_nova_subempreitada,
       })) as any,
       [{ id: "sub-nova-lareiras", codigo: "LAREIRAS", nome: LAREIRAS }],
     );
-    expect(pastas.pastas.map((p) => p.nome)).toContain(LAREIRAS);
-    expect(pastas.pastas.find((p) => p.nome === LAREIRAS)?.artigos).toHaveLength(1);
+    expect(pastas.map((p) => p.nome)).toContain(LAREIRAS);
+    expect(pastas.find((p) => p.nome === LAREIRAS)?.artigos).toHaveLength(1);
   });
 
   it("em massa, artigos com a mesma sugestão nova geram uma única subempreitada", () => {
