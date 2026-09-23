@@ -18,8 +18,8 @@ import { Plus, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowLeftRight } from
 import { cn } from "@/lib/utils";
 import type { Especialidade, Subespecialidade } from "@/lib/biblioteca-mestra/types";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/subespecialidades")({
-  head: () => ({ meta: [{ title: "Subespecialidades — Biblioteca Mestra — MV OS" }] }),
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/subespecialidades")({
+  head: () => ({ meta: [{ title: "Subespecialidades — Biblioteca de Subempreitadas — MV OS" }] }),
   component: SubesPage,
 });
 
@@ -170,7 +170,7 @@ function SubesPage() {
     <>
       <PageHeader
         title="Subespecialidades"
-        subtitle="Segundo nível da Biblioteca Mestra — agrupamentos técnicos por especialidade"
+        subtitle="Segundo nível da Biblioteca de Subempreitadas — agrupamentos técnicos por especialidade"
       />
       <div className="p-6 space-y-4">
         <div className="relative max-w-md">

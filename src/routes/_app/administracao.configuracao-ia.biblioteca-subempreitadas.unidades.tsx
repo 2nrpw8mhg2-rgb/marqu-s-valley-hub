@@ -16,8 +16,8 @@ import { toast } from "sonner";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import type { Unidade } from "@/lib/biblioteca-mestra/types";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/unidades")({
-  head: () => ({ meta: [{ title: "Unidades — Biblioteca Mestra — MV OS" }] }),
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/unidades")({
+  head: () => ({ meta: [{ title: "Unidades — Biblioteca de Subempreitadas — MV OS" }] }),
   component: UnidadesPage,
 });
 

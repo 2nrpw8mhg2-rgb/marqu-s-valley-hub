@@ -17,8 +17,8 @@ import { Plus, Edit, Trash2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { classificarTudo } from "@/lib/subempreitadas/classify.functions";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/subempreitadas")({
-  head: () => ({ meta: [{ title: "Subempreitadas — Biblioteca Mestra — MV OS" }] }),
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/subempreitadas")({
+  head: () => ({ meta: [{ title: "Subempreitadas — Biblioteca de Subempreitadas — MV OS" }] }),
   component: SubempreitadasAdmin,
 });
 

@@ -291,7 +291,7 @@ export function KnowledgeRunReport({ runId, report, onClose, onRegenerar }: Prop
   const handleEditar = () => {
     if (!report.artigo) return;
     navigate({
-      to: "/biblioteca-mestra/artigos",
+      to: "/administracao/configuracao-ia/biblioteca-subempreitadas/artigos",
       search: { artigoId: report.artigo.id, tab: "conhecimento" } as any,
     });
   };

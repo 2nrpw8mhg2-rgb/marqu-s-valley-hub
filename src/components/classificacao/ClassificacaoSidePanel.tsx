@@ -60,13 +60,13 @@ export function ClassificacaoSidePanel({
   const handleEnsinar = async (a: EnsinarAcao) => {
     if (!row) return;
     if (a === "criar_artigo") {
-      navigate({ to: "/biblioteca-mestra/artigos", search: { novo: 1, desc: row.descricao_original } as any });
+      navigate({ to: "/administracao/configuracao-ia/biblioteca-subempreitadas/artigos", search: { novo: 1, desc: row.descricao_original } as any });
     } else if (a === "adicionar_keyword") {
       setKwOpen(true);
     } else if (a === "criar_regra") {
       toast.info("Motor de regras formal — em breve");
     } else if (a === "criar_relacao") {
-      navigate({ to: "/biblioteca-mestra/sistemas" });
+      navigate({ to: "/administracao/configuracao-ia/biblioteca-subempreitadas/sistemas" });
     } else if (a === "ignorar") {
       const motivo = `${row.motivo ?? ""} [ignorado]`.trim();
       const { error } = await supabase.from("classificacao_artigos").update({ motivo }).eq("id", row.id);

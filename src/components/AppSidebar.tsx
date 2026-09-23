@@ -6,23 +6,34 @@ import {
   Users,
   Calculator,
   Layers,
-  BookMarked,
   ShoppingCart,
   Sparkles,
   LogOut,
-  Library,
   History,
   Wand2,
+  Settings,
+  Menu,
   type LucideIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { Logo } from "@/components/Logo";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
+import { usePodeAdministrar } from "@/hooks/usePermissoes";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { DESCRICAO_CONFIGURACAO_IA, ROTA_CONFIGURACAO_IA, seccoesVisiveis } from "@/lib/navegacao/menu";
 
-type NavItem = { to: string; label: string; icon: LucideIcon; phase?: string; disabled?: boolean };
+type NavItem = {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  descricao?: string;
+  phase?: string;
+  disabled?: boolean;
+};
 
-const sections: { title: string; items: NavItem[] }[] = [
+export const sections: { title: string; items: NavItem[]; adminOnly?: boolean }[] = [
   {
     title: "Fase 1 — MVP",
     items: [
@@ -30,23 +41,6 @@ const sections: { title: string; items: NavItem[] }[] = [
       { to: "/obras", label: "CRM de Obras", icon: HardHat },
       { to: "/documentos", label: "Gestão Documental", icon: FileText },
       { to: "/subempreiteiros", label: "Subempreiteiros", icon: Users },
-    ],
-  },
-  {
-    title: "Biblioteca Mestra",
-    items: [
-      { to: "/biblioteca-mestra", label: "Explorador", icon: Library },
-      { to: "/biblioteca-mestra/especialidades", label: "Especialidades", icon: BookMarked },
-      { to: "/biblioteca-mestra/subespecialidades", label: "Subespecialidades", icon: Layers },
-      { to: "/biblioteca-mestra/subempreitadas", label: "Subempreitadas", icon: Users },
-      
-      { to: "/biblioteca-mestra/categorias", label: "Categorias", icon: Layers },
-      { to: "/biblioteca-mestra/artigos", label: "Pesquisa de Artigos", icon: FileText },
-      { to: "/biblioteca-mestra/keywords", label: "Palavras-chave", icon: Sparkles },
-      { to: "/biblioteca-mestra/sistemas", label: "Sistemas Construtivos", icon: Layers },
-      { to: "/biblioteca-mestra/unidades", label: "Unidades", icon: Layers },
-      { to: "/biblioteca-mestra/templates", label: "Templates de Obra", icon: HardHat },
-      { to: "/biblioteca-mestra/knowledge-builder", label: "Knowledge Builder", icon: Wand2 },
     ],
   },
   {
@@ -76,6 +70,18 @@ const sections: { title: string; items: NavItem[] }[] = [
       { to: "/ia", label: "Agentes IA", icon: Sparkles, phase: "Fase 4+", disabled: true },
     ],
   },
+  {
+    title: "Administração",
+    adminOnly: true,
+    items: [
+      {
+        to: ROTA_CONFIGURACAO_IA,
+        label: "Configuração da IA",
+        icon: Settings,
+        descricao: DESCRICAO_CONFIGURACAO_IA,
+      },
+    ],
+  },
 ];
 
 export function AppSidebar() {
@@ -89,14 +95,14 @@ export function AppSidebar() {
     navigate({ to: "/auth", replace: true });
   };
 
-  return (
-    <aside className="hidden md:flex md:flex-col w-64 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-      <div className="p-5 border-b border-sidebar-border">
-        <Logo />
-      </div>
+  const { podeAdministrar } = usePodeAdministrar();
+  const [aberto, setAberto] = useState(false);
+  const visiveis = seccoesVisiveis(sections, podeAdministrar);
 
+  const conteudo = (
+    <>
       <nav className="flex-1 overflow-y-auto p-3 space-y-6">
-        {sections.map((section) => (
+        {visiveis.map((section) => (
           <div key={section.title}>
             <h3 className="px-2 mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {section.title}
@@ -124,14 +130,22 @@ export function AppSidebar() {
                   <li key={item.to}>
                     <Link
                       to={item.to}
-                      className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
+                      onClick={() => setAberto(false)}
+                      className={`flex flex-col gap-0.5 rounded-md px-3 py-2 text-sm transition-colors ${
                         active
                           ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
                           : "hover:bg-sidebar-accent/60"
                       }`}
                     >
-                      <Icon className={`h-4 w-4 ${active ? "text-primary" : ""}`} />
-                      {item.label}
+                      <span className="flex items-center gap-2.5">
+                        <Icon className={`h-4 w-4 ${active ? "text-primary" : ""}`} />
+                        {item.label}
+                      </span>
+                      {item.descricao && (
+                        <span className="pl-[26px] text-[11px] leading-snug text-muted-foreground">
+                          {item.descricao}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 );
@@ -155,6 +169,37 @@ export function AppSidebar() {
           </Button>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <aside className="hidden md:flex md:flex-col w-64 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+        <div className="p-5 border-b border-sidebar-border">
+          <Logo />
+        </div>
+        {conteudo}
+      </aside>
+
+      <div className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center gap-2 border-b border-sidebar-border bg-sidebar px-3 py-2">
+        <Sheet open={aberto} onOpenChange={setAberto}>
+          <SheetTrigger asChild>
+            <Button size="icon" variant="ghost" aria-label="Abrir navegação">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent
+            side="left"
+            className="flex w-[85vw] max-w-xs flex-col overflow-y-auto bg-sidebar p-0 text-sidebar-foreground"
+          >
+            <div className="p-5 border-b border-sidebar-border">
+              <Logo />
+            </div>
+            {conteudo}
+          </SheetContent>
+        </Sheet>
+        <Logo />
+      </div>
+    </>
   );
 }

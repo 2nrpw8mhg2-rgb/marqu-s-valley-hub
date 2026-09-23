@@ -10,8 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Search } from "lucide-react";
 import type { ArtigoMestre, ArtigoKeyword, Subespecialidade, Especialidade } from "@/lib/biblioteca-mestra/types";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/keywords")({
-  head: () => ({ meta: [{ title: "Palavras-chave — Biblioteca Mestra — MV OS" }] }),
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/keywords")({
+  head: () => ({ meta: [{ title: "Palavras-chave — Biblioteca de Subempreitadas — MV OS" }] }),
   component: KeywordsPage,
 });
 

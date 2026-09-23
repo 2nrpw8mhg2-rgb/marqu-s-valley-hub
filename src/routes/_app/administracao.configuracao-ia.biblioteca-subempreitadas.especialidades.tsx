@@ -17,8 +17,8 @@ import { toast } from "sonner";
 import { Plus, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import type { Especialidade } from "@/lib/biblioteca-mestra/types";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/especialidades")({
-  head: () => ({ meta: [{ title: "Especialidades — Biblioteca Mestra — MV OS" }] }),
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/especialidades")({
+  head: () => ({ meta: [{ title: "Especialidades — Biblioteca de Subempreitadas — MV OS" }] }),
   component: EspecialidadesPage,
 });
 
@@ -107,7 +107,7 @@ function EspecialidadesPage() {
     <>
       <PageHeader
         title="Especialidades"
-        subtitle="Topo da hierarquia da Biblioteca Mestra"
+        subtitle="Topo da hierarquia da Biblioteca de Subempreitadas"
         actions={
           <Button onClick={() => { setEditing({ ativa: true }); setEditOpen(true); }}>
             <Plus className="h-4 w-4 mr-1" /> Nova

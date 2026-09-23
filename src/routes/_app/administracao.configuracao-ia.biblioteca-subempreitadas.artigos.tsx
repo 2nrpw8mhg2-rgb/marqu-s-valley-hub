@@ -25,8 +25,8 @@ import { ArtigoRelacoesDialog } from "@/components/biblioteca-mestra/ArtigoRelac
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArtigoConhecimentoTab } from "@/components/biblioteca-mestra/ArtigoConhecimentoTab";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/artigos")({
-  head: () => ({ meta: [{ title: "Artigos Mestre — Biblioteca Mestra — MV OS" }] }),
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/artigos")({
+  head: () => ({ meta: [{ title: "Artigos Mestre — Biblioteca de Subempreitadas — MV OS" }] }),
   component: ArtigosPage,
 });
 
@@ -294,7 +294,7 @@ function ArtigosPage() {
     <>
       <PageHeader
         title="Pesquisa Global de Artigos"
-        subtitle="Pesquisa transversal a toda a Biblioteca Mestra. Para navegar pela hierarquia, use o Explorador → Categorias."
+        subtitle="Pesquisa transversal a toda a Biblioteca de Subempreitadas. Para navegar pela hierarquia, use o Explorador → Categorias."
         actions={<Button onClick={() => openEdit()}><Plus className="h-4 w-4 mr-1" /> Novo</Button>}
       />
       <div className="p-6 space-y-4">

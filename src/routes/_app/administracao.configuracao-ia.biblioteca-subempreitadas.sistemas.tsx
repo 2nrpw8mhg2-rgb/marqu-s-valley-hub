@@ -25,8 +25,8 @@ import type {
 } from "@/lib/relacoes/types";
 import type { ArtigoMestre } from "@/lib/biblioteca-mestra/types";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/sistemas")({
-  head: () => ({ meta: [{ title: "Sistemas Construtivos — Biblioteca Mestra — MV OS" }] }),
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/sistemas")({
+  head: () => ({ meta: [{ title: "Sistemas Construtivos — Biblioteca de Subempreitadas — MV OS" }] }),
   component: SistemasPage,
 });
 
