@@ -67,6 +67,18 @@ export const sections: { title: string; items: NavItem[]; adminOnly?: boolean }[
       { to: "/ia", label: "Agentes IA", icon: Sparkles, phase: "Fase 4+", disabled: true },
     ],
   },
+  {
+    title: "Administração",
+    adminOnly: true,
+    items: [
+      {
+        to: ROTA_CONFIGURACAO_IA,
+        label: "Configuração da IA",
+        icon: Settings,
+        descricao: DESCRICAO_CONFIGURACAO_IA,
+      },
+    ],
+  },
 ];
 
 export function AppSidebar() {
