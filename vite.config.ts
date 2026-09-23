@@ -15,5 +15,28 @@ export default defineConfig({
   },
   vite: {
     plugins: [mcpPlugin()],
+    // Pré-otimizar o router evita que o Vite o descubra depois do primeiro
+    // carregamento e misture módulos ligados a instâncias React diferentes.
+    optimizeDeps: {
+      include: [
+        "@tanstack/react-router",
+        "@tanstack/router-core",
+        "@tanstack/history",
+      ],
+    },
+    environments: {
+      ssr: {
+        optimizeDeps: {
+          include: [
+            "react",
+            "react-dom",
+            "react-dom/server",
+            "react/jsx-runtime",
+            "react/jsx-dev-runtime",
+            "@tanstack/react-router",
+          ],
+        },
+      },
+    },
   },
 });
