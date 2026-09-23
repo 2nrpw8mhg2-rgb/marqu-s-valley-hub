@@ -37,7 +37,7 @@ function VisaoGeral() {
     try {
       const r = await reconciliarPacotes(dados.orcamento.id);
       await invalidar();
-      if (manual) toast.success(`${r.pacotes_criados} pacotes criados, ${r.pacotes_atualizados} atualizados.`);
+      if (manual) toast.success(`${r.pacotes_criados} pacotes criados, ${r.pacotes_existentes} já existentes.`);
     } catch (e: any) {
       if (manual) toast.error(e?.message ?? "Não foi possível sincronizar os pacotes.");
     } finally {

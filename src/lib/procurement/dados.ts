@@ -131,13 +131,13 @@ export function useProcurementObra(obraId: string) {
  * sem duplicados e sem apagar o que já avançou no processo.
  */
 export async function reconciliarPacotes(orcamentoId: string) {
-  const { data, error } = await (supabase as any).rpc("gerar_pacotes_por_subempreitada", {
+  const { data, error } = await (supabase as any).rpc("procurement_reconciliar_pacotes", {
     p_orcamento_id: orcamentoId,
   });
   if (error) throw new Error(error.message);
-  return (data?.[0] ?? { pacotes_criados: 0, pacotes_atualizados: 0, artigos_incluidos: 0 }) as {
+  return (data?.[0] ?? { pacotes_criados: 0, pacotes_existentes: 0, artigos_incluidos: 0 }) as {
     pacotes_criados: number;
-    pacotes_atualizados: number;
+    pacotes_existentes: number;
     artigos_incluidos: number;
   };
 }
