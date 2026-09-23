@@ -19,21 +19,19 @@ function normalizarTexto(t: string) {
  * auditoria nem de aprendizagem. Cada artigo fica com exatamente uma
  * subempreitada; uma subempreitada pode receber qualquer número de artigos.
  */
-export const atribuirSubempreitadaManual = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: { orcamento_id: string; artigo_ids: string[]; subempreitada_id: string; operacao_id: string }) =>
-      z
-        .object({
-          orcamento_id: z.string().uuid(),
-          artigo_ids: z.array(z.string().uuid()).min(1),
-          subempreitada_id: z.string().uuid(),
-          operacao_id: z.string().uuid(),
-        })
-        .parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    const sb = context.supabase;
+type EntradaAtribuicao = {
+  orcamento_id: string;
+  artigo_ids: string[];
+  subempreitada_id: string;
+  operacao_id: string;
+};
+
+/**
+ * Núcleo da atribuição manual, partilhado pela atribuição direta e pela
+ * aceitação de sugestões de nova subempreitada.
+ */
+async function executarAtribuicao(sb: any, userId: string, data: EntradaAtribuicao) {
+  {
     const agora = new Date().toISOString();
 
     const { data: atuais, error: eAtuais } = await sb
