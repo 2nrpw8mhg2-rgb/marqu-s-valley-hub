@@ -58,7 +58,7 @@ function ListaPacotes() {
         <p className="mt-1 text-sm text-muted-foreground">Organize e prepare as consultas ao mercado a partir dos mapas validados desta obra.</p>
       </header>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Resumo dos pacotes">
+      <section className="grid gap-3 sm:grid-cols-2" aria-label="Resumo dos pacotes">
         <Metrica rotulo="Pacotes criados" valor={metricas.total} />
         <Metrica rotulo="Consultas enviadas" valor={metricas.consultas_enviadas} />
         <Metrica rotulo="Propostas recebidas" valor={metricas.propostas_recebidas} />

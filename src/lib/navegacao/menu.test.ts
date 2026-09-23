@@ -15,6 +15,7 @@ describe("navegação — Administração → Configuração da IA → Bibliotec
     expect(titulos).not.toContain("Biblioteca Mestra");
     const rotas = sections.flatMap((s) => s.items.map((i) => i.to));
     expect(rotas.some((r) => r.startsWith("/biblioteca-mestra"))).toBe(false);
+    expect(rotas).not.toContain("/procurement/pacotes");
   });
 
   it("mostra o percurso administrativo a perfis autorizados", () => {
