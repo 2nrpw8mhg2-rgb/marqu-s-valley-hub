@@ -29,7 +29,7 @@ import {
   useProcurementObra,
 } from "@/lib/procurement/dados";
 import { ambitoPreenchido, etiquetaVersao, type Ambito } from "@/lib/procurement/fase1";
-import { Download, FileSignature, FileSpreadsheet, FolderOpen, Send, Users } from "lucide-react";
+import { Download, FileSignature, FileSpreadsheet, FolderKanban, FolderOpen, Send, Users } from "lucide-react";
 
 const SEPARADORES = [
   { chave: "mapa", rotulo: "Mapa de Quantidades" },
@@ -132,7 +132,7 @@ function PacoteDetalhe() {
   }
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
+    <main className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
       <nav className="text-xs text-muted-foreground" aria-label="Percurso">
         <Link to="/obras/$id/procurement" params={{ id }} className="hover:text-foreground">Procurement</Link>
         <span className="mx-1">→</span>
@@ -141,17 +141,21 @@ function PacoteDetalhe() {
         <span className="text-foreground">{pacote.nome}</span>
       </nav>
 
-      <header className="flex flex-wrap items-end justify-between gap-3 border-b pb-4">
-        <div className="min-w-0">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-primary/10 text-primary"><FolderKanban className="h-5 w-5" /></span>
+          <div className="min-w-0">
           <div className="text-xs text-muted-foreground">{dados.obra?.nome}</div>
-          <h1 className="truncate text-xl font-semibold sm:text-2xl">{pacote.nome}</h1>
+          <h1 className="break-words text-xl font-semibold sm:text-2xl">{pacote.nome}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <EstadoBadge estado={pacote.estado} />
-            <span>{meta.versao}</span>
             <span>{pacote.artigos} artigos</span>
+            <span>{pacote.mq_revisao}</span>
+            {pacote.versoes > 0 && <span>{etiquetaVersao(pacote.versoes, 1)}</span>}
             <span>{pacote.empresas} empresas</span>
             <span>{pacote.consultas_enviadas} consultas</span>
             <span>{pacote.respostas} respostas</span>
+          </div>
           </div>
         </div>
         {pacote.alertas.length > 0 && (
@@ -163,21 +167,22 @@ function PacoteDetalhe() {
         )}
       </header>
 
-      <div role="tablist" aria-label="Separadores do pacote" className="flex flex-wrap gap-1 border-b">
+      <div role="tablist" aria-label="Separadores do pacote" className="flex overflow-x-auto border-b">
         {SEPARADORES.map((s) => (
-          <button
+          <Button
             key={s.chave}
             role="tab"
             aria-selected={search.tab === s.chave}
             onClick={() => irPara({ tab: s.chave })}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors ${
+            variant="ghost"
+            className={`h-auto shrink-0 rounded-none border-b-2 px-3 py-2 text-sm ${
               search.tab === s.chave
                 ? "border-primary font-medium text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             {s.rotulo}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -214,7 +219,7 @@ function PacoteDetalhe() {
           icone={<FileSignature className="h-8 w-8" />}
         />
       )}
-    </div>
+    </main>
   );
 }
 
@@ -252,8 +257,8 @@ function AmbitoConsulta({ pacoteId, obraId, inicial }: { pacoteId: string; obraI
     { chave: "responsabilidades_subempreiteiro", rotulo: "Responsabilidades do subempreiteiro" },
     { chave: "inclusoes", rotulo: "Inclusões" },
     { chave: "exclusoes", rotulo: "Exclusões" },
-    { chave: "alternativas", rotulo: "Alternativas permitidas" },
-    { chave: "observacoes", rotulo: "Observações" },
+    { chave: "alternativas", rotulo: "Meios, equipamentos e alternativas" },
+    { chave: "observacoes", rotulo: "Notas técnicas e comerciais" },
   ];
 
   return (
@@ -269,7 +274,7 @@ function AmbitoConsulta({ pacoteId, obraId, inicial }: { pacoteId: string; obraI
           {estado === "guardado" ? (ambitoPreenchido(valores) ? "Guardado" : "Por preencher") : estado === "a-guardar" ? "A guardar…" : "Alterações por guardar"}
         </span>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         {campos.map((c) => (
           <div key={c.chave} className="space-y-1">
             <Label htmlFor={`ambito-${c.chave}`}>{c.rotulo}</Label>
@@ -312,6 +317,15 @@ function Documentacao({ obraId, pacoteId }: { obraId: string; pacoteId: string }
 
   const termo = q.trim().toLowerCase();
   const lista = (data ?? []).filter((d: any) => (termo ? d.nome.toLowerCase().includes(termo) : true));
+  const grupos = useMemo(() => {
+    const mapa = new Map<string, any[]>();
+    for (const documento of lista) {
+      const pasta = Array.isArray(documento.pasta) ? documento.pasta[0]?.nome : documento.pasta?.nome;
+      const nome = pasta ?? "Sem pasta";
+      mapa.set(nome, [...(mapa.get(nome) ?? []), documento]);
+    }
+    return [...mapa.entries()].sort(([a], [b]) => a.localeCompare(b, "pt"));
+  }, [lista]);
 
   async function alternar(documentoId: string, ativo: boolean) {
     try {
@@ -342,14 +356,14 @@ function Documentacao({ obraId, pacoteId }: { obraId: string; pacoteId: string }
 
   return (
     <section className="space-y-3">
-      <p className="text-xs text-muted-foreground">
-        Selecione os documentos da obra a incluir na consulta. Retirar a seleção nunca apaga o ficheiro.
-      </p>
+      <div className="flex flex-wrap items-end justify-between gap-2"><p className="text-xs text-muted-foreground">Selecione os documentos da obra a incluir na consulta. Retirar a seleção nunca apaga o ficheiro.</p><Badge variant="outline">{associados.size} associados</Badge></div>
       <Input placeholder="Pesquisar documento…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Pesquisar documento" />
-      <ul className="divide-y rounded-md border bg-card">
-        {lista.map((d: any) => {
+      <div className="space-y-3">
+        {grupos.map(([grupo, documentos]) => <section key={grupo} className="overflow-hidden rounded-md border bg-card" aria-label={grupo}>
+          <h3 className="border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">{grupo} · {documentos.length}</h3>
+          <ul className="divide-y">
+        {documentos.map((d: any) => {
           const assoc = associados.get(d.id);
-          const pastaNome = Array.isArray(d.pasta) ? d.pasta[0]?.nome : d.pasta?.nome;
           return (
             <li key={d.id} className="flex flex-wrap items-center gap-3 p-3">
               <Checkbox
@@ -360,7 +374,7 @@ function Documentacao({ obraId, pacoteId }: { obraId: string; pacoteId: string }
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{d.nome}</p>
                 <p className="text-xs text-muted-foreground">
-                  {pastaNome ?? "Sem pasta"} · {d.tipo} · {d.tamanho ? `${Math.round(d.tamanho / 1024)} KB` : "—"} ·{" "}
+                  {d.tipo} · {d.tamanho ? `${Math.round(d.tamanho / 1024)} KB` : "—"} ·{" "}
                   {d.created_at ? new Date(d.created_at).toLocaleDateString("pt-PT") : "—"}
                 </p>
               </div>
@@ -380,7 +394,9 @@ function Documentacao({ obraId, pacoteId }: { obraId: string; pacoteId: string }
             </li>
           );
         })}
-      </ul>
+          </ul>
+        </section>)}
+      </div>
     </section>
   );
 }
@@ -465,8 +481,8 @@ function Empresas({ obraId, pacoteId, subempreitada }: { obraId: string; pacoteI
               aria-label={`Consultar ${e.nome}`}
             />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">
-                {e.nome} {e.sugerida && <Badge variant="outline" className="ml-1 text-[10px]">Sugerida</Badge>}
+              <p className="flex flex-wrap items-center gap-1 text-sm font-medium">
+                <span>{e.nome}</span> {selecionadas.has(e.id) ? <Badge variant="outline" className="text-[10px]">Selecionada</Badge> : <Badge variant="outline" className="text-[10px]">Disponível</Badge>} {e.sugerida && <Badge variant="outline" className="text-[10px]">Correspondência</Badge>}
                 {!e.ativo && <Badge variant="outline" className="ml-1 text-[10px]">Inativa</Badge>}
               </p>
               <p className="truncate text-xs text-muted-foreground">
@@ -474,6 +490,7 @@ function Empresas({ obraId, pacoteId, subempreitada }: { obraId: string; pacoteI
                   .filter(Boolean)
                   .join(" · ") || "Sem contacto registado"}
               </p>
+              {(e.especialidades ?? []).length > 0 && <p className="mt-1 text-xs text-muted-foreground">{e.especialidades.join(" · ")}</p>}
             </div>
           </li>
         ))}

@@ -45,7 +45,45 @@ function PacotesRoutePage() {
     select: (state) => state.location.pathname.startsWith("/procurement/pacotes/") && state.location.pathname !== "/procurement/pacotes/",
   });
 
-  return isDetailRoute ? <Outlet /> : <PacotesListPage />;
+  return isDetailRoute ? <Outlet /> : <SelecionarObraPage />;
+}
+
+function SelecionarObraPage() {
+  const { data: obras = [], isLoading } = useQuery({
+    queryKey: ["obras-selecao-procurement"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("obras").select("id, codigo, nome, cliente").order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  return (
+    <main className="mx-auto w-full max-w-5xl space-y-6 p-4 sm:p-6">
+      <header>
+        <h1 className="text-2xl font-semibold">Pacotes de Consulta</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Selecione uma obra para consultar e preparar os respetivos pacotes.</p>
+      </header>
+      {isLoading ? (
+        <div className="rounded-md border border-border bg-card p-8 text-sm text-muted-foreground">A carregar obras…</div>
+      ) : obras.length === 0 ? (
+        <div className="rounded-md border border-dashed border-border p-8 text-center">
+          <FolderOpen className="mx-auto h-8 w-8 text-muted-foreground" />
+          <p className="mt-2 font-medium">Ainda não existem obras</p>
+          <p className="text-sm text-muted-foreground">Crie uma obra para preparar pacotes de consulta.</p>
+        </div>
+      ) : (
+        <section className="grid gap-3 sm:grid-cols-2" aria-label="Obras">
+          {obras.map((obra) => (
+            <Link key={obra.id} to="/obras/$id/procurement/pacotes" params={{ id: obra.id }} className="group flex items-center gap-3 rounded-md border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <FolderOpen className="h-5 w-5 shrink-0 text-primary" />
+              <span className="min-w-0"><span className="block font-medium">{obra.nome}</span><span className="block truncate text-xs text-muted-foreground">{obra.codigo}{obra.cliente ? ` · ${obra.cliente}` : ""}</span></span>
+            </Link>
+          ))}
+        </section>
+      )}
+    </main>
+  );
 }
 
 const ESTADO_LABEL: Record<string, string> = {
