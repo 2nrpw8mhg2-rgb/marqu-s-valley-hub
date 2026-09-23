@@ -149,33 +149,86 @@ export function AtribuirSubempreitadaPopover({
           </div>
         )}
 
-        <div className="max-h-[220px] overflow-y-auto p-1">
-          {filtradas.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setSelecionada(s.id)}
-              onDoubleClick={() => atribuir(s.id)}
-              className={`w-full text-left text-sm rounded px-2 py-1.5 flex items-center gap-2 hover:bg-accent ${
-                selecionada === s.id ? "bg-accent" : ""
-              }`}
-            >
-              <Check className={`h-3.5 w-3.5 ${selecionada === s.id ? "opacity-100" : "opacity-0"}`} />
-              <span className="flex-1 truncate">
-                {s.codigo} · {s.nome}
-              </span>
-            </button>
-          ))}
-          {filtradas.length === 0 && (
-            <p className="text-sm text-muted-foreground p-3">Nenhuma subempreitada encontrada.</p>
-          )}
-        </div>
+        {modoCriar ? (
+          <div className="p-3 space-y-2">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Criar nova subempreitada</p>
+            <div className="space-y-1">
+              <label className="text-xs" htmlFor="nova-sub-nome">
+                Nome (obrigatório)
+              </label>
+              <Input
+                id="nova-sub-nome"
+                autoFocus
+                className="h-8"
+                value={novoNome}
+                onChange={(e) => setNovoNome(e.target.value)}
+                placeholder="Ex.: Lareiras e Braseiras"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs" htmlFor="nova-sub-codigo">
+                Código (opcional)
+              </label>
+              <Input
+                id="nova-sub-codigo"
+                className="h-8"
+                value={novoCodigo}
+                onChange={(e) => setNovoCodigo(e.target.value)}
+                placeholder={codigoSugerido(novoNome)}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {equivalente
+                ? `Já existe «${equivalente.codigo} · ${equivalente.nome}». Vai ser reutilizada.`
+                : `Vai ser criada: ${novoCodigo.trim() || codigoSugerido(novoNome)} · ${novoNome.trim() || "—"}`}
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button size="sm" variant="ghost" onClick={() => setModoCriar(false)}>
+                Voltar
+              </Button>
+              <Button size="sm" disabled={novoNome.trim().length < 2} onClick={criar}>
+                {equivalente ? "Reutilizar e atribuir" : "Criar e atribuir"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="max-h-[220px] overflow-y-auto p-1">
+              {filtradas.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSelecionada(s.id)}
+                  onDoubleClick={() => atribuir(s.id)}
+                  className={`w-full text-left text-sm rounded px-2 py-1.5 flex items-center gap-2 hover:bg-accent ${
+                    selecionada === s.id ? "bg-accent" : ""
+                  }`}
+                >
+                  <Check className={`h-3.5 w-3.5 ${selecionada === s.id ? "opacity-100" : "opacity-0"}`} />
+                  <span className="flex-1 truncate">
+                    {s.codigo} · {s.nome}
+                  </span>
+                </button>
+              ))}
+              {filtradas.length === 0 && (
+                <p className="text-sm text-muted-foreground p-3">Nenhuma subempreitada encontrada.</p>
+              )}
+            </div>
 
-        <div className="p-2 border-t flex justify-end">
-          <Button size="sm" disabled={!selecionada} onClick={() => selecionada && atribuir(selecionada)}>
-            Confirmar
-          </Button>
-        </div>
+            <div className="p-2 border-t flex items-center justify-between gap-2">
+              {onCriar ? (
+                <Button size="sm" variant="ghost" className="gap-1" onClick={abrirCriacao}>
+                  <Plus className="h-3.5 w-3.5" /> Criar nova
+                </Button>
+              ) : (
+                <span />
+              )}
+              <Button size="sm" disabled={!selecionada} onClick={() => selecionada && atribuir(selecionada)}>
+                Confirmar
+              </Button>
+            </div>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );
