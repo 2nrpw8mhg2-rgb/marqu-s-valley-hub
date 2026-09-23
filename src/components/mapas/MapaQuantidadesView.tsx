@@ -28,6 +28,7 @@ export function MapaQuantidadesView({ artigos, estado, onEstado }: Props) {
   const toolbar = useAlturaToolbar();
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const [descricoesGruposExpandidas, setDescricoesGruposExpandidas] = useState<Set<string>>(new Set());
   const [gruposFechados, setGruposFechados] = useState<Set<string>>(new Set());
   const opcoes = useMemo(() => opcoesHierarquia(artigos, estado.capitulo), [artigos, estado.capitulo]);
   const filtrados = useMemo(() => filtrarOrdenarArtigos(artigos, estado), [artigos, estado]);
@@ -50,7 +51,7 @@ export function MapaQuantidadesView({ artigos, estado, onEstado }: Props) {
 
   return <div className="rounded-md border bg-card" style={{ "--mapa-toolbar-h": `${toolbar.altura}px` } as React.CSSProperties}>
     <div ref={toolbar.ref}><MapaToolbar estado={estado} capitulos={opcoes.capitulos} subcapitulos={opcoes.subcapitulos} visiveis={filtrados.length} total={artigos.length} selecionados={selecionados.size} onAlterar={onEstado} onExpandir={() => { setExpandidos(new Set(pagina.artigos.map((a) => a.artigo_id))); setGruposFechados(new Set()); }} onRecolher={() => { setExpandidos(new Set()); setGruposFechados(new Set(agruparArtigos(pagina.artigos).flatMap((g) => [g.id, ...g.subcapitulos.map((s) => s.id)]))); }} onLimparSelecao={() => setSelecionados(new Set())} /></div>
-    <MapaHierarchy artigos={pagina.artigos} selecionados={selecionados} expandidos={expandidos} gruposFechados={gruposFechados} onSelecionar={selecionar} onSelecionarTodos={selecionarTodos} onExpandirDescricao={(id) => alternarConjunto(setExpandidos, id)} onDetalhes={abrirDetalhes} onGrupo={(id) => alternarConjunto(setGruposFechados, id)} />
+    <MapaHierarchy artigos={pagina.artigos} selecionados={selecionados} expandidos={expandidos} descricoesGruposExpandidas={descricoesGruposExpandidas} gruposFechados={gruposFechados} onSelecionar={selecionar} onSelecionarTodos={selecionarTodos} onExpandirDescricao={(id) => alternarConjunto(setExpandidos, id)} onExpandirDescricaoGrupo={(id) => alternarConjunto(setDescricoesGruposExpandidas, id)} onDetalhes={abrirDetalhes} onGrupo={(id) => alternarConjunto(setGruposFechados, id)} />
     <div className="grid gap-3 border-t px-3 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
       <div className="flex items-center gap-2 text-xs text-muted-foreground"><span>Linhas por página</span><Select value={String(estado.tamanho)} onValueChange={(v) => onEstado({ tamanho: Number(v) as MapaPageSize }, true)}><SelectTrigger className="w-20" aria-label="Linhas por página"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="25">25</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem></SelectContent></Select></div>
       <p className="text-center text-xs text-muted-foreground">{doPrimeiro}–{doUltimo} de {filtrados.length} · Página {pagina.pagina} de {pagina.totalPaginas}</p>
