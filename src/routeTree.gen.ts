@@ -49,6 +49,7 @@ import { Route as AppObrasIdMedicoesRouteImport } from './routes/_app/obras.$id.
 import { Route as AppObrasIdFinanceiraRouteImport } from './routes/_app/obras.$id.financeira'
 import { Route as AppObrasIdDocumentosRouteImport } from './routes/_app/obras.$id.documentos'
 import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas'
+import { Route as AppObrasIdProcurementIndexRouteImport } from './routes/_app/obras.$id.procurement.index'
 import { Route as AppObrasIdMapasIndexRouteImport } from './routes/_app/obras.$id.mapas.index'
 import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.index'
 import { Route as AppObrasIdMapasSubIdRouteImport } from './routes/_app/obras.$id.mapas.$subId'
@@ -274,6 +275,12 @@ const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute =
     path: '/configuracao-ia/biblioteca-subempreitadas',
     getParentRoute: () => AppAdministracaoRoute,
   } as any)
+const AppObrasIdProcurementIndexRoute =
+  AppObrasIdProcurementIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppObrasIdProcurementRoute,
+  } as any)
 const AppObrasIdMapasIndexRoute = AppObrasIdMapasIndexRouteImport.update({
   id: '/mapas/',
   path: '/mapas/',
@@ -416,7 +423,7 @@ export interface FileRoutesByFullPath {
   '/obras/$id/planeamento': typeof AppObrasIdPlaneamentoRoute
   '/obras/$id/preparacao-consultas': typeof AppObrasIdPreparacaoConsultasRoute
   '/obras/$id/preparacao-orcamento': typeof AppObrasIdPreparacaoOrcamentoRoute
-  '/obras/$id/procurement': typeof AppObrasIdProcurementRoute
+  '/obras/$id/procurement': typeof AppObrasIdProcurementRouteWithChildren
   '/obras/$id/relatorios': typeof AppObrasIdRelatoriosRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
   '/orcamentos/$id/subempreitadas': typeof AppOrcamentosIdSubempreitadasRoute
@@ -437,6 +444,7 @@ export interface FileRoutesByFullPath {
   '/obras/$id/mapas/$subId': typeof AppObrasIdMapasSubIdRoute
   '/administracao/configuracao-ia/biblioteca-subempreitadas/': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute
   '/obras/$id/mapas/': typeof AppObrasIdMapasIndexRoute
+  '/obras/$id/procurement/': typeof AppObrasIdProcurementIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -467,7 +475,6 @@ export interface FileRoutesByTo {
   '/obras/$id/planeamento': typeof AppObrasIdPlaneamentoRoute
   '/obras/$id/preparacao-consultas': typeof AppObrasIdPreparacaoConsultasRoute
   '/obras/$id/preparacao-orcamento': typeof AppObrasIdPreparacaoOrcamentoRoute
-  '/obras/$id/procurement': typeof AppObrasIdProcurementRoute
   '/obras/$id/relatorios': typeof AppObrasIdRelatoriosRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
   '/orcamentos/$id/subempreitadas': typeof AppOrcamentosIdSubempreitadasRoute
@@ -488,6 +495,7 @@ export interface FileRoutesByTo {
   '/obras/$id/mapas/$subId': typeof AppObrasIdMapasSubIdRoute
   '/administracao/configuracao-ia/biblioteca-subempreitadas': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute
   '/obras/$id/mapas': typeof AppObrasIdMapasIndexRoute
+  '/obras/$id/procurement': typeof AppObrasIdProcurementIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -523,7 +531,7 @@ export interface FileRoutesById {
   '/_app/obras/$id/planeamento': typeof AppObrasIdPlaneamentoRoute
   '/_app/obras/$id/preparacao-consultas': typeof AppObrasIdPreparacaoConsultasRoute
   '/_app/obras/$id/preparacao-orcamento': typeof AppObrasIdPreparacaoOrcamentoRoute
-  '/_app/obras/$id/procurement': typeof AppObrasIdProcurementRoute
+  '/_app/obras/$id/procurement': typeof AppObrasIdProcurementRouteWithChildren
   '/_app/obras/$id/relatorios': typeof AppObrasIdRelatoriosRoute
   '/_app/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
   '/_app/orcamentos/$id/subempreitadas': typeof AppOrcamentosIdSubempreitadasRoute
@@ -544,6 +552,7 @@ export interface FileRoutesById {
   '/_app/obras/$id/mapas/$subId': typeof AppObrasIdMapasSubIdRoute
   '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute
   '/_app/obras/$id/mapas/': typeof AppObrasIdMapasIndexRoute
+  '/_app/obras/$id/procurement/': typeof AppObrasIdProcurementIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -600,6 +609,7 @@ export interface FileRouteTypes {
     | '/obras/$id/mapas/$subId'
     | '/administracao/configuracao-ia/biblioteca-subempreitadas/'
     | '/obras/$id/mapas/'
+    | '/obras/$id/procurement/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -630,7 +640,6 @@ export interface FileRouteTypes {
     | '/obras/$id/planeamento'
     | '/obras/$id/preparacao-consultas'
     | '/obras/$id/preparacao-orcamento'
-    | '/obras/$id/procurement'
     | '/obras/$id/relatorios'
     | '/orcamentos/$id/decomposicao'
     | '/orcamentos/$id/subempreitadas'
@@ -651,6 +660,7 @@ export interface FileRouteTypes {
     | '/obras/$id/mapas/$subId'
     | '/administracao/configuracao-ia/biblioteca-subempreitadas'
     | '/obras/$id/mapas'
+    | '/obras/$id/procurement'
   id:
     | '__root__'
     | '/'
@@ -706,6 +716,7 @@ export interface FileRouteTypes {
     | '/_app/obras/$id/mapas/$subId'
     | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/'
     | '/_app/obras/$id/mapas/'
+    | '/_app/obras/$id/procurement/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1001,6 +1012,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteImport
       parentRoute: typeof AppAdministracaoRoute
     }
+    '/_app/obras/$id/procurement/': {
+      id: '/_app/obras/$id/procurement/'
+      path: '/'
+      fullPath: '/obras/$id/procurement/'
+      preLoaderRoute: typeof AppObrasIdProcurementIndexRouteImport
+      parentRoute: typeof AppObrasIdProcurementRoute
+    }
     '/_app/obras/$id/mapas/': {
       id: '/_app/obras/$id/mapas/'
       path: '/mapas'
@@ -1157,6 +1175,19 @@ const AppAdministracaoRouteChildren: AppAdministracaoRouteChildren = {
 const AppAdministracaoRouteWithChildren =
   AppAdministracaoRoute._addFileChildren(AppAdministracaoRouteChildren)
 
+interface AppObrasIdProcurementRouteChildren {
+  AppObrasIdProcurementIndexRoute: typeof AppObrasIdProcurementIndexRoute
+}
+
+const AppObrasIdProcurementRouteChildren: AppObrasIdProcurementRouteChildren = {
+  AppObrasIdProcurementIndexRoute: AppObrasIdProcurementIndexRoute,
+}
+
+const AppObrasIdProcurementRouteWithChildren =
+  AppObrasIdProcurementRoute._addFileChildren(
+    AppObrasIdProcurementRouteChildren,
+  )
+
 interface AppObrasIdRouteChildren {
   AppObrasIdDocumentosRoute: typeof AppObrasIdDocumentosRoute
   AppObrasIdFinanceiraRoute: typeof AppObrasIdFinanceiraRoute
@@ -1166,7 +1197,7 @@ interface AppObrasIdRouteChildren {
   AppObrasIdPlaneamentoRoute: typeof AppObrasIdPlaneamentoRoute
   AppObrasIdPreparacaoConsultasRoute: typeof AppObrasIdPreparacaoConsultasRoute
   AppObrasIdPreparacaoOrcamentoRoute: typeof AppObrasIdPreparacaoOrcamentoRoute
-  AppObrasIdProcurementRoute: typeof AppObrasIdProcurementRoute
+  AppObrasIdProcurementRoute: typeof AppObrasIdProcurementRouteWithChildren
   AppObrasIdRelatoriosRoute: typeof AppObrasIdRelatoriosRoute
   AppObrasIdIndexRoute: typeof AppObrasIdIndexRoute
   AppObrasIdMapasSubIdRoute: typeof AppObrasIdMapasSubIdRoute
@@ -1182,7 +1213,7 @@ const AppObrasIdRouteChildren: AppObrasIdRouteChildren = {
   AppObrasIdPlaneamentoRoute: AppObrasIdPlaneamentoRoute,
   AppObrasIdPreparacaoConsultasRoute: AppObrasIdPreparacaoConsultasRoute,
   AppObrasIdPreparacaoOrcamentoRoute: AppObrasIdPreparacaoOrcamentoRoute,
-  AppObrasIdProcurementRoute: AppObrasIdProcurementRoute,
+  AppObrasIdProcurementRoute: AppObrasIdProcurementRouteWithChildren,
   AppObrasIdRelatoriosRoute: AppObrasIdRelatoriosRoute,
   AppObrasIdIndexRoute: AppObrasIdIndexRoute,
   AppObrasIdMapasSubIdRoute: AppObrasIdMapasSubIdRoute,
