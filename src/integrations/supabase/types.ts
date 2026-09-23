@@ -1540,6 +1540,84 @@ export type Database = {
           },
         ]
       }
+      consulta_ia_sugestoes_rejeitadas: {
+        Row: {
+          alternativa_id: string | null
+          artigo_id: string
+          confianca_ia: number | null
+          created_at: string
+          id: string
+          orcamento_id: string
+          run_id: string | null
+          subempreitada_ia_id: string | null
+          sugestao: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          alternativa_id?: string | null
+          artigo_id: string
+          confianca_ia?: number | null
+          created_at?: string
+          id?: string
+          orcamento_id: string
+          run_id?: string | null
+          subempreitada_ia_id?: string | null
+          sugestao?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          alternativa_id?: string | null
+          artigo_id?: string
+          confianca_ia?: number | null
+          created_at?: string
+          id?: string
+          orcamento_id?: string
+          run_id?: string | null
+          subempreitada_ia_id?: string | null
+          sugestao?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consulta_ia_sugestoes_rejeitadas_alternativa_id_fkey"
+            columns: ["alternativa_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_sugestoes_rejeitadas_artigo_id_fkey"
+            columns: ["artigo_id"]
+            isOneToOne: false
+            referencedRelation: "orcamento_artigos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_sugestoes_rejeitadas_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_sugestoes_rejeitadas_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "consulta_ia_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consulta_ia_sugestoes_rejeitadas_subempreitada_ia_id_fkey"
+            columns: ["subempreitada_ia_id"]
+            isOneToOne: false
+            referencedRelation: "subempreitadas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documento_pastas: {
         Row: {
           created_at: string
@@ -2379,10 +2457,12 @@ export type Database = {
           ativo: boolean
           codigo: string
           created_at: string
+          criado_por: string | null
           descricao: string | null
           id: string
           nome: string
           ordem: number
+          origem: string
           palavras_chave: string[]
           termos_exclusao: string[]
           updated_at: string
@@ -2391,10 +2471,12 @@ export type Database = {
           ativo?: boolean
           codigo: string
           created_at?: string
+          criado_por?: string | null
           descricao?: string | null
           id?: string
           nome: string
           ordem?: number
+          origem?: string
           palavras_chave?: string[]
           termos_exclusao?: string[]
           updated_at?: string
@@ -2403,10 +2485,12 @@ export type Database = {
           ativo?: boolean
           codigo?: string
           created_at?: string
+          criado_por?: string | null
           descricao?: string | null
           id?: string
           nome?: string
           ordem?: number
+          origem?: string
           palavras_chave?: string[]
           termos_exclusao?: string[]
           updated_at?: string
@@ -2580,6 +2664,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      criar_ou_obter_subempreitada: {
+        Args: { _codigo?: string; _nome: string; _origem?: string }
+        Returns: {
+          codigo: string
+          criada: boolean
+          id: string
+          nome: string
+        }[]
+      }
       criar_pastas_padrao_obra: {
         Args: { _obra_id: string }
         Returns: undefined
@@ -2593,6 +2686,7 @@ export type Database = {
         }[]
       }
       normalizar_descricao: { Args: { _t: string }; Returns: string }
+      normalizar_nome_subempreitada: { Args: { _t: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
