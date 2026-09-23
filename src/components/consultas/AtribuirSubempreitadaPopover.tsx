@@ -63,12 +63,39 @@ export function AtribuirSubempreitadaPopover({
     return subempreitadas.filter((s) => normalizar(`${s.codigo} ${s.nome}`).includes(t));
   }, [subempreitadas, pesquisa]);
 
+  const equivalente = useMemo(
+    () => (novoNome.trim() ? encontrarEquivalente(subempreitadas, novoNome) : null),
+    [subempreitadas, novoNome],
+  );
+
   function atribuir(id: string) {
     onAtribuir(id);
     setAberto(false);
     setPesquisa("");
     setSelecionada(null);
   }
+
+  function criar() {
+    const nome = novoNome.trim();
+    if (!nome || !onCriar) return;
+    if (equivalente) {
+      atribuir(equivalente.id);
+      return;
+    }
+    onCriar(nome, novoCodigo.trim() || null);
+    setAberto(false);
+    setPesquisa("");
+    setSelecionada(null);
+    setNovoNome("");
+    setNovoCodigo("");
+  }
+
+  function abrirCriacao() {
+    setNovoNome(pesquisa.trim() || (sugestaoNova ?? ""));
+    setNovoCodigo("");
+    setModoCriar(true);
+  }
+
 
   return (
     <Popover open={aberto} onOpenChange={setAberto}>
