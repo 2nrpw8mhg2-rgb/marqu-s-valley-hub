@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Plus, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import type { Especialidade } from "@/lib/biblioteca-mestra/types";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/especialidades")({
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/especialidades")({
   head: () => ({ meta: [{ title: "Especialidades — Biblioteca Mestra — MV OS" }] }),
   component: EspecialidadesPage,
 });

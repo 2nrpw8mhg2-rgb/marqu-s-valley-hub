@@ -25,7 +25,7 @@ import { ArtigoRelacoesDialog } from "@/components/biblioteca-mestra/ArtigoRelac
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArtigoConhecimentoTab } from "@/components/biblioteca-mestra/ArtigoConhecimentoTab";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/artigos")({
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/artigos")({
   head: () => ({ meta: [{ title: "Artigos Mestre — Biblioteca Mestra — MV OS" }] }),
   component: ArtigosPage,
 });

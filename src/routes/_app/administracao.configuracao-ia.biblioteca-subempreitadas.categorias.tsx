@@ -20,7 +20,7 @@ import type { Especialidade, Subespecialidade, Categoria, ArtigoMestre, ArtigoKe
 import { ARTIGO_TIPOS, ARTIGO_ESTADOS_IA } from "@/lib/biblioteca-mestra/types";
 import { ArtigoMestreFormDialog, type ArtigoFormState } from "@/components/biblioteca-mestra/ArtigoMestreFormDialog";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/categorias")({
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/categorias")({
   head: () => ({ meta: [{ title: "Categorias — Biblioteca Mestra — MV OS" }] }),
   component: CategoriasPage,
 });

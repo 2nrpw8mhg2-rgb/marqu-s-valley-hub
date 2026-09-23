@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Plus, Pencil, Trash2, HardHat } from "lucide-react";
 import type { TemplateObra } from "@/lib/biblioteca-mestra/types";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/templates")({
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/templates")({
   head: () => ({ meta: [{ title: "Templates de Obra — Biblioteca Mestra — MV OS" }] }),
   component: TemplatesPage,
 });

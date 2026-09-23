@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronRight, ChevronDown, Search, FolderTree, FileText, Tag, Library, Folder } from "lucide-react";
 import type { Especialidade, Subespecialidade, Categoria, ArtigoMestre, ArtigoKeyword } from "@/lib/biblioteca-mestra/types";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/")({
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/")({
   head: () => ({ meta: [{ title: "Biblioteca Mestra — Explorador — MV OS" }] }),
   component: ExploradorPage,
 });

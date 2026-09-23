@@ -27,7 +27,7 @@ import { Brain, Play, Square, Sparkles, Search } from "lucide-react";
 import { toast } from "sonner";
 import { KnowledgeRunReport } from "@/components/biblioteca-mestra/KnowledgeRunReport";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/knowledge-builder")({
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/knowledge-builder")({
   head: () => ({ meta: [{ title: "Knowledge Builder — Biblioteca Mestra" }] }),
   component: KnowledgeBuilderPage,
 });

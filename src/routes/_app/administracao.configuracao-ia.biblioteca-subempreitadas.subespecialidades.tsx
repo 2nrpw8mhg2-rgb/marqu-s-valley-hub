@@ -18,7 +18,7 @@ import { Plus, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowLeftRight } from
 import { cn } from "@/lib/utils";
 import type { Especialidade, Subespecialidade } from "@/lib/biblioteca-mestra/types";
 
-export const Route = createFileRoute("/_app/biblioteca-mestra/subespecialidades")({
+export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/subespecialidades")({
   head: () => ({ meta: [{ title: "Subespecialidades — Biblioteca Mestra — MV OS" }] }),
   component: SubesPage,
 });
