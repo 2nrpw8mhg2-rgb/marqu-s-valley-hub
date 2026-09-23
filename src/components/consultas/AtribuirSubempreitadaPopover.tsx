@@ -3,7 +3,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles } from "lucide-react";
+import { Check, Plus, Sparkles } from "lucide-react";
+import { codigoSugerido, encontrarEquivalente } from "@/lib/consultas/sugestoes";
 
 export type SubOpcao = { id: string; codigo: string; nome: string };
 
