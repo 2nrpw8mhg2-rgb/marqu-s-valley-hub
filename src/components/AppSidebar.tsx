@@ -6,23 +6,31 @@ import {
   Users,
   Calculator,
   Layers,
-  BookMarked,
   ShoppingCart,
   Sparkles,
   LogOut,
-  Library,
   History,
   Wand2,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
+import { usePodeAdministrar } from "@/hooks/usePermissoes";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { DESCRICAO_CONFIGURACAO_IA, ROTA_CONFIGURACAO_IA, seccoesVisiveis } from "@/lib/navegacao/menu";
 
-type NavItem = { to: string; label: string; icon: LucideIcon; phase?: string; disabled?: boolean };
+type NavItem = {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  descricao?: string;
+  phase?: string;
+  disabled?: boolean;
+};
 
-const sections: { title: string; items: NavItem[] }[] = [
+export const sections: { title: string; items: NavItem[]; adminOnly?: boolean }[] = [
   {
     title: "Fase 1 — MVP",
     items: [
