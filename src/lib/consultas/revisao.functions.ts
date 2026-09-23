@@ -197,7 +197,7 @@ export const aceitarSugestaoSubempreitada = createServerFn({ method: "POST" })
 
     const { data: criada, error } = await sb.rpc("criar_ou_obter_subempreitada", {
       _nome: data.nome,
-      _codigo: data.codigo ?? null,
+      _codigo: data.codigo ?? undefined,
       _origem: data.origem ?? "sugestao_ia_validada",
     });
     if (error) throw new Error(error.message);
@@ -317,7 +317,7 @@ export const desfazerAtribuicaoManual = createServerFn({ method: "POST" })
           .delete()
           .eq("descricao_normalizada", norm)
           .eq("subempreitada_id", r.subempreitada_atribuida_id)
-          .eq("user_id", userId);
+          .eq("user_id", context.userId);
     }
 
     const { error: eDel } = await sb
