@@ -3,7 +3,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles } from "lucide-react";
+import { Check, Plus, Sparkles } from "lucide-react";
+import { codigoSugerido, encontrarEquivalente } from "@/lib/consultas/sugestoes";
 
 export type SubOpcao = { id: string; codigo: string; nome: string };
 
@@ -21,19 +22,37 @@ function normalizar(t: string) {
 export function AtribuirSubempreitadaPopover({
   subempreitadas,
   sugestoes,
+  sugestaoNova,
   onAtribuir,
+  onCriar,
   children,
   titulo,
+  aberto: abertoControlado,
+  onAbertoChange,
 }: {
   subempreitadas: SubOpcao[];
   sugestoes?: string[];
+  /** Nome sugerido pela IA que ainda não existe no catálogo. */
+  sugestaoNova?: string | null;
   onAtribuir: (subempreitadaId: string) => void;
+  onCriar?: (nome: string, codigo: string | null) => void;
   children: ReactNode;
   titulo?: string;
+  aberto?: boolean;
+  onAbertoChange?: (v: boolean) => void;
 }) {
-  const [aberto, setAberto] = useState(false);
+  const [abertoInterno, setAbertoInterno] = useState(false);
+  const aberto = abertoControlado ?? abertoInterno;
+  const setAberto = (v: boolean) => {
+    setAbertoInterno(v);
+    onAbertoChange?.(v);
+    if (!v) setModoCriar(false);
+  };
   const [pesquisa, setPesquisa] = useState("");
   const [selecionada, setSelecionada] = useState<string | null>(null);
+  const [modoCriar, setModoCriar] = useState(false);
+  const [novoNome, setNovoNome] = useState("");
+  const [novoCodigo, setNovoCodigo] = useState("");
 
   const porId = useMemo(() => new Map(subempreitadas.map((s) => [s.id, s])), [subempreitadas]);
   const destaques = (sugestoes ?? []).filter((id) => porId.has(id)).slice(0, 3);
@@ -44,12 +63,39 @@ export function AtribuirSubempreitadaPopover({
     return subempreitadas.filter((s) => normalizar(`${s.codigo} ${s.nome}`).includes(t));
   }, [subempreitadas, pesquisa]);
 
+  const equivalente = useMemo(
+    () => (novoNome.trim() ? encontrarEquivalente(subempreitadas, novoNome) : null),
+    [subempreitadas, novoNome],
+  );
+
   function atribuir(id: string) {
     onAtribuir(id);
     setAberto(false);
     setPesquisa("");
     setSelecionada(null);
   }
+
+  function criar() {
+    const nome = novoNome.trim();
+    if (!nome || !onCriar) return;
+    if (equivalente) {
+      atribuir(equivalente.id);
+      return;
+    }
+    onCriar(nome, novoCodigo.trim() || null);
+    setAberto(false);
+    setPesquisa("");
+    setSelecionada(null);
+    setNovoNome("");
+    setNovoCodigo("");
+  }
+
+  function abrirCriacao() {
+    setNovoNome(pesquisa.trim() || (sugestaoNova ?? ""));
+    setNovoCodigo("");
+    setModoCriar(true);
+  }
+
 
   return (
     <Popover open={aberto} onOpenChange={setAberto}>
@@ -103,33 +149,86 @@ export function AtribuirSubempreitadaPopover({
           </div>
         )}
 
-        <div className="max-h-[220px] overflow-y-auto p-1">
-          {filtradas.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setSelecionada(s.id)}
-              onDoubleClick={() => atribuir(s.id)}
-              className={`w-full text-left text-sm rounded px-2 py-1.5 flex items-center gap-2 hover:bg-accent ${
-                selecionada === s.id ? "bg-accent" : ""
-              }`}
-            >
-              <Check className={`h-3.5 w-3.5 ${selecionada === s.id ? "opacity-100" : "opacity-0"}`} />
-              <span className="flex-1 truncate">
-                {s.codigo} · {s.nome}
-              </span>
-            </button>
-          ))}
-          {filtradas.length === 0 && (
-            <p className="text-sm text-muted-foreground p-3">Nenhuma subempreitada encontrada.</p>
-          )}
-        </div>
+        {modoCriar ? (
+          <div className="p-3 space-y-2">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Criar nova subempreitada</p>
+            <div className="space-y-1">
+              <label className="text-xs" htmlFor="nova-sub-nome">
+                Nome (obrigatório)
+              </label>
+              <Input
+                id="nova-sub-nome"
+                autoFocus
+                className="h-8"
+                value={novoNome}
+                onChange={(e) => setNovoNome(e.target.value)}
+                placeholder="Ex.: Lareiras e Braseiras"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs" htmlFor="nova-sub-codigo">
+                Código (opcional)
+              </label>
+              <Input
+                id="nova-sub-codigo"
+                className="h-8"
+                value={novoCodigo}
+                onChange={(e) => setNovoCodigo(e.target.value)}
+                placeholder={codigoSugerido(novoNome)}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {equivalente
+                ? `Já existe «${equivalente.codigo} · ${equivalente.nome}». Vai ser reutilizada.`
+                : `Vai ser criada: ${novoCodigo.trim() || codigoSugerido(novoNome)} · ${novoNome.trim() || "—"}`}
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button size="sm" variant="ghost" onClick={() => setModoCriar(false)}>
+                Voltar
+              </Button>
+              <Button size="sm" disabled={novoNome.trim().length < 2} onClick={criar}>
+                {equivalente ? "Reutilizar e atribuir" : "Criar e atribuir"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="max-h-[220px] overflow-y-auto p-1">
+              {filtradas.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSelecionada(s.id)}
+                  onDoubleClick={() => atribuir(s.id)}
+                  className={`w-full text-left text-sm rounded px-2 py-1.5 flex items-center gap-2 hover:bg-accent ${
+                    selecionada === s.id ? "bg-accent" : ""
+                  }`}
+                >
+                  <Check className={`h-3.5 w-3.5 ${selecionada === s.id ? "opacity-100" : "opacity-0"}`} />
+                  <span className="flex-1 truncate">
+                    {s.codigo} · {s.nome}
+                  </span>
+                </button>
+              ))}
+              {filtradas.length === 0 && (
+                <p className="text-sm text-muted-foreground p-3">Nenhuma subempreitada encontrada.</p>
+              )}
+            </div>
 
-        <div className="p-2 border-t flex justify-end">
-          <Button size="sm" disabled={!selecionada} onClick={() => selecionada && atribuir(selecionada)}>
-            Confirmar
-          </Button>
-        </div>
+            <div className="p-2 border-t flex items-center justify-between gap-2">
+              {onCriar ? (
+                <Button size="sm" variant="ghost" className="gap-1" onClick={abrirCriacao}>
+                  <Plus className="h-3.5 w-3.5" /> Criar nova
+                </Button>
+              ) : (
+                <span />
+              )}
+              <Button size="sm" disabled={!selecionada} onClick={() => selecionada && atribuir(selecionada)}>
+                Confirmar
+              </Button>
+            </div>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );
