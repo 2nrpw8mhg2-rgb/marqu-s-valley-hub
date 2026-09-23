@@ -17,7 +17,13 @@ import {
   snapshotDe,
   type LinhaRevisao,
 } from "@/lib/consultas/revisao";
-import { atribuirSubempreitadaManual, desfazerAtribuicaoManual } from "@/lib/consultas/revisao.functions";
+import {
+  aceitarSugestaoSubempreitada,
+  atribuirSubempreitadaManual,
+  desfazerAtribuicaoManual,
+  rejeitarSugestaoIA,
+} from "@/lib/consultas/revisao.functions";
+import { classificarSugestao, rejeitarSugestaoOtimista, sugestaoNovaComum } from "@/lib/consultas/sugestoes";
 import { AtribuirSubempreitadaPopover, type SubOpcao } from "./AtribuirSubempreitadaPopover";
 
 const TODOS = "__todos__";
@@ -38,12 +44,16 @@ export function AReverPanel({
   const qc = useQueryClient();
   const atribuirFn = useServerFn(atribuirSubempreitadaManual);
   const desfazerFn = useServerFn(desfazerAtribuicaoManual);
+  const aceitarNovaFn = useServerFn(aceitarSugestaoSubempreitada);
+  const rejeitarFn = useServerFn(rejeitarSugestaoIA);
 
   const [pesquisa, setPesquisa] = useState("");
   const [capitulo, setCapitulo] = useState<string>(TODOS);
   const [sugestao, setSugestao] = useState<"todas" | "com" | "sem">("todas");
   const [selecao, setSelecao] = useState<Set<string>>(new Set());
   const [destinoMassa, setDestinoMassa] = useState<string | null>(null);
+  const [seletorAberto, setSeletorAberto] = useState<string | null>(null);
+  const [aGuardar, setAGuardar] = useState(false);
 
   const nomePorSub = useMemo(
     () => new Map(subempreitadas.map((s) => [s.id, `${s.codigo} · ${s.nome}`])),
@@ -118,6 +128,72 @@ export function AReverPanel({
     } catch (e: any) {
       qc.setQueryData<LinhaRevisao[]>(queryKey, (atual) => reverterAtribuicao(atual ?? anterior, snapshots));
       toast.error(e?.message ?? "Não foi possível atribuir a subempreitada. Os artigos continuam em «A Rever».");
+    }
+  }
+
+  /** Aceita (ou cria) uma subempreitada com o nome sugerido e atribui os artigos. */
+  async function aceitarNova(artigoIds: string[], nome: string) {
+    if (artigoIds.length === 0 || aGuardar) return;
+    const operacao_id = crypto.randomUUID();
+    const anterior = qc.getQueryData<LinhaRevisao[]>(queryKey) ?? linhas;
+    const snapshots = snapshotDe(anterior, artigoIds);
+    setAGuardar(true);
+    try {
+      const r: any = await aceitarNovaFn({
+        data: { orcamento_id: orcamentoId, artigo_ids: artigoIds, nome, operacao_id },
+      });
+      const subId: string = r.subempreitada.id;
+      qc.setQueryData<LinhaRevisao[]>(queryKey, (atual) =>
+        aplicarAtribuicaoOtimista(atual ?? anterior, artigoIds, subId),
+      );
+      setSelecao(new Set());
+      await qc.invalidateQueries({ queryKey: ["subempreitadas-ativas"] });
+      toast.success(
+        artigoIds.length === 1
+          ? `✓ Artigo atribuído a ${r.subempreitada.codigo} · ${r.subempreitada.nome}`
+          : `✓ ${artigoIds.length} artigos atribuídos a ${r.subempreitada.codigo} · ${r.subempreitada.nome}`,
+        {
+          duration: 8000,
+          action: {
+            label: "Desfazer",
+            onClick: async () => {
+              qc.setQueryData<LinhaRevisao[]>(queryKey, (atual) =>
+                reverterAtribuicao(atual ?? anterior, snapshots),
+              );
+              try {
+                await desfazerFn({ data: { orcamento_id: orcamentoId, operacao_id } });
+                toast.info("Atribuição desfeita. A subempreitada criada mantém-se disponível.");
+              } catch (e: any) {
+                toast.error(e?.message ?? "Não foi possível desfazer a atribuição.");
+              }
+              onAlterado();
+            },
+          },
+        },
+      );
+      onAlterado();
+    } catch (e: any) {
+      qc.setQueryData<LinhaRevisao[]>(queryKey, (atual) => reverterAtribuicao(atual ?? anterior, snapshots));
+      toast.error(e?.message ?? "Não foi possível criar a subempreitada. Os artigos continuam em «A Rever».");
+    } finally {
+      setAGuardar(false);
+    }
+  }
+
+  /** Rejeitar nunca valida o artigo: mantém-no em «A Rever» e abre o seletor. */
+  async function rejeitar(l: LinhaRevisao) {
+    const anterior = qc.getQueryData<LinhaRevisao[]>(queryKey) ?? linhas;
+    qc.setQueryData<LinhaRevisao[]>(queryKey, (atual) =>
+      rejeitarSugestaoOtimista(atual ?? anterior, l.artigo_id),
+    );
+    setSeletorAberto(l.artigo_id);
+    try {
+      await rejeitarFn({ data: { orcamento_id: orcamentoId, artigo_id: l.artigo_id } });
+      toast.info("Sugestão rejeitada. Escolha a subempreitada correta.");
+      onAlterado();
+    } catch (e: any) {
+      qc.setQueryData<LinhaRevisao[]>(queryKey, anterior);
+      toast.error(e?.message ?? "Não foi possível registar a rejeição da sugestão.");
     }
   }
 
