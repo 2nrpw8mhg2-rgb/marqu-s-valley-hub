@@ -1,7 +1,6 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { agruparArtigos, formatarQuantidade } from "@/lib/mapas/view";
 import type { ArtigoMapa } from "@/lib/mapas/pastas";
@@ -9,8 +8,11 @@ import { DescriptionCell } from "./DescriptionCell";
 
 type Props = { artigos: ArtigoMapa[]; selecionados: Set<string>; expandidos: Set<string>; gruposFechados: Set<string>; onSelecionar: (id: string, valor: boolean) => void; onSelecionarTodos: (valor: boolean) => void; onExpandirDescricao: (id: string) => void; onDetalhes: (id: string) => void; onGrupo: (id: string) => void };
 
+const TH = "sticky top-[var(--mapa-toolbar-h,0px)] z-10 h-10 border-b bg-background px-2 text-left align-middle text-xs font-medium text-muted-foreground";
+const TD = "border-b px-2 py-2 align-top";
+
 function GrupoTitulo({ nivel, nome, total, resumo, aberto, onClick }: { nivel: 1 | 2; nome: string; total: number; resumo: string | null; aberto: boolean; onClick: () => void }) {
-  return <Button variant="ghost" className={cn("h-auto w-full justify-start rounded-none py-2 text-left", nivel === 1 ? "bg-muted/80 px-3 font-semibold" : "bg-muted/35 px-6 text-sm")} onClick={onClick} aria-expanded={aberto}>
+  return <Button variant="ghost" className={cn("h-auto w-full justify-start gap-2 rounded-none py-2 text-left", nivel === 1 ? "bg-muted/80 px-3 font-semibold" : "bg-muted/35 px-6 text-sm")} onClick={onClick} aria-expanded={aberto}>
     {aberto ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}<span className="min-w-0 flex-1 truncate">{nome}</span><span className="shrink-0 text-xs font-normal text-muted-foreground">{total} {total === 1 ? "artigo" : "artigos"}{resumo ? ` · ${resumo}` : ""}</span>
   </Button>;
 }
@@ -29,16 +31,30 @@ export function MapaHierarchy(props: Props) {
   const alguns = props.artigos.some((a) => props.selecionados.has(a.artigo_id));
   const checkboxEstado = todos ? true : alguns ? "indeterminate" : false;
   return <div>
-    <div className="hidden md:block"><Table className="table-fixed"><colgroup><col className="w-10" /><col className="w-[110px]" /><col /><col className="w-[70px]" /><col className="w-[100px]" /><col className="w-[132px]" /></colgroup><TableHeader className="sticky top-[142px] z-10 bg-background"><TableRow><TableHead><Checkbox checked={checkboxEstado} onCheckedChange={(v) => props.onSelecionarTodos(v === true)} aria-label="Selecionar todos os artigos visíveis nesta página" /></TableHead><TableHead>Código</TableHead><TableHead>Descrição original</TableHead><TableHead>Un.</TableHead><TableHead className="text-right">Quantidade</TableHead><TableHead><span className="sr-only">Ações</span></TableHead></TableRow></TableHeader>
-      <TableBody>{grupos.map((cap) => { const capAberto = !props.gruposFechados.has(cap.id); return <FragmentoGrupo key={cap.id} cap={cap} capAberto={capAberto} {...props} />; })}</TableBody></Table></div>
+    <div className="hidden md:block">
+      <table className="w-full table-fixed caption-bottom text-sm" data-testid="mapa-tabela">
+        <colgroup><col className="w-10" /><col className="w-[110px]" /><col /><col className="w-[70px]" /><col className="w-[100px]" /><col className="w-[132px]" /></colgroup>
+        <thead data-testid="mapa-thead">
+          <tr>
+            <th scope="col" className={TH}><Checkbox checked={checkboxEstado} onCheckedChange={(v) => props.onSelecionarTodos(v === true)} aria-label="Selecionar todos os artigos visíveis nesta página" /></th>
+            <th scope="col" className={TH}>Código</th>
+            <th scope="col" className={TH}>Descrição original</th>
+            <th scope="col" className={TH}>Un.</th>
+            <th scope="col" className={cn(TH, "text-right")}>Quantidade</th>
+            <th scope="col" className={TH}><span className="sr-only">Ações</span></th>
+          </tr>
+        </thead>
+        <tbody data-testid="mapa-tbody">{grupos.map((cap) => { const capAberto = !props.gruposFechados.has(cap.id); return <FragmentoGrupo key={cap.id} cap={cap} capAberto={capAberto} {...props} />; })}</tbody>
+      </table>
+    </div>
     <div className="md:hidden"><div className="flex items-center gap-2 border-b px-4 py-3 text-sm"><Checkbox checked={checkboxEstado} onCheckedChange={(v) => props.onSelecionarTodos(v === true)} aria-label="Selecionar todos os artigos visíveis nesta página" /><span>Selecionar todos os visíveis</span></div>{grupos.map((cap) => { const capAberto = !props.gruposFechados.has(cap.id); return <div key={cap.id}><GrupoTitulo nivel={1} nome={cap.nome} total={cap.artigos} resumo={cap.resumoQuantidade} aberto={capAberto} onClick={() => props.onGrupo(cap.id)} />{capAberto && cap.subcapitulos.map((sub) => { const aberto = !props.gruposFechados.has(sub.id); return <div key={sub.id}><GrupoTitulo nivel={2} nome={sub.nome} total={sub.artigos.length} resumo={sub.resumoQuantidade} aberto={aberto} onClick={() => props.onGrupo(sub.id)} />{aberto && sub.artigos.map((a) => <ArtigoCard key={a.artigo_id} artigo={a} selecionado={props.selecionados.has(a.artigo_id)} expandido={props.expandidos.has(a.artigo_id)} onSelecionar={(v) => props.onSelecionar(a.artigo_id, v)} onExpandir={() => props.onExpandirDescricao(a.artigo_id)} onDetalhes={() => props.onDetalhes(a.artigo_id)} />)}</div>; })}</div>; })}</div>
   </div>;
 }
 
 function FragmentoGrupo({ cap, capAberto, ...props }: Props & { cap: ReturnType<typeof agruparArtigos>[number]; capAberto: boolean }) {
-  return <><TableRow className="hover:bg-transparent"><TableCell colSpan={6} className="p-0"><GrupoTitulo nivel={1} nome={cap.nome} total={cap.artigos} resumo={cap.resumoQuantidade} aberto={capAberto} onClick={() => props.onGrupo(cap.id)} /></TableCell></TableRow>{capAberto && cap.subcapitulos.map((sub) => { const aberto = !props.gruposFechados.has(sub.id); return <FragmentoSubgrupo key={sub.id} sub={sub} aberto={aberto} {...props} />; })}</>;
+  return <><tr><td colSpan={6} className="border-b p-0"><GrupoTitulo nivel={1} nome={cap.nome} total={cap.artigos} resumo={cap.resumoQuantidade} aberto={capAberto} onClick={() => props.onGrupo(cap.id)} /></td></tr>{capAberto && cap.subcapitulos.map((sub) => { const aberto = !props.gruposFechados.has(sub.id); return <FragmentoSubgrupo key={sub.id} sub={sub} aberto={aberto} {...props} />; })}</>;
 }
 
 function FragmentoSubgrupo({ sub, aberto, ...props }: Props & { sub: ReturnType<typeof agruparArtigos>[number]["subcapitulos"][number]; aberto: boolean }) {
-  return <><TableRow className="hover:bg-transparent"><TableCell colSpan={6} className="p-0"><GrupoTitulo nivel={2} nome={sub.nome} total={sub.artigos.length} resumo={sub.resumoQuantidade} aberto={aberto} onClick={() => props.onGrupo(sub.id)} /></TableCell></TableRow>{aberto && sub.artigos.map((a) => <TableRow key={a.artigo_id} data-state={props.selecionados.has(a.artigo_id) ? "selected" : undefined} className="align-top"><TableCell><Checkbox checked={props.selecionados.has(a.artigo_id)} onCheckedChange={(v) => props.onSelecionar(a.artigo_id, v === true)} aria-label={`Selecionar artigo ${a.codigo ?? "sem código"}`} /></TableCell><TableCell className="font-mono text-xs">{a.codigo ?? "—"}</TableCell><TableCell><DescriptionCell descricao={a.descricao} expandida={props.expandidos.has(a.artigo_id)} onAlternar={() => props.onExpandirDescricao(a.artigo_id)} onDetalhes={() => props.onDetalhes(a.artigo_id)} /></TableCell><TableCell>{a.unidade ?? "—"}</TableCell><TableCell className="text-right tabular-nums">{formatarQuantidade(a.quantidade)}</TableCell><TableCell><Button variant="ghost" size="sm" onClick={() => props.onDetalhes(a.artigo_id)}>Ver detalhes</Button></TableCell></TableRow>)}</>;
+  return <><tr><td colSpan={6} className="border-b p-0"><GrupoTitulo nivel={2} nome={sub.nome} total={sub.artigos.length} resumo={sub.resumoQuantidade} aberto={aberto} onClick={() => props.onGrupo(sub.id)} /></td></tr>{aberto && sub.artigos.map((a) => <tr key={a.artigo_id} data-state={props.selecionados.has(a.artigo_id) ? "selected" : undefined} className="align-top transition-colors hover:bg-muted/40 data-[state=selected]:bg-accent"><td className={TD}><Checkbox checked={props.selecionados.has(a.artigo_id)} onCheckedChange={(v) => props.onSelecionar(a.artigo_id, v === true)} aria-label={`Selecionar artigo ${a.codigo ?? "sem código"}`} /></td><td className={cn(TD, "font-mono text-xs")}>{a.codigo ?? "—"}</td><td className={TD}><DescriptionCell descricao={a.descricao} expandida={props.expandidos.has(a.artigo_id)} onAlternar={() => props.onExpandirDescricao(a.artigo_id)} onDetalhes={() => props.onDetalhes(a.artigo_id)} /></td><td className={TD}>{a.unidade ?? "—"}</td><td className={cn(TD, "text-right tabular-nums")}>{formatarQuantidade(a.quantidade)}</td><td className={TD}><Button variant="ghost" size="sm" onClick={() => props.onDetalhes(a.artigo_id)}>Ver detalhes</Button></td></tr>)}</>;
 }
