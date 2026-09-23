@@ -220,6 +220,7 @@ function MapasGrelha() {
             key={p.subempreitada_id}
             to="/obras/$id/mapas/$subId"
             params={{ id: obraId, subId: p.subempreitada_id }}
+            search={{ q: "", capitulo: "", subcapitulo: "", ordenar: "original", direcao: "asc", pagina: 1, tamanho: 25 }}
             className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
           >
             <Card className="p-4 h-full hover:bg-muted/40 transition-colors space-y-2">
