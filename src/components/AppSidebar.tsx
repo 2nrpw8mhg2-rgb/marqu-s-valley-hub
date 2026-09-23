@@ -12,9 +12,12 @@ import {
   History,
   Wand2,
   Settings,
+  Menu,
   type LucideIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { Logo } from "@/components/Logo";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { usePodeAdministrar } from "@/hooks/usePermissoes";
 import { Button } from "@/components/ui/button";
@@ -93,7 +96,8 @@ export function AppSidebar() {
   };
 
   const { podeAdministrar } = usePodeAdministrar();
-  const visiveis = seccoesVisiveis(sections as never, podeAdministrar) as typeof sections;
+  const [aberto, setAberto] = useState(false);
+  const visiveis = seccoesVisiveis(sections, podeAdministrar);
 
   const conteudo = (
     <>
@@ -196,7 +200,6 @@ export function AppSidebar() {
         </Sheet>
         <Logo />
       </div>
-      <div className="md:hidden h-12 shrink-0" aria-hidden />
     </>
   );
 }

@@ -28,7 +28,10 @@ export function redirecionamentoBiblioteca(caminho: string): string {
 }
 
 /** Filtra as secções do menu de acordo com as permissões do utilizador. */
-export function seccoesVisiveis(seccoes: SeccaoMenu[], podeAdministrar: boolean): SeccaoMenu[] {
+export function seccoesVisiveis<T extends { adminOnly?: boolean }>(
+  seccoes: readonly T[],
+  podeAdministrar: boolean,
+): T[] {
   return seccoes.filter((s) => !s.adminOnly || podeAdministrar);
 }
 
