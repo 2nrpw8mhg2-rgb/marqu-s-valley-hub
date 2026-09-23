@@ -150,6 +150,16 @@ describe("métricas", () => {
     expect(m.propostas_recebidas).toBe(0);
     expect(m.alertas).toBe(1);
   });
+
+  it("soma consultas e propostas reais e conta apenas pacotes em comparação", () => {
+    const m = metricasProcurement([
+      linha({ id: "p1", estado: "enviado", consultas_enviadas: 3, respostas: 1 }),
+      linha({ id: "p2", estado: "em_analise", consultas_enviadas: 2, respostas: 2 }),
+    ]);
+    expect(m.consultas_enviadas).toBe(5);
+    expect(m.propostas_recebidas).toBe(3);
+    expect(m.em_comparacao).toBe(1);
+  });
 });
 
 describe("lista de pacotes", () => {
