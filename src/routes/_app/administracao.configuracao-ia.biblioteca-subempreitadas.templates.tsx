@@ -18,7 +18,7 @@ import { Plus, Pencil, Trash2, HardHat } from "lucide-react";
 import type { TemplateObra } from "@/lib/biblioteca-mestra/types";
 
 export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/templates")({
-  head: () => ({ meta: [{ title: "Templates de Obra — Biblioteca Mestra — MV OS" }] }),
+  head: () => ({ meta: [{ title: "Templates de Obra — Biblioteca de Subempreitadas — MV OS" }] }),
   component: TemplatesPage,
 });
 

@@ -18,26 +18,14 @@ import { Route as AppMotorClassificacaoRouteImport } from './routes/_app/motor-c
 import { Route as AppDocumentosRouteImport } from './routes/_app/documentos'
 import { Route as AppDecomposicaoPrecosRouteImport } from './routes/_app/decomposicao-precos'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
-import { Route as AppBibliotecaMestraRouteImport } from './routes/_app/biblioteca-mestra'
 import { Route as AppBibliotecaRouteImport } from './routes/_app/biblioteca'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos.index'
 import { Route as AppObrasIndexRouteImport } from './routes/_app/obras.index'
-import { Route as AppBibliotecaMestraIndexRouteImport } from './routes/_app/biblioteca-mestra.index'
 import { Route as AppProcurementPacotesRouteImport } from './routes/_app/procurement.pacotes'
 import { Route as AppOrcamentosDecomposicaoRouteImport } from './routes/_app/orcamentos.decomposicao'
 import { Route as AppObrasIdRouteImport } from './routes/_app/obras.$id'
-import { Route as AppBibliotecaMestraUnidadesRouteImport } from './routes/_app/biblioteca-mestra.unidades'
-import { Route as AppBibliotecaMestraTemplatesRouteImport } from './routes/_app/biblioteca-mestra.templates'
-import { Route as AppBibliotecaMestraSubespecialidadesRouteImport } from './routes/_app/biblioteca-mestra.subespecialidades'
-import { Route as AppBibliotecaMestraSubempreitadasRouteImport } from './routes/_app/biblioteca-mestra.subempreitadas'
-import { Route as AppBibliotecaMestraSistemasRouteImport } from './routes/_app/biblioteca-mestra.sistemas'
-import { Route as AppBibliotecaMestraKnowledgeBuilderRouteImport } from './routes/_app/biblioteca-mestra.knowledge-builder'
-import { Route as AppBibliotecaMestraKeywordsRouteImport } from './routes/_app/biblioteca-mestra.keywords'
-import { Route as AppBibliotecaMestraEspecialidadesRouteImport } from './routes/_app/biblioteca-mestra.especialidades'
-import { Route as AppBibliotecaMestraCategoriasRouteImport } from './routes/_app/biblioteca-mestra.categorias'
-import { Route as AppBibliotecaMestraArtigosRouteImport } from './routes/_app/biblioteca-mestra.artigos'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AppOrcamentosIdIndexRouteImport } from './routes/_app/orcamentos.$id.index'
@@ -55,8 +43,20 @@ import { Route as AppObrasIdMqRouteImport } from './routes/_app/obras.$id.mq'
 import { Route as AppObrasIdMedicoesRouteImport } from './routes/_app/obras.$id.medicoes'
 import { Route as AppObrasIdFinanceiraRouteImport } from './routes/_app/obras.$id.financeira'
 import { Route as AppObrasIdDocumentosRouteImport } from './routes/_app/obras.$id.documentos'
+import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas'
 import { Route as AppObrasIdMapasIndexRouteImport } from './routes/_app/obras.$id.mapas.index'
+import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.index'
 import { Route as AppObrasIdMapasSubIdRouteImport } from './routes/_app/obras.$id.mapas.$subId'
+import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.unidades'
+import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.templates'
+import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubespecialidadesRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.subespecialidades'
+import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubempreitadasRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.subempreitadas'
+import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSistemasRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.sistemas'
+import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKnowledgeBuilderRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.knowledge-builder'
+import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKeywordsRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.keywords'
+import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasEspecialidadesRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.especialidades'
+import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasCategoriasRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.categorias'
+import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.artigos'
 
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
@@ -102,11 +102,6 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
-const AppBibliotecaMestraRoute = AppBibliotecaMestraRouteImport.update({
-  id: '/biblioteca-mestra',
-  path: '/biblioteca-mestra',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppBibliotecaRoute = AppBibliotecaRouteImport.update({
   id: '/biblioteca',
   path: '/biblioteca',
@@ -134,12 +129,6 @@ const AppObrasIndexRoute = AppObrasIndexRouteImport.update({
   path: '/obras/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppBibliotecaMestraIndexRoute =
-  AppBibliotecaMestraIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AppBibliotecaMestraRoute,
-  } as any)
 const AppProcurementPacotesRoute = AppProcurementPacotesRouteImport.update({
   id: '/procurement/pacotes',
   path: '/procurement/pacotes',
@@ -156,66 +145,6 @@ const AppObrasIdRoute = AppObrasIdRouteImport.update({
   path: '/obras/$id',
   getParentRoute: () => AppRoute,
 } as any)
-const AppBibliotecaMestraUnidadesRoute =
-  AppBibliotecaMestraUnidadesRouteImport.update({
-    id: '/unidades',
-    path: '/unidades',
-    getParentRoute: () => AppBibliotecaMestraRoute,
-  } as any)
-const AppBibliotecaMestraTemplatesRoute =
-  AppBibliotecaMestraTemplatesRouteImport.update({
-    id: '/templates',
-    path: '/templates',
-    getParentRoute: () => AppBibliotecaMestraRoute,
-  } as any)
-const AppBibliotecaMestraSubespecialidadesRoute =
-  AppBibliotecaMestraSubespecialidadesRouteImport.update({
-    id: '/subespecialidades',
-    path: '/subespecialidades',
-    getParentRoute: () => AppBibliotecaMestraRoute,
-  } as any)
-const AppBibliotecaMestraSubempreitadasRoute =
-  AppBibliotecaMestraSubempreitadasRouteImport.update({
-    id: '/subempreitadas',
-    path: '/subempreitadas',
-    getParentRoute: () => AppBibliotecaMestraRoute,
-  } as any)
-const AppBibliotecaMestraSistemasRoute =
-  AppBibliotecaMestraSistemasRouteImport.update({
-    id: '/sistemas',
-    path: '/sistemas',
-    getParentRoute: () => AppBibliotecaMestraRoute,
-  } as any)
-const AppBibliotecaMestraKnowledgeBuilderRoute =
-  AppBibliotecaMestraKnowledgeBuilderRouteImport.update({
-    id: '/knowledge-builder',
-    path: '/knowledge-builder',
-    getParentRoute: () => AppBibliotecaMestraRoute,
-  } as any)
-const AppBibliotecaMestraKeywordsRoute =
-  AppBibliotecaMestraKeywordsRouteImport.update({
-    id: '/keywords',
-    path: '/keywords',
-    getParentRoute: () => AppBibliotecaMestraRoute,
-  } as any)
-const AppBibliotecaMestraEspecialidadesRoute =
-  AppBibliotecaMestraEspecialidadesRouteImport.update({
-    id: '/especialidades',
-    path: '/especialidades',
-    getParentRoute: () => AppBibliotecaMestraRoute,
-  } as any)
-const AppBibliotecaMestraCategoriasRoute =
-  AppBibliotecaMestraCategoriasRouteImport.update({
-    id: '/categorias',
-    path: '/categorias',
-    getParentRoute: () => AppBibliotecaMestraRoute,
-  } as any)
-const AppBibliotecaMestraArtigosRoute =
-  AppBibliotecaMestraArtigosRouteImport.update({
-    id: '/artigos',
-    path: '/artigos',
-    getParentRoute: () => AppBibliotecaMestraRoute,
-  } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -306,16 +235,121 @@ const AppObrasIdDocumentosRoute = AppObrasIdDocumentosRouteImport.update({
   path: '/documentos',
   getParentRoute: () => AppObrasIdRoute,
 } as any)
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteImport.update({
+    id: '/administracao/configuracao-ia/biblioteca-subempreitadas',
+    path: '/administracao/configuracao-ia/biblioteca-subempreitadas',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppObrasIdMapasIndexRoute = AppObrasIdMapasIndexRouteImport.update({
   id: '/mapas/',
   path: '/mapas/',
   getParentRoute: () => AppObrasIdRoute,
 } as any)
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRouteImport.update(
+    {
+      id: '/',
+      path: '/',
+      getParentRoute: () =>
+        AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
+    } as any,
+  )
 const AppObrasIdMapasSubIdRoute = AppObrasIdMapasSubIdRouteImport.update({
   id: '/mapas/$subId',
   path: '/mapas/$subId',
   getParentRoute: () => AppObrasIdRoute,
 } as any)
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRoute =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRouteImport.update(
+    {
+      id: '/unidades',
+      path: '/unidades',
+      getParentRoute: () =>
+        AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
+    } as any,
+  )
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRoute =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRouteImport.update(
+    {
+      id: '/templates',
+      path: '/templates',
+      getParentRoute: () =>
+        AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
+    } as any,
+  )
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubespecialidadesRoute =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubespecialidadesRouteImport.update(
+    {
+      id: '/subespecialidades',
+      path: '/subespecialidades',
+      getParentRoute: () =>
+        AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
+    } as any,
+  )
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubempreitadasRoute =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubempreitadasRouteImport.update(
+    {
+      id: '/subempreitadas',
+      path: '/subempreitadas',
+      getParentRoute: () =>
+        AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
+    } as any,
+  )
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSistemasRoute =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSistemasRouteImport.update(
+    {
+      id: '/sistemas',
+      path: '/sistemas',
+      getParentRoute: () =>
+        AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
+    } as any,
+  )
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKnowledgeBuilderRoute =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKnowledgeBuilderRouteImport.update(
+    {
+      id: '/knowledge-builder',
+      path: '/knowledge-builder',
+      getParentRoute: () =>
+        AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
+    } as any,
+  )
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKeywordsRoute =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKeywordsRouteImport.update(
+    {
+      id: '/keywords',
+      path: '/keywords',
+      getParentRoute: () =>
+        AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
+    } as any,
+  )
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasEspecialidadesRoute =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasEspecialidadesRouteImport.update(
+    {
+      id: '/especialidades',
+      path: '/especialidades',
+      getParentRoute: () =>
+        AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
+    } as any,
+  )
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasCategoriasRoute =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasCategoriasRouteImport.update(
+    {
+      id: '/categorias',
+      path: '/categorias',
+      getParentRoute: () =>
+        AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
+    } as any,
+  )
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRoute =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRouteImport.update(
+    {
+      id: '/artigos',
+      path: '/artigos',
+      getParentRoute: () =>
+        AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
+    } as any,
+  )
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -324,7 +358,6 @@ export interface FileRoutesByFullPath {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/biblioteca': typeof AppBibliotecaRoute
-  '/biblioteca-mestra': typeof AppBibliotecaMestraRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
   '/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/documentos': typeof AppDocumentosRoute
@@ -332,22 +365,12 @@ export interface FileRoutesByFullPath {
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
-  '/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
-  '/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
-  '/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
-  '/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
-  '/biblioteca-mestra/knowledge-builder': typeof AppBibliotecaMestraKnowledgeBuilderRoute
-  '/biblioteca-mestra/sistemas': typeof AppBibliotecaMestraSistemasRoute
-  '/biblioteca-mestra/subempreitadas': typeof AppBibliotecaMestraSubempreitadasRoute
-  '/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
-  '/biblioteca-mestra/templates': typeof AppBibliotecaMestraTemplatesRoute
-  '/biblioteca-mestra/unidades': typeof AppBibliotecaMestraUnidadesRoute
   '/obras/$id': typeof AppObrasIdRouteWithChildren
   '/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/procurement/pacotes': typeof AppProcurementPacotesRouteWithChildren
-  '/biblioteca-mestra/': typeof AppBibliotecaMestraIndexRoute
   '/obras/': typeof AppObrasIndexRoute
   '/orcamentos/': typeof AppOrcamentosIndexRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteWithChildren
   '/obras/$id/documentos': typeof AppObrasIdDocumentosRoute
   '/obras/$id/financeira': typeof AppObrasIdFinanceiraRoute
   '/obras/$id/medicoes': typeof AppObrasIdMedicoesRoute
@@ -363,7 +386,18 @@ export interface FileRoutesByFullPath {
   '/procurement/pacotes/$id': typeof AppProcurementPacotesIdRoute
   '/obras/$id/': typeof AppObrasIdIndexRoute
   '/orcamentos/$id/': typeof AppOrcamentosIdIndexRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/artigos': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/categorias': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasCategoriasRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/especialidades': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasEspecialidadesRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/keywords': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKeywordsRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/knowledge-builder': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKnowledgeBuilderRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/sistemas': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSistemasRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/subempreitadas': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubempreitadasRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/subespecialidades': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubespecialidadesRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/templates': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/unidades': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRoute
   '/obras/$id/mapas/$subId': typeof AppObrasIdMapasSubIdRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute
   '/obras/$id/mapas/': typeof AppObrasIdMapasIndexRoute
 }
 export interface FileRoutesByTo {
@@ -380,19 +414,8 @@ export interface FileRoutesByTo {
   '/subempreiteiros': typeof AppSubempreiteirosRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
-  '/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
-  '/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
-  '/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
-  '/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
-  '/biblioteca-mestra/knowledge-builder': typeof AppBibliotecaMestraKnowledgeBuilderRoute
-  '/biblioteca-mestra/sistemas': typeof AppBibliotecaMestraSistemasRoute
-  '/biblioteca-mestra/subempreitadas': typeof AppBibliotecaMestraSubempreitadasRoute
-  '/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
-  '/biblioteca-mestra/templates': typeof AppBibliotecaMestraTemplatesRoute
-  '/biblioteca-mestra/unidades': typeof AppBibliotecaMestraUnidadesRoute
   '/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/procurement/pacotes': typeof AppProcurementPacotesRouteWithChildren
-  '/biblioteca-mestra': typeof AppBibliotecaMestraIndexRoute
   '/obras': typeof AppObrasIndexRoute
   '/orcamentos': typeof AppOrcamentosIndexRoute
   '/obras/$id/documentos': typeof AppObrasIdDocumentosRoute
@@ -410,7 +433,18 @@ export interface FileRoutesByTo {
   '/procurement/pacotes/$id': typeof AppProcurementPacotesIdRoute
   '/obras/$id': typeof AppObrasIdIndexRoute
   '/orcamentos/$id': typeof AppOrcamentosIdIndexRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/artigos': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/categorias': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasCategoriasRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/especialidades': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasEspecialidadesRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/keywords': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKeywordsRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/knowledge-builder': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKnowledgeBuilderRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/sistemas': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSistemasRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/subempreitadas': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubempreitadasRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/subespecialidades': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubespecialidadesRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/templates': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas/unidades': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRoute
   '/obras/$id/mapas/$subId': typeof AppObrasIdMapasSubIdRoute
+  '/administracao/configuracao-ia/biblioteca-subempreitadas': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute
   '/obras/$id/mapas': typeof AppObrasIdMapasIndexRoute
 }
 export interface FileRoutesById {
@@ -422,7 +456,6 @@ export interface FileRoutesById {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_app/biblioteca': typeof AppBibliotecaRoute
-  '/_app/biblioteca-mestra': typeof AppBibliotecaMestraRouteWithChildren
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/decomposicao-precos': typeof AppDecomposicaoPrecosRoute
   '/_app/documentos': typeof AppDocumentosRoute
@@ -430,22 +463,12 @@ export interface FileRoutesById {
   '/_app/subempreiteiros': typeof AppSubempreiteirosRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
-  '/_app/biblioteca-mestra/artigos': typeof AppBibliotecaMestraArtigosRoute
-  '/_app/biblioteca-mestra/categorias': typeof AppBibliotecaMestraCategoriasRoute
-  '/_app/biblioteca-mestra/especialidades': typeof AppBibliotecaMestraEspecialidadesRoute
-  '/_app/biblioteca-mestra/keywords': typeof AppBibliotecaMestraKeywordsRoute
-  '/_app/biblioteca-mestra/knowledge-builder': typeof AppBibliotecaMestraKnowledgeBuilderRoute
-  '/_app/biblioteca-mestra/sistemas': typeof AppBibliotecaMestraSistemasRoute
-  '/_app/biblioteca-mestra/subempreitadas': typeof AppBibliotecaMestraSubempreitadasRoute
-  '/_app/biblioteca-mestra/subespecialidades': typeof AppBibliotecaMestraSubespecialidadesRoute
-  '/_app/biblioteca-mestra/templates': typeof AppBibliotecaMestraTemplatesRoute
-  '/_app/biblioteca-mestra/unidades': typeof AppBibliotecaMestraUnidadesRoute
   '/_app/obras/$id': typeof AppObrasIdRouteWithChildren
   '/_app/orcamentos/decomposicao': typeof AppOrcamentosDecomposicaoRoute
   '/_app/procurement/pacotes': typeof AppProcurementPacotesRouteWithChildren
-  '/_app/biblioteca-mestra/': typeof AppBibliotecaMestraIndexRoute
   '/_app/obras/': typeof AppObrasIndexRoute
   '/_app/orcamentos/': typeof AppOrcamentosIndexRoute
+  '/_app/administracao/configuracao-ia/biblioteca-subempreitadas': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteWithChildren
   '/_app/obras/$id/documentos': typeof AppObrasIdDocumentosRoute
   '/_app/obras/$id/financeira': typeof AppObrasIdFinanceiraRoute
   '/_app/obras/$id/medicoes': typeof AppObrasIdMedicoesRoute
@@ -461,7 +484,18 @@ export interface FileRoutesById {
   '/_app/procurement/pacotes/$id': typeof AppProcurementPacotesIdRoute
   '/_app/obras/$id/': typeof AppObrasIdIndexRoute
   '/_app/orcamentos/$id/': typeof AppOrcamentosIdIndexRoute
+  '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/artigos': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRoute
+  '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/categorias': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasCategoriasRoute
+  '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/especialidades': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasEspecialidadesRoute
+  '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/keywords': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKeywordsRoute
+  '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/knowledge-builder': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKnowledgeBuilderRoute
+  '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/sistemas': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSistemasRoute
+  '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/subempreitadas': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubempreitadasRoute
+  '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/subespecialidades': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubespecialidadesRoute
+  '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/templates': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRoute
+  '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/unidades': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRoute
   '/_app/obras/$id/mapas/$subId': typeof AppObrasIdMapasSubIdRoute
+  '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute
   '/_app/obras/$id/mapas/': typeof AppObrasIdMapasIndexRoute
 }
 export interface FileRouteTypes {
@@ -473,7 +507,6 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/biblioteca'
-    | '/biblioteca-mestra'
     | '/dashboard'
     | '/decomposicao-precos'
     | '/documentos'
@@ -481,22 +514,12 @@ export interface FileRouteTypes {
     | '/subempreiteiros'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
-    | '/biblioteca-mestra/artigos'
-    | '/biblioteca-mestra/categorias'
-    | '/biblioteca-mestra/especialidades'
-    | '/biblioteca-mestra/keywords'
-    | '/biblioteca-mestra/knowledge-builder'
-    | '/biblioteca-mestra/sistemas'
-    | '/biblioteca-mestra/subempreitadas'
-    | '/biblioteca-mestra/subespecialidades'
-    | '/biblioteca-mestra/templates'
-    | '/biblioteca-mestra/unidades'
     | '/obras/$id'
     | '/orcamentos/decomposicao'
     | '/procurement/pacotes'
-    | '/biblioteca-mestra/'
     | '/obras/'
     | '/orcamentos/'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas'
     | '/obras/$id/documentos'
     | '/obras/$id/financeira'
     | '/obras/$id/medicoes'
@@ -512,7 +535,18 @@ export interface FileRouteTypes {
     | '/procurement/pacotes/$id'
     | '/obras/$id/'
     | '/orcamentos/$id/'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/artigos'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/categorias'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/especialidades'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/keywords'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/knowledge-builder'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/sistemas'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/subempreitadas'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/subespecialidades'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/templates'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/unidades'
     | '/obras/$id/mapas/$subId'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/'
     | '/obras/$id/mapas/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -529,19 +563,8 @@ export interface FileRouteTypes {
     | '/subempreiteiros'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
-    | '/biblioteca-mestra/artigos'
-    | '/biblioteca-mestra/categorias'
-    | '/biblioteca-mestra/especialidades'
-    | '/biblioteca-mestra/keywords'
-    | '/biblioteca-mestra/knowledge-builder'
-    | '/biblioteca-mestra/sistemas'
-    | '/biblioteca-mestra/subempreitadas'
-    | '/biblioteca-mestra/subespecialidades'
-    | '/biblioteca-mestra/templates'
-    | '/biblioteca-mestra/unidades'
     | '/orcamentos/decomposicao'
     | '/procurement/pacotes'
-    | '/biblioteca-mestra'
     | '/obras'
     | '/orcamentos'
     | '/obras/$id/documentos'
@@ -559,7 +582,18 @@ export interface FileRouteTypes {
     | '/procurement/pacotes/$id'
     | '/obras/$id'
     | '/orcamentos/$id'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/artigos'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/categorias'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/especialidades'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/keywords'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/knowledge-builder'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/sistemas'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/subempreitadas'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/subespecialidades'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/templates'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas/unidades'
     | '/obras/$id/mapas/$subId'
+    | '/administracao/configuracao-ia/biblioteca-subempreitadas'
     | '/obras/$id/mapas'
   id:
     | '__root__'
@@ -570,7 +604,6 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/_app/biblioteca'
-    | '/_app/biblioteca-mestra'
     | '/_app/dashboard'
     | '/_app/decomposicao-precos'
     | '/_app/documentos'
@@ -578,22 +611,12 @@ export interface FileRouteTypes {
     | '/_app/subempreiteiros'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
-    | '/_app/biblioteca-mestra/artigos'
-    | '/_app/biblioteca-mestra/categorias'
-    | '/_app/biblioteca-mestra/especialidades'
-    | '/_app/biblioteca-mestra/keywords'
-    | '/_app/biblioteca-mestra/knowledge-builder'
-    | '/_app/biblioteca-mestra/sistemas'
-    | '/_app/biblioteca-mestra/subempreitadas'
-    | '/_app/biblioteca-mestra/subespecialidades'
-    | '/_app/biblioteca-mestra/templates'
-    | '/_app/biblioteca-mestra/unidades'
     | '/_app/obras/$id'
     | '/_app/orcamentos/decomposicao'
     | '/_app/procurement/pacotes'
-    | '/_app/biblioteca-mestra/'
     | '/_app/obras/'
     | '/_app/orcamentos/'
+    | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas'
     | '/_app/obras/$id/documentos'
     | '/_app/obras/$id/financeira'
     | '/_app/obras/$id/medicoes'
@@ -609,7 +632,18 @@ export interface FileRouteTypes {
     | '/_app/procurement/pacotes/$id'
     | '/_app/obras/$id/'
     | '/_app/orcamentos/$id/'
+    | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/artigos'
+    | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/categorias'
+    | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/especialidades'
+    | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/keywords'
+    | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/knowledge-builder'
+    | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/sistemas'
+    | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/subempreitadas'
+    | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/subespecialidades'
+    | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/templates'
+    | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/unidades'
     | '/_app/obras/$id/mapas/$subId'
+    | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/'
     | '/_app/obras/$id/mapas/'
   fileRoutesById: FileRoutesById
 }
@@ -689,13 +723,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/biblioteca-mestra': {
-      id: '/_app/biblioteca-mestra'
-      path: '/biblioteca-mestra'
-      fullPath: '/biblioteca-mestra'
-      preLoaderRoute: typeof AppBibliotecaMestraRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/biblioteca': {
       id: '/_app/biblioteca'
       path: '/biblioteca'
@@ -731,13 +758,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppObrasIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/biblioteca-mestra/': {
-      id: '/_app/biblioteca-mestra/'
-      path: '/'
-      fullPath: '/biblioteca-mestra/'
-      preLoaderRoute: typeof AppBibliotecaMestraIndexRouteImport
-      parentRoute: typeof AppBibliotecaMestraRoute
-    }
     '/_app/procurement/pacotes': {
       id: '/_app/procurement/pacotes'
       path: '/procurement/pacotes'
@@ -758,76 +778,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/obras/$id'
       preLoaderRoute: typeof AppObrasIdRouteImport
       parentRoute: typeof AppRoute
-    }
-    '/_app/biblioteca-mestra/unidades': {
-      id: '/_app/biblioteca-mestra/unidades'
-      path: '/unidades'
-      fullPath: '/biblioteca-mestra/unidades'
-      preLoaderRoute: typeof AppBibliotecaMestraUnidadesRouteImport
-      parentRoute: typeof AppBibliotecaMestraRoute
-    }
-    '/_app/biblioteca-mestra/templates': {
-      id: '/_app/biblioteca-mestra/templates'
-      path: '/templates'
-      fullPath: '/biblioteca-mestra/templates'
-      preLoaderRoute: typeof AppBibliotecaMestraTemplatesRouteImport
-      parentRoute: typeof AppBibliotecaMestraRoute
-    }
-    '/_app/biblioteca-mestra/subespecialidades': {
-      id: '/_app/biblioteca-mestra/subespecialidades'
-      path: '/subespecialidades'
-      fullPath: '/biblioteca-mestra/subespecialidades'
-      preLoaderRoute: typeof AppBibliotecaMestraSubespecialidadesRouteImport
-      parentRoute: typeof AppBibliotecaMestraRoute
-    }
-    '/_app/biblioteca-mestra/subempreitadas': {
-      id: '/_app/biblioteca-mestra/subempreitadas'
-      path: '/subempreitadas'
-      fullPath: '/biblioteca-mestra/subempreitadas'
-      preLoaderRoute: typeof AppBibliotecaMestraSubempreitadasRouteImport
-      parentRoute: typeof AppBibliotecaMestraRoute
-    }
-    '/_app/biblioteca-mestra/sistemas': {
-      id: '/_app/biblioteca-mestra/sistemas'
-      path: '/sistemas'
-      fullPath: '/biblioteca-mestra/sistemas'
-      preLoaderRoute: typeof AppBibliotecaMestraSistemasRouteImport
-      parentRoute: typeof AppBibliotecaMestraRoute
-    }
-    '/_app/biblioteca-mestra/knowledge-builder': {
-      id: '/_app/biblioteca-mestra/knowledge-builder'
-      path: '/knowledge-builder'
-      fullPath: '/biblioteca-mestra/knowledge-builder'
-      preLoaderRoute: typeof AppBibliotecaMestraKnowledgeBuilderRouteImport
-      parentRoute: typeof AppBibliotecaMestraRoute
-    }
-    '/_app/biblioteca-mestra/keywords': {
-      id: '/_app/biblioteca-mestra/keywords'
-      path: '/keywords'
-      fullPath: '/biblioteca-mestra/keywords'
-      preLoaderRoute: typeof AppBibliotecaMestraKeywordsRouteImport
-      parentRoute: typeof AppBibliotecaMestraRoute
-    }
-    '/_app/biblioteca-mestra/especialidades': {
-      id: '/_app/biblioteca-mestra/especialidades'
-      path: '/especialidades'
-      fullPath: '/biblioteca-mestra/especialidades'
-      preLoaderRoute: typeof AppBibliotecaMestraEspecialidadesRouteImport
-      parentRoute: typeof AppBibliotecaMestraRoute
-    }
-    '/_app/biblioteca-mestra/categorias': {
-      id: '/_app/biblioteca-mestra/categorias'
-      path: '/categorias'
-      fullPath: '/biblioteca-mestra/categorias'
-      preLoaderRoute: typeof AppBibliotecaMestraCategoriasRouteImport
-      parentRoute: typeof AppBibliotecaMestraRoute
-    }
-    '/_app/biblioteca-mestra/artigos': {
-      id: '/_app/biblioteca-mestra/artigos'
-      path: '/artigos'
-      fullPath: '/biblioteca-mestra/artigos'
-      preLoaderRoute: typeof AppBibliotecaMestraArtigosRouteImport
-      parentRoute: typeof AppBibliotecaMestraRoute
     }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
@@ -948,12 +898,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppObrasIdDocumentosRouteImport
       parentRoute: typeof AppObrasIdRoute
     }
+    '/_app/administracao/configuracao-ia/biblioteca-subempreitadas': {
+      id: '/_app/administracao/configuracao-ia/biblioteca-subempreitadas'
+      path: '/administracao/configuracao-ia/biblioteca-subempreitadas'
+      fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas'
+      preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/obras/$id/mapas/': {
       id: '/_app/obras/$id/mapas/'
       path: '/mapas'
       fullPath: '/obras/$id/mapas/'
       preLoaderRoute: typeof AppObrasIdMapasIndexRouteImport
       parentRoute: typeof AppObrasIdRoute
+    }
+    '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/': {
+      id: '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/'
+      path: '/'
+      fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas/'
+      preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRouteImport
+      parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
     }
     '/_app/obras/$id/mapas/$subId': {
       id: '/_app/obras/$id/mapas/$subId'
@@ -962,43 +926,78 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppObrasIdMapasSubIdRouteImport
       parentRoute: typeof AppObrasIdRoute
     }
+    '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/unidades': {
+      id: '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/unidades'
+      path: '/unidades'
+      fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas/unidades'
+      preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRouteImport
+      parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
+    }
+    '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/templates': {
+      id: '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/templates'
+      path: '/templates'
+      fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas/templates'
+      preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRouteImport
+      parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
+    }
+    '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/subespecialidades': {
+      id: '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/subespecialidades'
+      path: '/subespecialidades'
+      fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas/subespecialidades'
+      preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubespecialidadesRouteImport
+      parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
+    }
+    '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/subempreitadas': {
+      id: '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/subempreitadas'
+      path: '/subempreitadas'
+      fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas/subempreitadas'
+      preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubempreitadasRouteImport
+      parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
+    }
+    '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/sistemas': {
+      id: '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/sistemas'
+      path: '/sistemas'
+      fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas/sistemas'
+      preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSistemasRouteImport
+      parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
+    }
+    '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/knowledge-builder': {
+      id: '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/knowledge-builder'
+      path: '/knowledge-builder'
+      fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas/knowledge-builder'
+      preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKnowledgeBuilderRouteImport
+      parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
+    }
+    '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/keywords': {
+      id: '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/keywords'
+      path: '/keywords'
+      fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas/keywords'
+      preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKeywordsRouteImport
+      parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
+    }
+    '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/especialidades': {
+      id: '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/especialidades'
+      path: '/especialidades'
+      fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas/especialidades'
+      preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasEspecialidadesRouteImport
+      parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
+    }
+    '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/categorias': {
+      id: '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/categorias'
+      path: '/categorias'
+      fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas/categorias'
+      preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasCategoriasRouteImport
+      parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
+    }
+    '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/artigos': {
+      id: '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/artigos'
+      path: '/artigos'
+      fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas/artigos'
+      preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRouteImport
+      parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
+    }
   }
 }
-
-interface AppBibliotecaMestraRouteChildren {
-  AppBibliotecaMestraArtigosRoute: typeof AppBibliotecaMestraArtigosRoute
-  AppBibliotecaMestraCategoriasRoute: typeof AppBibliotecaMestraCategoriasRoute
-  AppBibliotecaMestraEspecialidadesRoute: typeof AppBibliotecaMestraEspecialidadesRoute
-  AppBibliotecaMestraKeywordsRoute: typeof AppBibliotecaMestraKeywordsRoute
-  AppBibliotecaMestraKnowledgeBuilderRoute: typeof AppBibliotecaMestraKnowledgeBuilderRoute
-  AppBibliotecaMestraSistemasRoute: typeof AppBibliotecaMestraSistemasRoute
-  AppBibliotecaMestraSubempreitadasRoute: typeof AppBibliotecaMestraSubempreitadasRoute
-  AppBibliotecaMestraSubespecialidadesRoute: typeof AppBibliotecaMestraSubespecialidadesRoute
-  AppBibliotecaMestraTemplatesRoute: typeof AppBibliotecaMestraTemplatesRoute
-  AppBibliotecaMestraUnidadesRoute: typeof AppBibliotecaMestraUnidadesRoute
-  AppBibliotecaMestraIndexRoute: typeof AppBibliotecaMestraIndexRoute
-}
-
-const AppBibliotecaMestraRouteChildren: AppBibliotecaMestraRouteChildren = {
-  AppBibliotecaMestraArtigosRoute: AppBibliotecaMestraArtigosRoute,
-  AppBibliotecaMestraCategoriasRoute: AppBibliotecaMestraCategoriasRoute,
-  AppBibliotecaMestraEspecialidadesRoute:
-    AppBibliotecaMestraEspecialidadesRoute,
-  AppBibliotecaMestraKeywordsRoute: AppBibliotecaMestraKeywordsRoute,
-  AppBibliotecaMestraKnowledgeBuilderRoute:
-    AppBibliotecaMestraKnowledgeBuilderRoute,
-  AppBibliotecaMestraSistemasRoute: AppBibliotecaMestraSistemasRoute,
-  AppBibliotecaMestraSubempreitadasRoute:
-    AppBibliotecaMestraSubempreitadasRoute,
-  AppBibliotecaMestraSubespecialidadesRoute:
-    AppBibliotecaMestraSubespecialidadesRoute,
-  AppBibliotecaMestraTemplatesRoute: AppBibliotecaMestraTemplatesRoute,
-  AppBibliotecaMestraUnidadesRoute: AppBibliotecaMestraUnidadesRoute,
-  AppBibliotecaMestraIndexRoute: AppBibliotecaMestraIndexRoute,
-}
-
-const AppBibliotecaMestraRouteWithChildren =
-  AppBibliotecaMestraRoute._addFileChildren(AppBibliotecaMestraRouteChildren)
 
 interface AppObrasIdRouteChildren {
   AppObrasIdDocumentosRoute: typeof AppObrasIdDocumentosRoute
@@ -1049,9 +1048,53 @@ const AppProcurementPacotesRouteWithChildren =
     AppProcurementPacotesRouteChildren,
   )
 
+interface AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteChildren {
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRoute
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasCategoriasRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasCategoriasRoute
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasEspecialidadesRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasEspecialidadesRoute
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKeywordsRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKeywordsRoute
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKnowledgeBuilderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKnowledgeBuilderRoute
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSistemasRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSistemasRoute
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubempreitadasRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubempreitadasRoute
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubespecialidadesRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubespecialidadesRoute
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRoute
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRoute
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute
+}
+
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteChildren: AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteChildren =
+  {
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRoute:
+      AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRoute,
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasCategoriasRoute:
+      AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasCategoriasRoute,
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasEspecialidadesRoute:
+      AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasEspecialidadesRoute,
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKeywordsRoute:
+      AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKeywordsRoute,
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKnowledgeBuilderRoute:
+      AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKnowledgeBuilderRoute,
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSistemasRoute:
+      AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSistemasRoute,
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubempreitadasRoute:
+      AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubempreitadasRoute,
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubespecialidadesRoute:
+      AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasSubespecialidadesRoute,
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRoute:
+      AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRoute,
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRoute:
+      AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRoute,
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute:
+      AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute,
+  }
+
+const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteWithChildren =
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute._addFileChildren(
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteChildren,
+  )
+
 interface AppRouteChildren {
   AppBibliotecaRoute: typeof AppBibliotecaRoute
-  AppBibliotecaMestraRoute: typeof AppBibliotecaMestraRouteWithChildren
   AppDashboardRoute: typeof AppDashboardRoute
   AppDecomposicaoPrecosRoute: typeof AppDecomposicaoPrecosRoute
   AppDocumentosRoute: typeof AppDocumentosRoute
@@ -1062,6 +1105,7 @@ interface AppRouteChildren {
   AppProcurementPacotesRoute: typeof AppProcurementPacotesRouteWithChildren
   AppObrasIndexRoute: typeof AppObrasIndexRoute
   AppOrcamentosIndexRoute: typeof AppOrcamentosIndexRoute
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteWithChildren
   AppOrcamentosIdDecomposicaoRoute: typeof AppOrcamentosIdDecomposicaoRoute
   AppOrcamentosIdSubempreitadasRoute: typeof AppOrcamentosIdSubempreitadasRoute
   AppOrcamentosIdIndexRoute: typeof AppOrcamentosIdIndexRoute
@@ -1069,7 +1113,6 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppBibliotecaRoute: AppBibliotecaRoute,
-  AppBibliotecaMestraRoute: AppBibliotecaMestraRouteWithChildren,
   AppDashboardRoute: AppDashboardRoute,
   AppDecomposicaoPrecosRoute: AppDecomposicaoPrecosRoute,
   AppDocumentosRoute: AppDocumentosRoute,
@@ -1080,6 +1123,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppProcurementPacotesRoute: AppProcurementPacotesRouteWithChildren,
   AppObrasIndexRoute: AppObrasIndexRoute,
   AppOrcamentosIndexRoute: AppOrcamentosIndexRoute,
+  AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute:
+    AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteWithChildren,
   AppOrcamentosIdDecomposicaoRoute: AppOrcamentosIdDecomposicaoRoute,
   AppOrcamentosIdSubempreitadasRoute: AppOrcamentosIdSubempreitadasRoute,
   AppOrcamentosIdIndexRoute: AppOrcamentosIdIndexRoute,

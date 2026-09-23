@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import { KnowledgeRunReport } from "@/components/biblioteca-mestra/KnowledgeRunReport";
 
 export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/knowledge-builder")({
-  head: () => ({ meta: [{ title: "Knowledge Builder — Biblioteca Mestra" }] }),
+  head: () => ({ meta: [{ title: "Knowledge Builder — Biblioteca de Subempreitadas" }] }),
   component: KnowledgeBuilderPage,
 });
 
@@ -172,7 +172,7 @@ function KnowledgeBuilderPage() {
     <div className="p-6 max-w-6xl space-y-6">
       <PageHeader
         title="Knowledge Builder"
-        subtitle="Enriquece a Biblioteca Mestra com IA, aprendendo a partir dos mapas de quantidades reais."
+        subtitle="Enriquece a Biblioteca de Subempreitadas com IA, aprendendo a partir dos mapas de quantidades reais."
       />
 
 

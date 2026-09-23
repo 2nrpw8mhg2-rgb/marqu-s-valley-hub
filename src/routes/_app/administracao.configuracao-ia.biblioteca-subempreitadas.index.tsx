@@ -10,7 +10,7 @@ import { ChevronRight, ChevronDown, Search, FolderTree, FileText, Tag, Library, 
 import type { Especialidade, Subespecialidade, Categoria, ArtigoMestre, ArtigoKeyword } from "@/lib/biblioteca-mestra/types";
 
 export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/")({
-  head: () => ({ meta: [{ title: "Biblioteca Mestra — Explorador — MV OS" }] }),
+  head: () => ({ meta: [{ title: "Biblioteca de Subempreitadas — Explorador — MV OS" }] }),
   component: ExploradorPage,
 });
 
@@ -153,7 +153,7 @@ function ExploradorPage() {
   return (
     <>
       <PageHeader
-        title="Biblioteca Mestra"
+        title="Biblioteca de Subempreitadas"
         subtitle="Especialidades · Subespecialidades · Categorias · Artigos Mestre"
       />
 

@@ -21,7 +21,7 @@ import { ARTIGO_TIPOS, ARTIGO_ESTADOS_IA } from "@/lib/biblioteca-mestra/types";
 import { ArtigoMestreFormDialog, type ArtigoFormState } from "@/components/biblioteca-mestra/ArtigoMestreFormDialog";
 
 export const Route = createFileRoute("/_app/administracao/configuracao-ia/biblioteca-subempreitadas/categorias")({
-  head: () => ({ meta: [{ title: "Categorias — Biblioteca Mestra — MV OS" }] }),
+  head: () => ({ meta: [{ title: "Categorias — Biblioteca de Subempreitadas — MV OS" }] }),
   component: CategoriasPage,
 });
 
@@ -447,7 +447,7 @@ function CategoriasPage() {
     <>
       <PageHeader
         title="Categorias"
-        subtitle="Terceiro nível da Biblioteca Mestra — organização fina de Artigos Mestre"
+        subtitle="Terceiro nível da Biblioteca de Subempreitadas — organização fina de Artigos Mestre"
       />
       <div className="p-6 space-y-4">
         <div className="relative max-w-md">
