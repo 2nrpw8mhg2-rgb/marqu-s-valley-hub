@@ -24,6 +24,8 @@ export const Route = createFileRoute("/_app/obras/$id/procurement/pacotes/")({
   component: ListaPacotes,
 });
 
+const BUSCA_INICIAL = { q: "", capitulo: "", subcapitulo: "", ordenar: "original", direcao: "asc", pagina: 1, tamanho: 25, tab: "mapa" } as const;
+
 function dataPT(v: string | null) {
   if (!v) return "—";
   return new Date(v).toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -146,7 +148,7 @@ function ListaPacotes() {
                   <TableCell><Alertas alertas={l.alertas} /></TableCell>
                   <TableCell className="text-xs text-muted-foreground">{dataPT(l.atualizado_em)}</TableCell>
                   <TableCell className="text-right">
-                    <Link to="/obras/$id/procurement/pacotes/$pacoteId" params={{ id, pacoteId: l.id }}>
+                    <Link to="/obras/$id/procurement/pacotes/$pacoteId" params={{ id, pacoteId: l.id }} search={BUSCA_INICIAL}>
                       <Button size="sm" variant="outline">Abrir</Button>
                     </Link>
                   </TableCell>
@@ -171,7 +173,7 @@ function ListaPacotes() {
               <Alertas alertas={l.alertas} />
               <div className="flex items-center justify-between pt-1">
                 <span className="text-[11px] text-muted-foreground">{dataPT(l.atualizado_em)}</span>
-                <Link to="/obras/$id/procurement/pacotes/$pacoteId" params={{ id, pacoteId: l.id }}>
+                <Link to="/obras/$id/procurement/pacotes/$pacoteId" params={{ id, pacoteId: l.id }} search={BUSCA_INICIAL}>
                   <Button size="sm" variant="outline">Abrir</Button>
                 </Link>
               </div>
