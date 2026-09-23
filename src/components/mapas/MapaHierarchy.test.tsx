@@ -13,10 +13,12 @@ function render(expandidos: Set<string> = new Set()) {
       artigos={[artigo("a", 1), artigo("b", 2, { capitulo_codigo: "2.1", capitulo_descricao: "Pavimentos" })]}
       selecionados={new Set()}
       expandidos={expandidos}
+      descricoesGruposExpandidas={new Set()}
       gruposFechados={new Set()}
       onSelecionar={() => {}}
       onSelecionarTodos={() => {}}
       onExpandirDescricao={() => {}}
+      onExpandirDescricaoGrupo={() => {}}
       onDetalhes={() => {}}
       onGrupo={() => {}}
     />,
