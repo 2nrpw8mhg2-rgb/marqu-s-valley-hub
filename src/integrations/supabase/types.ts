@@ -2877,6 +2877,14 @@ export type Database = {
       }
       normalizar_descricao: { Args: { _t: string }; Returns: string }
       normalizar_nome_subempreitada: { Args: { _t: string }; Returns: string }
+      procurement_reconciliar_pacotes: {
+        Args: { p_orcamento_id: string }
+        Returns: {
+          artigos_incluidos: number
+          pacotes_criados: number
+          pacotes_existentes: number
+        }[]
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
