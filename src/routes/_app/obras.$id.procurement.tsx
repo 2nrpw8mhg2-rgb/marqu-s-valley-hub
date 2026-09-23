@@ -1,27 +1,58 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ShoppingCart, ExternalLink } from "lucide-react";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
+import {
+  BarChart3,
+  ClipboardList,
+  FileSignature,
+  Gavel,
+  LayoutDashboard,
+  Send,
+  Users,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_app/obras/$id/procurement")({
-  component: ProcurementTab,
+  component: ProcurementLayout,
 });
 
-function ProcurementTab() {
+const VISTAS = [
+  { to: "", label: "Visão Geral", icon: LayoutDashboard },
+  { to: "/pacotes", label: "Pacotes de Consulta", icon: ClipboardList },
+  { to: "/fornecedores", label: "Fornecedores e Subempreiteiros", icon: Users },
+  { to: "/consultas", label: "Consultas Enviadas", icon: Send },
+  { to: "/propostas", label: "Propostas Recebidas", icon: FileSignature },
+  { to: "/comparacao", label: "Comparação de Propostas", icon: BarChart3 },
+  { to: "/adjudicacoes", label: "Adjudicações", icon: Gavel },
+];
+
+function ProcurementLayout() {
+  const { id } = Route.useParams();
+  const { pathname } = useLocation();
+  const base = `/obras/${id}/procurement`;
+  const sub = pathname.startsWith(base) ? pathname.slice(base.length) : "";
+
   return (
-    <div className="p-6">
-      <Card className="bg-card border-border p-10 text-center space-y-3">
-        <ShoppingCart className="h-10 w-10 mx-auto text-primary" />
-        <h2 className="font-semibold">Procurement</h2>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Os pacotes de consulta vivem no módulo global de Procurement e podem ser gerados a partir do MQ classificado.
-        </p>
-        <Link to="/procurement/pacotes">
-          <Button variant="outline" size="sm">
-            <ExternalLink className="h-4 w-4 mr-1" /> Abrir Pacotes de Consulta
-          </Button>
-        </Link>
-      </Card>
+    <div>
+      <nav className="overflow-x-auto border-b border-border bg-card/40 px-3 sm:px-6" aria-label="Secções de Procurement">
+        <ul className="flex min-w-max gap-1 py-2">
+          {VISTAS.map((v) => {
+            const activa = v.to === "" ? sub === "" || sub === "/" : sub === v.to || sub.startsWith(v.to + "/");
+            const Icone = v.icon;
+            return (
+              <li key={v.to}>
+                <Link
+                  to={base + v.to}
+                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                    activa ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Icone className="h-3.5 w-3.5" />
+                  {v.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+      <Outlet />
     </div>
   );
 }

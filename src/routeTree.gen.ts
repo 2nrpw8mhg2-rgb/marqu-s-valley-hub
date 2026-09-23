@@ -49,8 +49,14 @@ import { Route as AppObrasIdMedicoesRouteImport } from './routes/_app/obras.$id.
 import { Route as AppObrasIdFinanceiraRouteImport } from './routes/_app/obras.$id.financeira'
 import { Route as AppObrasIdDocumentosRouteImport } from './routes/_app/obras.$id.documentos'
 import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas'
+import { Route as AppObrasIdProcurementIndexRouteImport } from './routes/_app/obras.$id.procurement.index'
 import { Route as AppObrasIdMapasIndexRouteImport } from './routes/_app/obras.$id.mapas.index'
 import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.index'
+import { Route as AppObrasIdProcurementPropostasRouteImport } from './routes/_app/obras.$id.procurement.propostas'
+import { Route as AppObrasIdProcurementFornecedoresRouteImport } from './routes/_app/obras.$id.procurement.fornecedores'
+import { Route as AppObrasIdProcurementConsultasRouteImport } from './routes/_app/obras.$id.procurement.consultas'
+import { Route as AppObrasIdProcurementComparacaoRouteImport } from './routes/_app/obras.$id.procurement.comparacao'
+import { Route as AppObrasIdProcurementAdjudicacoesRouteImport } from './routes/_app/obras.$id.procurement.adjudicacoes'
 import { Route as AppObrasIdMapasSubIdRouteImport } from './routes/_app/obras.$id.mapas.$subId'
 import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.unidades'
 import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.templates'
@@ -62,6 +68,8 @@ import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasKeywords
 import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasEspecialidadesRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.especialidades'
 import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasCategoriasRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.categorias'
 import { Route as AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRouteImport } from './routes/_app/administracao.configuracao-ia.biblioteca-subempreitadas.artigos'
+import { Route as AppObrasIdProcurementPacotesIndexRouteImport } from './routes/_app/obras.$id.procurement.pacotes.index'
+import { Route as AppObrasIdProcurementPacotesPacoteIdRouteImport } from './routes/_app/obras.$id.procurement.pacotes.$pacoteId'
 
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
@@ -274,6 +282,12 @@ const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute =
     path: '/configuracao-ia/biblioteca-subempreitadas',
     getParentRoute: () => AppAdministracaoRoute,
   } as any)
+const AppObrasIdProcurementIndexRoute =
+  AppObrasIdProcurementIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppObrasIdProcurementRoute,
+  } as any)
 const AppObrasIdMapasIndexRoute = AppObrasIdMapasIndexRouteImport.update({
   id: '/mapas/',
   path: '/mapas/',
@@ -288,6 +302,36 @@ const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute =
         AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
     } as any,
   )
+const AppObrasIdProcurementPropostasRoute =
+  AppObrasIdProcurementPropostasRouteImport.update({
+    id: '/propostas',
+    path: '/propostas',
+    getParentRoute: () => AppObrasIdProcurementRoute,
+  } as any)
+const AppObrasIdProcurementFornecedoresRoute =
+  AppObrasIdProcurementFornecedoresRouteImport.update({
+    id: '/fornecedores',
+    path: '/fornecedores',
+    getParentRoute: () => AppObrasIdProcurementRoute,
+  } as any)
+const AppObrasIdProcurementConsultasRoute =
+  AppObrasIdProcurementConsultasRouteImport.update({
+    id: '/consultas',
+    path: '/consultas',
+    getParentRoute: () => AppObrasIdProcurementRoute,
+  } as any)
+const AppObrasIdProcurementComparacaoRoute =
+  AppObrasIdProcurementComparacaoRouteImport.update({
+    id: '/comparacao',
+    path: '/comparacao',
+    getParentRoute: () => AppObrasIdProcurementRoute,
+  } as any)
+const AppObrasIdProcurementAdjudicacoesRoute =
+  AppObrasIdProcurementAdjudicacoesRouteImport.update({
+    id: '/adjudicacoes',
+    path: '/adjudicacoes',
+    getParentRoute: () => AppObrasIdProcurementRoute,
+  } as any)
 const AppObrasIdMapasSubIdRoute = AppObrasIdMapasSubIdRouteImport.update({
   id: '/mapas/$subId',
   path: '/mapas/$subId',
@@ -383,6 +427,18 @@ const AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRoute =
         AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute,
     } as any,
   )
+const AppObrasIdProcurementPacotesIndexRoute =
+  AppObrasIdProcurementPacotesIndexRouteImport.update({
+    id: '/pacotes/',
+    path: '/pacotes/',
+    getParentRoute: () => AppObrasIdProcurementRoute,
+  } as any)
+const AppObrasIdProcurementPacotesPacoteIdRoute =
+  AppObrasIdProcurementPacotesPacoteIdRouteImport.update({
+    id: '/pacotes/$pacoteId',
+    path: '/pacotes/$pacoteId',
+    getParentRoute: () => AppObrasIdProcurementRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -416,7 +472,7 @@ export interface FileRoutesByFullPath {
   '/obras/$id/planeamento': typeof AppObrasIdPlaneamentoRoute
   '/obras/$id/preparacao-consultas': typeof AppObrasIdPreparacaoConsultasRoute
   '/obras/$id/preparacao-orcamento': typeof AppObrasIdPreparacaoOrcamentoRoute
-  '/obras/$id/procurement': typeof AppObrasIdProcurementRoute
+  '/obras/$id/procurement': typeof AppObrasIdProcurementRouteWithChildren
   '/obras/$id/relatorios': typeof AppObrasIdRelatoriosRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
   '/orcamentos/$id/subempreitadas': typeof AppOrcamentosIdSubempreitadasRoute
@@ -435,8 +491,16 @@ export interface FileRoutesByFullPath {
   '/administracao/configuracao-ia/biblioteca-subempreitadas/templates': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRoute
   '/administracao/configuracao-ia/biblioteca-subempreitadas/unidades': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRoute
   '/obras/$id/mapas/$subId': typeof AppObrasIdMapasSubIdRoute
+  '/obras/$id/procurement/adjudicacoes': typeof AppObrasIdProcurementAdjudicacoesRoute
+  '/obras/$id/procurement/comparacao': typeof AppObrasIdProcurementComparacaoRoute
+  '/obras/$id/procurement/consultas': typeof AppObrasIdProcurementConsultasRoute
+  '/obras/$id/procurement/fornecedores': typeof AppObrasIdProcurementFornecedoresRoute
+  '/obras/$id/procurement/propostas': typeof AppObrasIdProcurementPropostasRoute
   '/administracao/configuracao-ia/biblioteca-subempreitadas/': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute
   '/obras/$id/mapas/': typeof AppObrasIdMapasIndexRoute
+  '/obras/$id/procurement/': typeof AppObrasIdProcurementIndexRoute
+  '/obras/$id/procurement/pacotes/$pacoteId': typeof AppObrasIdProcurementPacotesPacoteIdRoute
+  '/obras/$id/procurement/pacotes/': typeof AppObrasIdProcurementPacotesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -467,7 +531,6 @@ export interface FileRoutesByTo {
   '/obras/$id/planeamento': typeof AppObrasIdPlaneamentoRoute
   '/obras/$id/preparacao-consultas': typeof AppObrasIdPreparacaoConsultasRoute
   '/obras/$id/preparacao-orcamento': typeof AppObrasIdPreparacaoOrcamentoRoute
-  '/obras/$id/procurement': typeof AppObrasIdProcurementRoute
   '/obras/$id/relatorios': typeof AppObrasIdRelatoriosRoute
   '/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
   '/orcamentos/$id/subempreitadas': typeof AppOrcamentosIdSubempreitadasRoute
@@ -486,8 +549,16 @@ export interface FileRoutesByTo {
   '/administracao/configuracao-ia/biblioteca-subempreitadas/templates': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRoute
   '/administracao/configuracao-ia/biblioteca-subempreitadas/unidades': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRoute
   '/obras/$id/mapas/$subId': typeof AppObrasIdMapasSubIdRoute
+  '/obras/$id/procurement/adjudicacoes': typeof AppObrasIdProcurementAdjudicacoesRoute
+  '/obras/$id/procurement/comparacao': typeof AppObrasIdProcurementComparacaoRoute
+  '/obras/$id/procurement/consultas': typeof AppObrasIdProcurementConsultasRoute
+  '/obras/$id/procurement/fornecedores': typeof AppObrasIdProcurementFornecedoresRoute
+  '/obras/$id/procurement/propostas': typeof AppObrasIdProcurementPropostasRoute
   '/administracao/configuracao-ia/biblioteca-subempreitadas': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute
   '/obras/$id/mapas': typeof AppObrasIdMapasIndexRoute
+  '/obras/$id/procurement': typeof AppObrasIdProcurementIndexRoute
+  '/obras/$id/procurement/pacotes/$pacoteId': typeof AppObrasIdProcurementPacotesPacoteIdRoute
+  '/obras/$id/procurement/pacotes': typeof AppObrasIdProcurementPacotesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -523,7 +594,7 @@ export interface FileRoutesById {
   '/_app/obras/$id/planeamento': typeof AppObrasIdPlaneamentoRoute
   '/_app/obras/$id/preparacao-consultas': typeof AppObrasIdPreparacaoConsultasRoute
   '/_app/obras/$id/preparacao-orcamento': typeof AppObrasIdPreparacaoOrcamentoRoute
-  '/_app/obras/$id/procurement': typeof AppObrasIdProcurementRoute
+  '/_app/obras/$id/procurement': typeof AppObrasIdProcurementRouteWithChildren
   '/_app/obras/$id/relatorios': typeof AppObrasIdRelatoriosRoute
   '/_app/orcamentos/$id/decomposicao': typeof AppOrcamentosIdDecomposicaoRoute
   '/_app/orcamentos/$id/subempreitadas': typeof AppOrcamentosIdSubempreitadasRoute
@@ -542,8 +613,16 @@ export interface FileRoutesById {
   '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/templates': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasTemplatesRoute
   '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/unidades': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasUnidadesRoute
   '/_app/obras/$id/mapas/$subId': typeof AppObrasIdMapasSubIdRoute
+  '/_app/obras/$id/procurement/adjudicacoes': typeof AppObrasIdProcurementAdjudicacoesRoute
+  '/_app/obras/$id/procurement/comparacao': typeof AppObrasIdProcurementComparacaoRoute
+  '/_app/obras/$id/procurement/consultas': typeof AppObrasIdProcurementConsultasRoute
+  '/_app/obras/$id/procurement/fornecedores': typeof AppObrasIdProcurementFornecedoresRoute
+  '/_app/obras/$id/procurement/propostas': typeof AppObrasIdProcurementPropostasRoute
   '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/': typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRoute
   '/_app/obras/$id/mapas/': typeof AppObrasIdMapasIndexRoute
+  '/_app/obras/$id/procurement/': typeof AppObrasIdProcurementIndexRoute
+  '/_app/obras/$id/procurement/pacotes/$pacoteId': typeof AppObrasIdProcurementPacotesPacoteIdRoute
+  '/_app/obras/$id/procurement/pacotes/': typeof AppObrasIdProcurementPacotesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -598,8 +677,16 @@ export interface FileRouteTypes {
     | '/administracao/configuracao-ia/biblioteca-subempreitadas/templates'
     | '/administracao/configuracao-ia/biblioteca-subempreitadas/unidades'
     | '/obras/$id/mapas/$subId'
+    | '/obras/$id/procurement/adjudicacoes'
+    | '/obras/$id/procurement/comparacao'
+    | '/obras/$id/procurement/consultas'
+    | '/obras/$id/procurement/fornecedores'
+    | '/obras/$id/procurement/propostas'
     | '/administracao/configuracao-ia/biblioteca-subempreitadas/'
     | '/obras/$id/mapas/'
+    | '/obras/$id/procurement/'
+    | '/obras/$id/procurement/pacotes/$pacoteId'
+    | '/obras/$id/procurement/pacotes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -630,7 +717,6 @@ export interface FileRouteTypes {
     | '/obras/$id/planeamento'
     | '/obras/$id/preparacao-consultas'
     | '/obras/$id/preparacao-orcamento'
-    | '/obras/$id/procurement'
     | '/obras/$id/relatorios'
     | '/orcamentos/$id/decomposicao'
     | '/orcamentos/$id/subempreitadas'
@@ -649,8 +735,16 @@ export interface FileRouteTypes {
     | '/administracao/configuracao-ia/biblioteca-subempreitadas/templates'
     | '/administracao/configuracao-ia/biblioteca-subempreitadas/unidades'
     | '/obras/$id/mapas/$subId'
+    | '/obras/$id/procurement/adjudicacoes'
+    | '/obras/$id/procurement/comparacao'
+    | '/obras/$id/procurement/consultas'
+    | '/obras/$id/procurement/fornecedores'
+    | '/obras/$id/procurement/propostas'
     | '/administracao/configuracao-ia/biblioteca-subempreitadas'
     | '/obras/$id/mapas'
+    | '/obras/$id/procurement'
+    | '/obras/$id/procurement/pacotes/$pacoteId'
+    | '/obras/$id/procurement/pacotes'
   id:
     | '__root__'
     | '/'
@@ -704,8 +798,16 @@ export interface FileRouteTypes {
     | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/templates'
     | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/unidades'
     | '/_app/obras/$id/mapas/$subId'
+    | '/_app/obras/$id/procurement/adjudicacoes'
+    | '/_app/obras/$id/procurement/comparacao'
+    | '/_app/obras/$id/procurement/consultas'
+    | '/_app/obras/$id/procurement/fornecedores'
+    | '/_app/obras/$id/procurement/propostas'
     | '/_app/administracao/configuracao-ia/biblioteca-subempreitadas/'
     | '/_app/obras/$id/mapas/'
+    | '/_app/obras/$id/procurement/'
+    | '/_app/obras/$id/procurement/pacotes/$pacoteId'
+    | '/_app/obras/$id/procurement/pacotes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1001,6 +1103,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRouteImport
       parentRoute: typeof AppAdministracaoRoute
     }
+    '/_app/obras/$id/procurement/': {
+      id: '/_app/obras/$id/procurement/'
+      path: '/'
+      fullPath: '/obras/$id/procurement/'
+      preLoaderRoute: typeof AppObrasIdProcurementIndexRouteImport
+      parentRoute: typeof AppObrasIdProcurementRoute
+    }
     '/_app/obras/$id/mapas/': {
       id: '/_app/obras/$id/mapas/'
       path: '/mapas'
@@ -1014,6 +1123,41 @@ declare module '@tanstack/react-router' {
       fullPath: '/administracao/configuracao-ia/biblioteca-subempreitadas/'
       preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasIndexRouteImport
       parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
+    }
+    '/_app/obras/$id/procurement/propostas': {
+      id: '/_app/obras/$id/procurement/propostas'
+      path: '/propostas'
+      fullPath: '/obras/$id/procurement/propostas'
+      preLoaderRoute: typeof AppObrasIdProcurementPropostasRouteImport
+      parentRoute: typeof AppObrasIdProcurementRoute
+    }
+    '/_app/obras/$id/procurement/fornecedores': {
+      id: '/_app/obras/$id/procurement/fornecedores'
+      path: '/fornecedores'
+      fullPath: '/obras/$id/procurement/fornecedores'
+      preLoaderRoute: typeof AppObrasIdProcurementFornecedoresRouteImport
+      parentRoute: typeof AppObrasIdProcurementRoute
+    }
+    '/_app/obras/$id/procurement/consultas': {
+      id: '/_app/obras/$id/procurement/consultas'
+      path: '/consultas'
+      fullPath: '/obras/$id/procurement/consultas'
+      preLoaderRoute: typeof AppObrasIdProcurementConsultasRouteImport
+      parentRoute: typeof AppObrasIdProcurementRoute
+    }
+    '/_app/obras/$id/procurement/comparacao': {
+      id: '/_app/obras/$id/procurement/comparacao'
+      path: '/comparacao'
+      fullPath: '/obras/$id/procurement/comparacao'
+      preLoaderRoute: typeof AppObrasIdProcurementComparacaoRouteImport
+      parentRoute: typeof AppObrasIdProcurementRoute
+    }
+    '/_app/obras/$id/procurement/adjudicacoes': {
+      id: '/_app/obras/$id/procurement/adjudicacoes'
+      path: '/adjudicacoes'
+      fullPath: '/obras/$id/procurement/adjudicacoes'
+      preLoaderRoute: typeof AppObrasIdProcurementAdjudicacoesRouteImport
+      parentRoute: typeof AppObrasIdProcurementRoute
     }
     '/_app/obras/$id/mapas/$subId': {
       id: '/_app/obras/$id/mapas/$subId'
@@ -1092,6 +1236,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasArtigosRouteImport
       parentRoute: typeof AppAdministracaoConfiguracaoIaBibliotecaSubempreitadasRoute
     }
+    '/_app/obras/$id/procurement/pacotes/': {
+      id: '/_app/obras/$id/procurement/pacotes/'
+      path: '/pacotes'
+      fullPath: '/obras/$id/procurement/pacotes/'
+      preLoaderRoute: typeof AppObrasIdProcurementPacotesIndexRouteImport
+      parentRoute: typeof AppObrasIdProcurementRoute
+    }
+    '/_app/obras/$id/procurement/pacotes/$pacoteId': {
+      id: '/_app/obras/$id/procurement/pacotes/$pacoteId'
+      path: '/pacotes/$pacoteId'
+      fullPath: '/obras/$id/procurement/pacotes/$pacoteId'
+      preLoaderRoute: typeof AppObrasIdProcurementPacotesPacoteIdRouteImport
+      parentRoute: typeof AppObrasIdProcurementRoute
+    }
   }
 }
 
@@ -1157,6 +1315,37 @@ const AppAdministracaoRouteChildren: AppAdministracaoRouteChildren = {
 const AppAdministracaoRouteWithChildren =
   AppAdministracaoRoute._addFileChildren(AppAdministracaoRouteChildren)
 
+interface AppObrasIdProcurementRouteChildren {
+  AppObrasIdProcurementAdjudicacoesRoute: typeof AppObrasIdProcurementAdjudicacoesRoute
+  AppObrasIdProcurementComparacaoRoute: typeof AppObrasIdProcurementComparacaoRoute
+  AppObrasIdProcurementConsultasRoute: typeof AppObrasIdProcurementConsultasRoute
+  AppObrasIdProcurementFornecedoresRoute: typeof AppObrasIdProcurementFornecedoresRoute
+  AppObrasIdProcurementPropostasRoute: typeof AppObrasIdProcurementPropostasRoute
+  AppObrasIdProcurementIndexRoute: typeof AppObrasIdProcurementIndexRoute
+  AppObrasIdProcurementPacotesPacoteIdRoute: typeof AppObrasIdProcurementPacotesPacoteIdRoute
+  AppObrasIdProcurementPacotesIndexRoute: typeof AppObrasIdProcurementPacotesIndexRoute
+}
+
+const AppObrasIdProcurementRouteChildren: AppObrasIdProcurementRouteChildren = {
+  AppObrasIdProcurementAdjudicacoesRoute:
+    AppObrasIdProcurementAdjudicacoesRoute,
+  AppObrasIdProcurementComparacaoRoute: AppObrasIdProcurementComparacaoRoute,
+  AppObrasIdProcurementConsultasRoute: AppObrasIdProcurementConsultasRoute,
+  AppObrasIdProcurementFornecedoresRoute:
+    AppObrasIdProcurementFornecedoresRoute,
+  AppObrasIdProcurementPropostasRoute: AppObrasIdProcurementPropostasRoute,
+  AppObrasIdProcurementIndexRoute: AppObrasIdProcurementIndexRoute,
+  AppObrasIdProcurementPacotesPacoteIdRoute:
+    AppObrasIdProcurementPacotesPacoteIdRoute,
+  AppObrasIdProcurementPacotesIndexRoute:
+    AppObrasIdProcurementPacotesIndexRoute,
+}
+
+const AppObrasIdProcurementRouteWithChildren =
+  AppObrasIdProcurementRoute._addFileChildren(
+    AppObrasIdProcurementRouteChildren,
+  )
+
 interface AppObrasIdRouteChildren {
   AppObrasIdDocumentosRoute: typeof AppObrasIdDocumentosRoute
   AppObrasIdFinanceiraRoute: typeof AppObrasIdFinanceiraRoute
@@ -1166,7 +1355,7 @@ interface AppObrasIdRouteChildren {
   AppObrasIdPlaneamentoRoute: typeof AppObrasIdPlaneamentoRoute
   AppObrasIdPreparacaoConsultasRoute: typeof AppObrasIdPreparacaoConsultasRoute
   AppObrasIdPreparacaoOrcamentoRoute: typeof AppObrasIdPreparacaoOrcamentoRoute
-  AppObrasIdProcurementRoute: typeof AppObrasIdProcurementRoute
+  AppObrasIdProcurementRoute: typeof AppObrasIdProcurementRouteWithChildren
   AppObrasIdRelatoriosRoute: typeof AppObrasIdRelatoriosRoute
   AppObrasIdIndexRoute: typeof AppObrasIdIndexRoute
   AppObrasIdMapasSubIdRoute: typeof AppObrasIdMapasSubIdRoute
@@ -1182,7 +1371,7 @@ const AppObrasIdRouteChildren: AppObrasIdRouteChildren = {
   AppObrasIdPlaneamentoRoute: AppObrasIdPlaneamentoRoute,
   AppObrasIdPreparacaoConsultasRoute: AppObrasIdPreparacaoConsultasRoute,
   AppObrasIdPreparacaoOrcamentoRoute: AppObrasIdPreparacaoOrcamentoRoute,
-  AppObrasIdProcurementRoute: AppObrasIdProcurementRoute,
+  AppObrasIdProcurementRoute: AppObrasIdProcurementRouteWithChildren,
   AppObrasIdRelatoriosRoute: AppObrasIdRelatoriosRoute,
   AppObrasIdIndexRoute: AppObrasIdIndexRoute,
   AppObrasIdMapasSubIdRoute: AppObrasIdMapasSubIdRoute,
