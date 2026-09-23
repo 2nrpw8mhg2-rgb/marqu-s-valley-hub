@@ -72,7 +72,7 @@ async function executarAtribuicao(sb: any, userId: string, data: EntradaAtribuic
           confianca: 1,
           necessita_revisao: false,
           validado_manual: true,
-          validado_por: context.userId,
+          validado_por: userId,
           validado_em: agora,
         })
         .eq("orcamento_id", data.orcamento_id)
@@ -103,7 +103,7 @@ async function executarAtribuicao(sb: any, userId: string, data: EntradaAtribuic
         confianca_ia: confIA,
         subempreitada_atribuida_id: data.subempreitada_id,
         estado_anterior,
-        user_id: context.userId,
+        user_id: userId,
       });
 
       const descricao: string = art?.descricao ?? "";
@@ -113,7 +113,7 @@ async function executarAtribuicao(sb: any, userId: string, data: EntradaAtribuic
           descricao_normalizada: normalizarTexto(descricao).slice(0, 1000),
           subempreitada_id: data.subempreitada_id,
           trabalho_principal: c.trabalho_principal ?? null,
-          user_id: context.userId,
+          user_id: userId,
         });
       }
     }
@@ -138,6 +138,132 @@ async function executarAtribuicao(sb: any, userId: string, data: EntradaAtribuic
     }
 
     return { ok: true, operacao_id: data.operacao_id, atribuidos: auditorias.length };
+  }
+}
+
+/**
+ * Atribuição manual de subempreitada (individual ou em massa).
+ *
+ * Idempotente: repetir a mesma `operacao_id` não cria registos duplicados.
+ */
+export const atribuirSubempreitadaManual = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: { orcamento_id: string; artigo_ids: string[]; subempreitada_id: string; operacao_id: string }) =>
+      z
+        .object({
+          orcamento_id: z.string().uuid(),
+          artigo_ids: z.array(z.string().uuid()).min(1),
+          subempreitada_id: z.string().uuid(),
+          operacao_id: z.string().uuid(),
+        })
+        .parse(d),
+  )
+  .handler(async ({ data, context }) => executarAtribuicao(context.supabase, context.userId, data));
+
+/**
+ * Aceita uma sugestão de nova subempreitada (ou cria uma manualmente a partir
+ * do seletor): normaliza o nome, reutiliza a equivalente já existente e, na
+ * mesma operação, atribui os artigos indicados.
+ *
+ * A criação é feita por uma operação transacional na base de dados, pelo que
+ * cliques simultâneos nunca geram duplicados. Não promove nada para a
+ * Biblioteca Mestra: fica registada com origem «sugestao_ia_validada».
+ */
+export const aceitarSugestaoSubempreitada = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: {
+      orcamento_id: string;
+      artigo_ids: string[];
+      nome: string;
+      codigo?: string | null;
+      operacao_id: string;
+      origem?: string;
+    }) =>
+      z
+        .object({
+          orcamento_id: z.string().uuid(),
+          artigo_ids: z.array(z.string().uuid()).min(1),
+          nome: z.string().trim().min(2).max(120),
+          codigo: z.string().trim().max(20).nullish(),
+          operacao_id: z.string().uuid(),
+          origem: z.string().trim().max(40).optional(),
+        })
+        .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+
+    const { data: criada, error } = await sb.rpc("criar_ou_obter_subempreitada", {
+      _nome: data.nome,
+      _codigo: data.codigo ?? null,
+      _origem: data.origem ?? "sugestao_ia_validada",
+    });
+    if (error) throw new Error(error.message);
+
+    const sub = Array.isArray(criada) ? criada[0] : criada;
+    if (!sub?.id) throw new Error("Não foi possível criar ou encontrar a subempreitada.");
+
+    const resultado = await executarAtribuicao(sb, context.userId, {
+      orcamento_id: data.orcamento_id,
+      artigo_ids: data.artigo_ids,
+      subempreitada_id: sub.id as string,
+      operacao_id: data.operacao_id,
+    });
+
+    return {
+      ...resultado,
+      subempreitada: { id: sub.id as string, codigo: sub.codigo as string, nome: sub.nome as string },
+      criada: Boolean(sub.criada),
+    };
+  });
+
+/**
+ * Rejeita a sugestão da IA sem validar o artigo: regista a rejeição para
+ * auditoria e o artigo permanece em «A Rever» até receber uma subempreitada.
+ */
+export const rejeitarSugestaoIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orcamento_id: string; artigo_id: string }) =>
+    z.object({ orcamento_id: z.string().uuid(), artigo_id: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+
+    const { data: atual, error } = await sb
+      .from("consulta_ia_classificacoes")
+      .select("run_id, subempreitada_ia_id, subempreitada_id, confianca_ia, confianca, sugestao_nova_subempreitada")
+      .eq("orcamento_id", data.orcamento_id)
+      .eq("artigo_id", data.artigo_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!atual) throw new Error("Este artigo ainda não tem classificação da IA.");
+
+    const c = atual as any;
+    const { error: eIns } = await sb.from("consulta_ia_sugestoes_rejeitadas").insert({
+      orcamento_id: data.orcamento_id,
+      artigo_id: data.artigo_id,
+      run_id: c.run_id ?? null,
+      sugestao: c.sugestao_nova_subempreitada ?? null,
+      subempreitada_ia_id: c.subempreitada_ia_id ?? c.subempreitada_id ?? null,
+      confianca_ia: c.confianca_ia ?? c.confianca ?? 0,
+      user_id: context.userId,
+    });
+    if (eIns) throw new Error(eIns.message);
+
+    const { error: eUp } = await sb
+      .from("consulta_ia_classificacoes")
+      .update({
+        sugestao_nova_subempreitada: null,
+        necessita_revisao: true,
+        validado_manual: false,
+      })
+      .eq("orcamento_id", data.orcamento_id)
+      .eq("artigo_id", data.artigo_id);
+    if (eUp) throw new Error(eUp.message);
+
+    return { ok: true };
   });
 
 /** Desfaz uma atribuição manual, repondo atomicamente os valores anteriores. */
@@ -191,7 +317,7 @@ export const desfazerAtribuicaoManual = createServerFn({ method: "POST" })
           .delete()
           .eq("descricao_normalizada", norm)
           .eq("subempreitada_id", r.subempreitada_atribuida_id)
-          .eq("user_id", context.userId);
+          .eq("user_id", userId);
     }
 
     const { error: eDel } = await sb
