@@ -2228,6 +2228,56 @@ export type Database = {
           },
         ]
       }
+      procurement_pacote_ambito: {
+        Row: {
+          alternativas: string
+          ambito_geral: string
+          created_at: string
+          exclusoes: string
+          inclusoes: string
+          observacoes: string
+          pacote_id: string
+          responsabilidades_mv: string
+          responsabilidades_subempreiteiro: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          alternativas?: string
+          ambito_geral?: string
+          created_at?: string
+          exclusoes?: string
+          inclusoes?: string
+          observacoes?: string
+          pacote_id: string
+          responsabilidades_mv?: string
+          responsabilidades_subempreiteiro?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          alternativas?: string
+          ambito_geral?: string
+          created_at?: string
+          exclusoes?: string
+          inclusoes?: string
+          observacoes?: string
+          pacote_id?: string
+          responsabilidades_mv?: string
+          responsabilidades_subempreiteiro?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procurement_pacote_ambito_pacote_id_fkey"
+            columns: ["pacote_id"]
+            isOneToOne: true
+            referencedRelation: "procurement_pacotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       procurement_pacote_artigos: {
         Row: {
           artigo_id: string | null
@@ -2300,6 +2350,143 @@ export type Database = {
           },
         ]
       }
+      procurement_pacote_documentos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          documento_id: string
+          id: string
+          obrigatorio: boolean
+          pacote_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          documento_id: string
+          id?: string
+          obrigatorio?: boolean
+          pacote_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          documento_id?: string
+          id?: string
+          obrigatorio?: boolean
+          pacote_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procurement_pacote_documentos_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "documentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procurement_pacote_documentos_pacote_id_fkey"
+            columns: ["pacote_id"]
+            isOneToOne: false
+            referencedRelation: "procurement_pacotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      procurement_pacote_empresas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notas: string | null
+          pacote_id: string
+          subempreiteiro_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notas?: string | null
+          pacote_id: string
+          subempreiteiro_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notas?: string | null
+          pacote_id?: string
+          subempreiteiro_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procurement_pacote_empresas_pacote_id_fkey"
+            columns: ["pacote_id"]
+            isOneToOne: false
+            referencedRelation: "procurement_pacotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procurement_pacote_empresas_subempreiteiro_id_fkey"
+            columns: ["subempreiteiro_id"]
+            isOneToOne: false
+            referencedRelation: "subempreiteiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      procurement_pacote_versoes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          enviado_em: string | null
+          estado: string
+          id: string
+          mq_revisao: string
+          numero: number
+          pacote_id: string
+          snapshot: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          enviado_em?: string | null
+          estado?: string
+          id?: string
+          mq_revisao?: string
+          numero: number
+          pacote_id: string
+          snapshot?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          enviado_em?: string | null
+          estado?: string
+          id?: string
+          mq_revisao?: string
+          numero?: number
+          pacote_id?: string
+          snapshot?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procurement_pacote_versoes_pacote_id_fkey"
+            columns: ["pacote_id"]
+            isOneToOne: false
+            referencedRelation: "procurement_pacotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       procurement_pacotes: {
         Row: {
           created_at: string
@@ -2313,6 +2500,7 @@ export type Database = {
           observacoes: string | null
           orcamento_id: string
           origem: string
+          responsavel_id: string | null
           subempreitada_id: string | null
           subespecialidade_id: string | null
           updated_at: string
@@ -2329,6 +2517,7 @@ export type Database = {
           observacoes?: string | null
           orcamento_id: string
           origem?: string
+          responsavel_id?: string | null
           subempreitada_id?: string | null
           subespecialidade_id?: string | null
           updated_at?: string
@@ -2345,6 +2534,7 @@ export type Database = {
           observacoes?: string | null
           orcamento_id?: string
           origem?: string
+          responsavel_id?: string | null
           subempreitada_id?: string | null
           subespecialidade_id?: string | null
           updated_at?: string
@@ -2803,6 +2993,8 @@ export type Database = {
         | "em_analise"
         | "adjudicado"
         | "cancelado"
+        | "em_preparacao"
+        | "pronto_envio"
       severidade_alerta: "critico" | "aviso" | "info"
       tipo_relacao:
         | "complementa"
@@ -3067,6 +3259,8 @@ export const Constants = {
         "em_analise",
         "adjudicado",
         "cancelado",
+        "em_preparacao",
+        "pronto_envio",
       ],
       severidade_alerta: ["critico", "aviso", "info"],
       tipo_relacao: [
