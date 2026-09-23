@@ -24,7 +24,7 @@ export function EstadoBadge({ estado }: { estado: string }) {
 
 export function Metrica({ rotulo, valor, nota }: { rotulo: string; valor: number; nota?: string }) {
   return (
-    <Card className="p-4">
+    <Card className="rounded-md p-4 shadow-sm">
       <p className="text-xs text-muted-foreground">{rotulo}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{valor}</p>
       {nota && <p className="mt-1 text-[11px] text-muted-foreground">{nota}</p>}
