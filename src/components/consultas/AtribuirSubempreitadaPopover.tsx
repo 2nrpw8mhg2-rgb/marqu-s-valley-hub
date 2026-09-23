@@ -22,19 +22,37 @@ function normalizar(t: string) {
 export function AtribuirSubempreitadaPopover({
   subempreitadas,
   sugestoes,
+  sugestaoNova,
   onAtribuir,
+  onCriar,
   children,
   titulo,
+  aberto: abertoControlado,
+  onAbertoChange,
 }: {
   subempreitadas: SubOpcao[];
   sugestoes?: string[];
+  /** Nome sugerido pela IA que ainda não existe no catálogo. */
+  sugestaoNova?: string | null;
   onAtribuir: (subempreitadaId: string) => void;
+  onCriar?: (nome: string, codigo: string | null) => void;
   children: ReactNode;
   titulo?: string;
+  aberto?: boolean;
+  onAbertoChange?: (v: boolean) => void;
 }) {
-  const [aberto, setAberto] = useState(false);
+  const [abertoInterno, setAbertoInterno] = useState(false);
+  const aberto = abertoControlado ?? abertoInterno;
+  const setAberto = (v: boolean) => {
+    setAbertoInterno(v);
+    onAbertoChange?.(v);
+    if (!v) setModoCriar(false);
+  };
   const [pesquisa, setPesquisa] = useState("");
   const [selecionada, setSelecionada] = useState<string | null>(null);
+  const [modoCriar, setModoCriar] = useState(false);
+  const [novoNome, setNovoNome] = useState("");
+  const [novoCodigo, setNovoCodigo] = useState("");
 
   const porId = useMemo(() => new Map(subempreitadas.map((s) => [s.id, s])), [subempreitadas]);
   const destaques = (sugestoes ?? []).filter((id) => porId.has(id)).slice(0, 3);
