@@ -76,6 +76,11 @@ export function AReverPanel({
     [linhas, pesquisa, capitulo, sugestao],
   );
 
+  const sugestaoComumSelecao = useMemo(
+    () => (selecao.size > 0 ? sugestaoNovaComum(linhas, [...selecao]) : null),
+    [linhas, selecao],
+  );
+
   const visiveisIds = aRever.map((l) => l.artigo_id);
   const todosVisiveisSelecionados = visiveisIds.length > 0 && visiveisIds.every((id) => selecao.has(id));
 
@@ -197,6 +202,56 @@ export function AReverPanel({
     }
   }
 
+  /** Ações visíveis por artigo, conforme o tipo de sugestão da IA. */
+  function Acoes({ l, compacto }: { l: LinhaRevisao; compacto?: boolean }) {
+    const sug = classificarSugestao(l, subempreitadas);
+    const seletor = (
+      <AtribuirSubempreitadaPopover
+        subempreitadas={subempreitadas}
+        sugestoes={sugestoesDe(l)}
+        sugestaoNova={l.sugestao_nova_subempreitada}
+        aberto={seletorAberto === l.artigo_id}
+        onAbertoChange={(v) => setSeletorAberto(v ? l.artigo_id : null)}
+        onAtribuir={(id) => atribuir([l.artigo_id], id)}
+        onCriar={(nome) => aceitarNova([l.artigo_id], nome)}
+      >
+        <Button size="sm" variant="outline" className={compacto ? "w-full" : ""}>
+          {sug.tipo === "nenhuma" ? "Atribuir Subempreitada" : "Escolher outra"}
+        </Button>
+      </AtribuirSubempreitadaPopover>
+    );
+
+    return (
+      <div className={`flex flex-wrap gap-1.5 ${compacto ? "" : "justify-end"}`}>
+        {sug.tipo === "nova" && (
+          <Button
+            size="sm"
+            disabled={aGuardar}
+            className={compacto ? "w-full" : ""}
+            onClick={() => aceitarNova([l.artigo_id], sug.nome)}
+          >
+            {sug.equivalente_id ? "Aceitar e reutilizar" : "Aceitar e criar"}
+          </Button>
+        )}
+        {sug.tipo === "existente" && (
+          <Button
+            size="sm"
+            className={compacto ? "w-full" : ""}
+            onClick={() => atribuir([l.artigo_id], sug.subempreitada_id)}
+          >
+            Aceitar sugestão
+          </Button>
+        )}
+        {seletor}
+        {sug.tipo !== "nenhuma" && (
+          <Button size="sm" variant="ghost" className={compacto ? "w-full" : ""} onClick={() => rejeitar(l)}>
+            Rejeitar sugestão
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   function sugestoesDe(l: LinhaRevisao) {
     return [l.subempreitada_ia_id, l.subempreitada_id].filter(Boolean) as string[];
   }
@@ -255,8 +310,14 @@ export function AReverPanel({
         <div className="sticky top-0 z-10 px-4 py-2 border-b bg-muted/70 backdrop-blur flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium">{selecao.size} selecionados</span>
           <div className="flex-1" />
+          {sugestaoComumSelecao ? (
+            <Button size="sm" disabled={aGuardar} onClick={() => aceitarNova([...selecao], sugestaoComumSelecao)}>
+              Aceitar «{sugestaoComumSelecao}» para {selecao.size} artigos
+            </Button>
+          ) : null}
           <AtribuirSubempreitadaPopover
             subempreitadas={subempreitadas}
+            onCriar={(nome) => aceitarNova([...selecao], nome)}
             onAtribuir={(id) => {
               setDestinoMassa(id);
               atribuir([...selecao], id);
@@ -292,7 +353,7 @@ export function AReverPanel({
               <th className="text-right p-2 w-24">Qtd.</th>
               <th className="text-left p-2 w-44">Sugestão da IA</th>
               <th className="text-left p-2 w-24">Confiança</th>
-              <th className="text-right p-2 w-44">Ação</th>
+              <th className="text-right p-2 w-56">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -325,16 +386,8 @@ export function AReverPanel({
                     {Math.round((l.confianca_ia ?? 0) * 100)}%
                   </Badge>
                 </td>
-                <td className="p-2 text-right">
-                  <AtribuirSubempreitadaPopover
-                    subempreitadas={subempreitadas}
-                    sugestoes={sugestoesDe(l)}
-                    onAtribuir={(id) => atribuir([l.artigo_id], id)}
-                  >
-                    <Button size="sm" variant="outline">
-                      Atribuir Subempreitada
-                    </Button>
-                  </AtribuirSubempreitadaPopover>
+                <td className="p-2">
+                  <Acoes l={l} />
                 </td>
               </tr>
             ))}
@@ -364,15 +417,10 @@ export function AReverPanel({
                 </div>
               </div>
             </div>
-            <AtribuirSubempreitadaPopover
-              subempreitadas={subempreitadas}
-              sugestoes={sugestoesDe(l)}
-              onAtribuir={(id) => atribuir([l.artigo_id], id)}
-            >
-              <Button size="sm" variant="outline" className="w-full">
-                Atribuir Subempreitada
-              </Button>
-            </AtribuirSubempreitadaPopover>
+            {l.sugestao_nova_subempreitada ? (
+              <div className="text-xs text-amber-600">Nova: {l.sugestao_nova_subempreitada}</div>
+            ) : null}
+            <Acoes l={l} compacto />
           </div>
         ))}
       </div>
