@@ -33,23 +33,6 @@ const sections: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
-    title: "Biblioteca Mestra",
-    items: [
-      { to: "/administracao/configuracao-ia/biblioteca-subempreitadas", label: "Explorador", icon: Library },
-      { to: "/administracao/configuracao-ia/biblioteca-subempreitadas/especialidades", label: "Especialidades", icon: BookMarked },
-      { to: "/administracao/configuracao-ia/biblioteca-subempreitadas/subespecialidades", label: "Subespecialidades", icon: Layers },
-      { to: "/administracao/configuracao-ia/biblioteca-subempreitadas/subempreitadas", label: "Subempreitadas", icon: Users },
-      
-      { to: "/administracao/configuracao-ia/biblioteca-subempreitadas/categorias", label: "Categorias", icon: Layers },
-      { to: "/administracao/configuracao-ia/biblioteca-subempreitadas/artigos", label: "Pesquisa de Artigos", icon: FileText },
-      { to: "/administracao/configuracao-ia/biblioteca-subempreitadas/keywords", label: "Palavras-chave", icon: Sparkles },
-      { to: "/administracao/configuracao-ia/biblioteca-subempreitadas/sistemas", label: "Sistemas Construtivos", icon: Layers },
-      { to: "/administracao/configuracao-ia/biblioteca-subempreitadas/unidades", label: "Unidades", icon: Layers },
-      { to: "/administracao/configuracao-ia/biblioteca-subempreitadas/templates", label: "Templates de Obra", icon: HardHat },
-      { to: "/administracao/configuracao-ia/biblioteca-subempreitadas/knowledge-builder", label: "Knowledge Builder", icon: Wand2 },
-    ],
-  },
-  {
     title: "Motor de Classificação",
     items: [
       { to: "/motor-classificacao", label: "Centro de Classificação", icon: Wand2 },
