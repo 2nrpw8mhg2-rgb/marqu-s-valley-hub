@@ -6,7 +6,6 @@ import {
   Users,
   Calculator,
   Layers,
-  ShoppingCart,
   Sparkles,
   LogOut,
   History,
@@ -58,12 +57,6 @@ export const sections: { title: string; items: NavItem[]; adminOnly?: boolean }[
     ],
   },
 
-  {
-    title: "Fase 3 — Procurement",
-    items: [
-      { to: "/procurement/pacotes", label: "Pacotes de Consulta", icon: ShoppingCart },
-    ],
-  },
   {
     title: "Próximas fases",
     items: [
